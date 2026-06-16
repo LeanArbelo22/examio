@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+:root {
+  /* Vinculamos la variable de Next.js con el set de fuentes de Tailwind */
+  --font-sans: var(--font-geist-sans);
+}
+
+body {
+  /* Nos aseguramos de que toda la app use Geist y suavice el renderizado de letras */
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  max-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ==========================================
+   CUSTOM SCROLLBAR GLOBAL (CSS PURO DIRECTO)
+   ========================================== */
+
+/* Configuración para navegadores basados en Webkit (Chrome, Brave, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px;  /* Ancho de la barra vertical */
+  height: 8px; /* Alto de la barra horizontal */
+}
+
+/* El fondo de la pista por donde corre la barra */
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+
+/* La barra arrastrable (Thumb) */
+::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1; /* Gris sutil en reposo (slate-300 nativo) */
+  border-radius: 9999px;     /* Bordes 100% circulares y orgánicos */
+  background-clip: padding-box; /* Reemplaza el border transparent para un renderizado perfecto */
+}
+
+/* Cuando el usuario pasa el mouse por encima de la barra */
+::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8; /* Gris más oscuro al hacer hover (slate-400 nativo) */
+}
+
+/* Soporte estándar moderno para Firefox */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
