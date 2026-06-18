@@ -34,14 +34,14 @@ API REST desarrollada en Express 5 + TypeScript 6 que abstrae la lógica de nego
                SQL Server (GestionExamio)
 ```
 
-| Componente                  | Rol                                                                                                                                 |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **Express 5**               | Enrutamiento y middleware. Soporta async/await nativo.                                                                              |
-| **TypeScript 6**            | Tipado estático estricto (`strict: true`). Compilación a `/dist` con `tsc`.                                                         |
-| **mssql 12**                | Driver TDS para SQL Server. `pool` es singleton. Soporta `sql.Transaction` para operaciones atómicas.                               |
-| **Zod 4**                   | Esquemas de validación en cada `POST`/`PUT`. El middleware `validateRequest` rechaza payloads inválidos con `400` + array `errors`. |
-| **jsonwebtoken + bcryptjs** | Autenticación stateless. `bcrypt.compare()` para contraseñas. JWT con payload `{ id, email, role }` y expiración de 1 hora.         |
-| **ts-jest + supertest**     | 138 tests de integración con mock completo de `mssql`. Sin dependencia de BD real.                                                  |
+| Componente                  | Rol                                                                                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Express 5**               | Enrutamiento y middleware. Soporta async/await nativo.                                                                                           |
+| **TypeScript 6**            | Tipado estático estricto (`strict: true`). Compilación a `/dist` con `tsc`.                                                                      |
+| **mssql 12**                | Driver TDS para SQL Server. `pool` es singleton. Soporta `sql.Transaction` para operaciones atómicas.                                            |
+| **Zod 4**                   | Esquemas de validación en cada `POST`/`PUT`. El middleware `validateRequest` rechaza payloads inválidos con `400` + array `errors`.              |
+| **jsonwebtoken + bcryptjs** | Autenticación stateless. `bcrypt.compare()` para contraseñas. JWT con payload `{ id, email, role, idAlumno, idDocente }` y expiración de 1 hora. |
+| **ts-jest + supertest**     | 145 tests de integración con mock completo de `mssql`. Sin dependencia de BD real.                                                               |
 
 ---
 
@@ -63,8 +63,8 @@ API REST desarrollada en Express 5 + TypeScript 6 que abstrae la lógica de nego
 PORT=55803
 DB_SERVER=localhost
 DB_PORT=1433
-DB_USER=********
-DB_PASSWORD=*********
+DB_USER=*****
+DB_PASSWORD=******
 DB_NAME=GestionExamio
 JWT_SECRET=c7a2e8f1d4b9a6c3f0e5d8b7a4c1f9e6d3b0a7c5f2e8d1b4a9c6f3e0d5b8a7
 ```
@@ -563,7 +563,7 @@ Cada endpoint detalla: método, ruta, esquema Zod que valida el body (si aplica)
 >
 > ⚠️ Cada opción lleva `fueSeleccionada: true/false` para que el Frontend pueda pintar directamente cuál fue marcada, sin cruzar arrays.
 >
-> \* `alumno` — solo puede acceder a su propio intento (validación por titularidad `IdAlumno` vs. `req.user.id`).
+> \* `alumno` — solo puede acceder a su propio intento (validación por titularidad `IdAlumno` vs. `req.user.idAlumno`).
 
 ```json
 {
@@ -592,7 +592,9 @@ Cada endpoint detalla: método, ruta, esquema Zod que valida el body (si aplica)
         "grupoConceptualmente": "SQL Básico",
         "respuesta": {
           "idRespuesta": 1,
-          "rtaTexto": null
+          "rtaTexto": null,
+          "esCorrecta": null,
+          "comentariosDocente": null
         },
         "opciones": [
           {
@@ -616,7 +618,9 @@ Cada endpoint detalla: método, ruta, esquema Zod que valida el body (si aplica)
         "grupoConceptualmente": "Diseño BD",
         "respuesta": {
           "idRespuesta": 2,
-          "rtaTexto": "Es un proceso para evitar redundancia"
+          "rtaTexto": "Es un proceso para evitar redundancia",
+          "esCorrecta": null,
+          "comentariosDocente": null
         },
         "opciones": []
       }
@@ -649,6 +653,26 @@ Cada endpoint detalla: método, ruta, esquema Zod que valida el body (si aplica)
 {
   "success": true,
   "message": "Nota asignada correctamente"
+}
+```
+
+**Body `PUT /api/intentos/:idIntento/preguntas/:idPregunta/corregir`:**
+
+> ⚠️ **Excepción a la regla PascalCase.** Este endpoint no pasa por un SP; el controlador consume los datos directamente. Las claves se envían en **camelCase** (mismo criterio que `CalificarSchema`).
+
+```json
+{
+  "esCorrecta": true,
+  "comentariosDocente": "Excelente respuesta, demuestra dominio del concepto."
+}
+```
+
+**Response `PUT /api/intentos/:idIntento/preguntas/:idPregunta/corregir`:**
+
+```json
+{
+  "success": true,
+  "message": "Respuesta corregida correctamente"
 }
 ```
 
@@ -794,76 +818,139 @@ Cada endpoint detalla: método, ruta, esquema Zod que valida el body (si aplica)
 
 ---
 
+### 4.13 Administración — Dashboard Analítico
+
+| Método | Endpoint                         | Zod | Roles   |
+| ------ | -------------------------------- | --- | ------- |
+| GET    | `/api/admin/dashboard/analitica` | —   | `admin` |
+
+**Query Params (todos opcionales):**
+
+| Parámetro           | Tipo     | Descripción          |
+| ------------------- | -------- | -------------------- |
+| `idCarrera`         | `number` | Filtrar por carrera  |
+| `idMateria`         | `number` | Filtrar por materia  |
+| `idMateriaDivision` | `number` | Filtrar por comisión |
+| `legajoDocente`     | `number` | Filtrar por docente  |
+| `matriculaAlumno`   | `number` | Filtrar por alumno   |
+
+**Response `GET /api/admin/dashboard/analitica`:**
+
+> Devuelve KPIs globales, listado de intentos y evaluaciones publicadas. Todos los filtros se aplican como `AND` en las consultas.
+
+```json
+{
+  "success": true,
+  "data": {
+    "kpis": {
+      "totalIntentos": 45,
+      "promedioGeneral": 6.75,
+      "tasaAprobacion": 68.89,
+      "totalAlertasFraude": 3
+    },
+    "intentos": [
+      {
+        "idIntento": 1,
+        "matricula": 30500,
+        "nombreAlumno": "Julieta Acosta",
+        "tituloEvaluacion": "Parcial I",
+        "comisionMateria": "1NMS",
+        "fechaInicio": "2026-06-15T10:00:00.000Z",
+        "estado": "entregado",
+        "notaFinal": 8.0,
+        "totalAlertas": 0
+      }
+    ],
+    "evaluaciones": [
+      {
+        "legajoDocente": 100542,
+        "nombreDocente": "Laura Fernandez",
+        "tituloEvaluacion": "Parcial I",
+        "nombreMateria": "Bases de Datos I",
+        "nombreDivision": "1NMS",
+        "fechaPublicacion": "2026-06-10T08:00:00.000Z",
+        "estado": "publicada",
+        "alumnosInscriptos": 25
+      }
+    ]
+  }
+}
+```
+
+---
+
 ## 5. Esquemas Zod — Detalle Completo
 
 ### 5.1 Tipos de Dato y Obligatoriedad
 
-| Esquema                  | Campo                     | Tipo Zod                                     | Obligatorio   |
-| ------------------------ | ------------------------- | -------------------------------------------- | ------------- |
-| `LoginSchema`            | `Email`                   | `z.string().email().max(150)`                | Sí            |
-|                          | `Password`                | `z.string().min(1)`                          | Sí            |
-| `AlumnoSchema`           | `Matricula`               | `z.number().int()`                           | Sí            |
-|                          | `Nombre`                  | `z.string()`                                 | Sí            |
-|                          | `Apellido`                | `z.string()`                                 | Sí            |
-|                          | `Cuil`                    | `z.string()`                                 | No            |
-|                          | `Correo`                  | `z.string().email()`                         | Sí            |
-| `DocenteSchema`          | `Legajo`                  | `z.number().int()`                           | Sí            |
-|                          | `Nombre`                  | `z.string()`                                 | Sí            |
-|                          | `Apellido`                | `z.string()`                                 | Sí            |
-|                          | `Cuil`                    | `z.string()`                                 | No            |
-|                          | `Correo`                  | `z.string().email()`                         | Sí            |
-| `CarreraSchema`          | `Nombre`                  | `z.string()`                                 | Sí            |
-|                          | `Descripcion`             | `z.string()`                                 | No            |
-|                          | `DuracionSemestres`       | `z.number().int()`                           | No            |
-| `MateriaSchema`          | `Nombre`                  | `z.string()`                                 | Sí            |
-|                          | `Semestre`                | `z.number().int()`                           | No            |
-|                          | `IdCarrera`               | `z.number().int()`                           | Sí            |
-| `DivisionSchema`         | `Descripcion`             | `z.string()`                                 | Sí            |
-| `ActaSchema`             | `IdMateriaDivision`       | `z.number().int()`                           | Sí            |
-|                          | `Libro`                   | `z.string()`                                 | Sí            |
-|                          | `Folio`                   | `z.string()`                                 | Sí            |
-| `DetalleActaSchema`      | `IdActa`                  | `z.number().int()`                           | Sí            |
-|                          | `IdAlumno`                | `z.number().int()`                           | Sí            |
-|                          | `NotaCursada`             | `z.number()`                                 | Sí            |
-|                          | `NotaFinalExamen`         | `z.number()`                                 | No (nullable) |
-|                          | `CondicionFinal`          | `z.enum([...])`                              | Sí            |
-| `ActividadSchema`        | `Titulo`                  | `z.string()`                                 | Sí            |
-|                          | `Descripcion`             | `z.string()`                                 | No            |
-|                          | `Tipo`                    | `z.enum([...])`                              | Sí            |
-|                          | `CantidadIntentosMaximos` | `z.number().int()`                           | Sí            |
-|                          | `DuracionMinutos`         | `z.number().int()`                           | Sí (nullable) |
-|                          | `RecursosPermitidos`      | `z.string()`                                 | No            |
-|                          | `IdMateriaDivision`       | `z.number().int()`                           | Sí            |
-|                          | `FechaInicio`             | `z.string().datetime()`                      | Sí            |
-|                          | `FechaFin`                | `z.string().datetime()`                      | Sí            |
-|                          | `GruposPreguntas`         | `z.array(GrupoPreguntaSchema)`               | Sí            |
-| `IniciarExamenSchema`    | `IdPublicacion`           | `z.number().int()`                           | Sí            |
-|                          | `IdAlumno`                | `z.number().int()`                           | Sí            |
-| `GuardarRespuestaSchema` | `IdIntento`               | `z.number().int()`                           | Sí            |
-|                          | `IdPregunta`              | `z.number().int()`                           | Sí            |
-|                          | `IdOpcionNueva`           | `z.number().int()`                           | No (nullable) |
-|                          | `RtaTexto`                | `z.string()`                                 | No (nullable) |
-| `AsignarDivisionSchema`  | `Id`                      | `z.number().int()`                           | Sí            |
-| `AsignarComisionSchema`  | `IdMateriaDivision`       | `z.number().int()`                           | Sí            |
-| `AlertaSchema`           | `IdIntento`               | `z.number().int()`                           | Sí            |
-|                          | `TipoIncidente`           | `z.string()`                                 | Sí            |
-|                          | `Detalle`                 | `z.string()`                                 | No            |
-| `NavegacionSchema`       | `IdIntento`               | `z.number().int()`                           | Sí            |
-|                          | `IdPregunta`              | `z.number().int()`                           | Sí            |
-|                          | `SegundosPermanencia`     | `z.number().int()`                           | Sí            |
-| `CalificarSchema`        | `notaFinal`               | `z.number().min(0).max(10).multipleOf(0.01)` | Sí            |
-| `UsuarioSchema`          | `Email`                   | `z.string().email()`                         | Sí            |
-|                          | `Password`                | `z.string()`                                 | Sí            |
-|                          | `Rol`                     | `z.enum([...])`                              | Sí            |
-|                          | `IdDocente`               | `z.number().int()`                           | No (nullable) |
-|                          | `IdAlumno`                | `z.number().int()`                           | No (nullable) |
-|                          | `Activo`                  | `z.boolean()`                                | No            |
-| `UsuarioUpdateSchema`    | `Email`                   | `z.string().email()`                         | No            |
-|                          | `Password`                | `z.string()`                                 | No            |
-|                          | `Rol`                     | `z.enum([...])`                              | No            |
-|                          | `IdDocente`               | `z.number().int()`                           | No (nullable) |
-|                          | `IdAlumno`                | `z.number().int()`                           | No (nullable) |
-|                          | `Activo`                  | `z.boolean()`                                | No            |
+| Esquema                   | Campo                     | Tipo Zod                                     | Obligatorio         |
+| ------------------------- | ------------------------- | -------------------------------------------- | ------------------- |
+| `LoginSchema`             | `Email`                   | `z.string().email().max(150)`                | Sí                  |
+|                           | `Password`                | `z.string().min(1)`                          | Sí                  |
+| `AlumnoSchema`            | `Matricula`               | `z.number().int()`                           | Sí                  |
+|                           | `Nombre`                  | `z.string()`                                 | Sí                  |
+|                           | `Apellido`                | `z.string()`                                 | Sí                  |
+|                           | `Cuil`                    | `z.string()`                                 | No                  |
+|                           | `Correo`                  | `z.string().email()`                         | Sí                  |
+| `DocenteSchema`           | `Legajo`                  | `z.number().int()`                           | Sí                  |
+|                           | `Nombre`                  | `z.string()`                                 | Sí                  |
+|                           | `Apellido`                | `z.string()`                                 | Sí                  |
+|                           | `Cuil`                    | `z.string()`                                 | No                  |
+|                           | `Correo`                  | `z.string().email()`                         | Sí                  |
+| `CarreraSchema`           | `Nombre`                  | `z.string()`                                 | Sí                  |
+|                           | `Descripcion`             | `z.string()`                                 | No                  |
+|                           | `DuracionSemestres`       | `z.number().int()`                           | No                  |
+| `MateriaSchema`           | `Nombre`                  | `z.string()`                                 | Sí                  |
+|                           | `Semestre`                | `z.number().int()`                           | No                  |
+|                           | `IdCarrera`               | `z.number().int()`                           | Sí                  |
+| `DivisionSchema`          | `Descripcion`             | `z.string()`                                 | Sí                  |
+| `ActaSchema`              | `IdMateriaDivision`       | `z.number().int()`                           | Sí                  |
+|                           | `Libro`                   | `z.string()`                                 | Sí                  |
+|                           | `Folio`                   | `z.string()`                                 | Sí                  |
+| `DetalleActaSchema`       | `IdActa`                  | `z.number().int()`                           | Sí                  |
+|                           | `IdAlumno`                | `z.number().int()`                           | Sí                  |
+|                           | `NotaCursada`             | `z.number()`                                 | Sí                  |
+|                           | `NotaFinalExamen`         | `z.number()`                                 | No (nullable)       |
+|                           | `CondicionFinal`          | `z.enum([...])`                              | Sí                  |
+| `ActividadSchema`         | `Titulo`                  | `z.string()`                                 | Sí                  |
+|                           | `Descripcion`             | `z.string()`                                 | No                  |
+|                           | `Tipo`                    | `z.enum([...])`                              | Sí                  |
+|                           | `CantidadIntentosMaximos` | `z.number().int()`                           | Sí                  |
+|                           | `DuracionMinutos`         | `z.number().int()`                           | Sí (nullable)       |
+|                           | `RecursosPermitidos`      | `z.string()`                                 | No                  |
+|                           | `IdMateriaDivision`       | `z.number().int()`                           | Sí                  |
+|                           | `FechaInicio`             | `z.string().datetime()`                      | Sí                  |
+|                           | `FechaFin`                | `z.string().datetime()`                      | Sí                  |
+|                           | `GruposPreguntas`         | `z.array(GrupoPreguntaSchema)`               | Sí                  |
+| `IniciarExamenSchema`     | `IdPublicacion`           | `z.number().int()`                           | Sí                  |
+|                           | `IdAlumno`                | `z.number().int()`                           | Sí                  |
+| `GuardarRespuestaSchema`  | `IdIntento`               | `z.number().int()`                           | Sí                  |
+|                           | `IdPregunta`              | `z.number().int()`                           | Sí                  |
+|                           | `IdOpcionNueva`           | `z.number().int()`                           | No (nullable)       |
+|                           | `RtaTexto`                | `z.string()`                                 | No (nullable)       |
+| `AsignarDivisionSchema`   | `Id`                      | `z.number().int()`                           | Sí                  |
+| `AsignarComisionSchema`   | `IdMateriaDivision`       | `z.number().int()`                           | Sí                  |
+| `AlertaSchema`            | `IdIntento`               | `z.number().int()`                           | Sí                  |
+|                           | `TipoIncidente`           | `z.string()`                                 | Sí                  |
+|                           | `Detalle`                 | `z.string()`                                 | No                  |
+| `NavegacionSchema`        | `IdIntento`               | `z.number().int()`                           | Sí                  |
+|                           | `IdPregunta`              | `z.number().int()`                           | Sí                  |
+|                           | `SegundosPermanencia`     | `z.number().int()`                           | Sí                  |
+| `CalificarSchema`         | `notaFinal`               | `z.number().min(0).max(10).multipleOf(0.01)` | Sí                  |
+| `CorregirRespuestaSchema` | `esCorrecta`              | `z.boolean().nullable()`                     | No (puede ser null) |
+|                           | `comentariosDocente`      | `z.string().nullable().optional()`           | No                  |
+| `UsuarioSchema`           | `Email`                   | `z.string().email()`                         | Sí                  |
+|                           | `Password`                | `z.string()`                                 | Sí                  |
+|                           | `Rol`                     | `z.enum([...])`                              | Sí                  |
+|                           | `IdDocente`               | `z.number().int()`                           | No (nullable)       |
+|                           | `IdAlumno`                | `z.number().int()`                           | No (nullable)       |
+|                           | `Activo`                  | `z.boolean()`                                | No                  |
+| `UsuarioUpdateSchema`     | `Email`                   | `z.string().email()`                         | No                  |
+|                           | `Password`                | `z.string()`                                 | No                  |
+|                           | `Rol`                     | `z.enum([...])`                              | No                  |
+|                           | `IdDocente`               | `z.number().int()`                           | No (nullable)       |
+|                           | `IdAlumno`                | `z.number().int()`                           | No (nullable)       |
+|                           | `Activo`                  | `z.boolean()`                                | No                  |
 
 ### 5.2 Restricciones de Longitud (`.max()`)
 
@@ -894,6 +981,7 @@ Cada endpoint detalla: método, ruta, esquema Zod que valida el body (si aplica)
 | `GrupoPreguntaSchema` (anidado) | `TituloReferencia`   | 150                               |
 | `UsuarioSchema`                 | `Email`              | 150                               |
 | `CalificarSchema`               | `notaFinal`          | `min(0).max(10).multipleOf(0.01)` |
+| `CorregirRespuestaSchema`       | `comentariosDocente` | Sin restricción (NVARCHAR(MAX))   |
 
 ### 5.3 Enumeraciones (`z.enum()`)
 
@@ -912,8 +1000,8 @@ Cada endpoint detalla: método, ruta, esquema Zod que valida el body (si aplica)
 
 ```bash
 npm install         # Una sola vez
-npm test            # Suite completa (138 tests)
-npx jest --verbose  # Reporte detallado (138 tests)
+npm test            # Suite completa (145 tests)
+npx jest --verbose  # Reporte detallado (145 tests)
 npx jest tests/auth.test.ts  # Archivo específico
 npx jest -t "carreras"       # Por patrón de nombre
 ```
@@ -924,10 +1012,11 @@ npx jest -t "carreras"       # Por patrón de nombre
 tests/
 ├── mocks/
 │   └── db.ts               ← Fábrica de mock de mssql
+├── admin.test.ts           ← Dashboard analítico + KPIs + filtros + RBAC (5)
 ├── auth.test.ts            ← Login, bcrypt, JWT (4)
 ├── alumnos.test.ts         ← CRUD Alumnos + camelCase + estadísticas (13)
 ├── evaluaciones.test.ts    ← Evaluaciones + preguntas + detalle + alumnos (19)
-├── intentos.test.ts        ← Intentos + getIntentoCompleto + calificar + detallados + historial (26)
+├── intentos.test.ts        ← Intentos + getIntentoCompleto + calificar + corregir + detallados + historial (28)
 ├── academico.test.ts       ← Carreras, Materias, Docentes (41)
 ├── actas.test.ts           ← Actas, Detalle, decimales (15)
 └── rbac.test.ts            ← checkRole, JWT, roles (20)
@@ -952,7 +1041,13 @@ const reqBuilder = mock.pool.request();
 ```typescript
 process.env.JWT_SECRET = "test-secret-key";
 adminToken = jwt.sign(
-  { id: 1, email: "admin@test.com", role: "admin" },
+  {
+    id: 1,
+    email: "admin@test.com",
+    role: "admin",
+    idAlumno: null,
+    idDocente: null,
+  },
   process.env.JWT_SECRET,
 );
 ```
@@ -966,3 +1061,40 @@ adminToken = jwt.sign(
 | `npm run dev`   | Servidor con `ts-node-dev` (recarga automática). |
 | `npm run build` | Compilación TypeScript → `/dist`.                |
 | `npm test`      | Suite de tests con Jest.                         |
+
+---
+
+## 8. Errores Conocidos y Deuda Técnica
+
+### 8.1 Auth — Login sin validación Zod
+
+**Archivo:** `src/routes/auth.routes.ts:6`
+
+El endpoint `POST /api/auth/login` está documentado con `LoginSchema` pero la ruta no incluye el middleware `validateRequest(LoginSchema)`. Actualmente el controlador recibe `req.body` sin prevalidación.
+
+**Impacto:** Endpoint público acepta payloads mal formados sin rechazarlos en la capa HTTP.
+
+**Fix pendiente:**
+
+```typescript
+// src/routes/auth.routes.ts
+import { validateRequest } from "../middlewares/auth.middleware";
+import { LoginSchema } from "../schemas/academico.schema";
+
+router.post("/login", validateRequest(LoginSchema), login);
+```
+
+---
+
+### 8.2 Docentes — SP duplicado en comisiones y materias
+
+**Archivo:** `src/controllers/docentes.controller.ts:81-134`
+
+| Endpoint                               | Controlador              | SP que llama             |
+| -------------------------------------- | ------------------------ | ------------------------ |
+| `GET /api/docentes/:legajo/comisiones` | `getComisionesByDocente` | `SP_Docente_VerMaterias` |
+| `GET /api/docentes/:legajo/materias`   | `getMateriasByDocente`   | `SP_Docente_VerMaterias` |
+
+Ambos endpoints ejecutan el mismo SP (`SP_Docente_VerMaterias`), por lo que devuelven datos idénticos. Es un error por copy-paste. `getMateriasByDocente` debería llamar a un SP diferente (ej. `SP_Docente_ObtenerMaterias`) o ejecutar una query directa que retorne solo las materias del docente.
+
+**Fix pendiente:** Corregir `getMateriasByDocente` para que consulte datos de materias (no comisiones).

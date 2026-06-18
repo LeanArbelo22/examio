@@ -690,6 +690,46 @@ export interface CargarDetalleActaPayload {
   CondicionFinal: CondicionFinal;
 }
 
+// ============================================================
+// ADMIN — Dashboard Analítico
+// ============================================================
+
+export interface AdminAnalyticsKPIs {
+  totalIntentos: number;
+  promedioGeneral: number;
+  tasaAprobacion: number;
+  totalAlertasFraude: number;
+}
+
+export interface AdminIntentoItem {
+  idIntento: number;
+  matricula: number;
+  nombreAlumno: string;
+  tituloEvaluacion: string;
+  comisionMateria: string;
+  fechaInicio: string;
+  estado: string;
+  notaFinal: number;
+  totalAlertas: number;
+}
+
+export interface AdminEvaluacionItem {
+  legajoDocente: number;
+  nombreDocente: string;
+  tituloEvaluacion: string;
+  nombreMateria: string;
+  nombreDivision: string;
+  fechaPublicacion: string;
+  estado: string;
+  alumnosInscriptos: number;
+}
+
+export interface AdminAnalyticsResponse {
+  kpis: AdminAnalyticsKPIs;
+  intentos: AdminIntentoItem[];
+  evaluaciones: AdminEvaluacionItem[];
+}
+
 // --- Telemetría ---
 export interface AlertaPayload {
   IdIntento: number;

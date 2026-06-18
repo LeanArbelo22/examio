@@ -27,6 +27,16 @@ interface PreguntaEstructura {
   variantes: Variante[];
 }
 
+function TrashIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+
 export default function CrearExamenPage() {
   const router = useRouter();
   const { types, securityMeasures } = examCategoriesMock;
@@ -53,7 +63,7 @@ export default function CrearExamenPage() {
   const [preguntas, setPreguntas] = useState<PreguntaEstructura[]>([
     {
       id: 1,
-      tituloReferencia: "Eje conceptual 1 (Ej: Derivadas)",
+      tituloReferencia: "Grupo o eje conceptual 1 (Ej: Derivadas)",
       variantes: [
         {
           id: "v1",
@@ -97,6 +107,47 @@ export default function CrearExamenPage() {
                   opciones: [],
                 },
               ],
+            }
+          : p,
+      ),
+    );
+  };
+
+  const handleRemoveGrupo = (preguntaId: number) => {
+    setPreguntas((prev) => prev.filter((p) => p.id !== preguntaId));
+  };
+
+  const handleRemoveVariante = (preguntaId: number, varianteId: string) => {
+    setPreguntas((prev) =>
+      prev.map((p) =>
+        p.id === preguntaId
+          ? {
+              ...p,
+              variantes: p.variantes.filter((v) => v.id !== varianteId),
+            }
+          : p,
+      ),
+    );
+  };
+
+  const handleRemoveOpcion = (
+    preguntaId: number,
+    varianteId: string,
+    opcionIdx: number,
+  ) => {
+    setPreguntas((prev) =>
+      prev.map((p) =>
+        p.id === preguntaId
+          ? {
+              ...p,
+              variantes: p.variantes.map((v) =>
+                v.id === varianteId
+                  ? {
+                      ...v,
+                      opciones: v.opciones?.filter((_, idx) => idx !== opcionIdx),
+                    }
+                  : v,
+              ),
             }
           : p,
       ),
@@ -269,9 +320,17 @@ export default function CrearExamenPage() {
       errores.push("La cantidad máxima de intentos debe ser un número entero mayor o igual a 1.");
     }
 
+    if (preguntas.length === 0) {
+      errores.push("El examen debe contener al menos un Grupo de Preguntas estructural.");
+    }
+
     preguntas.forEach((p, pi) => {
       if (!p.tituloReferencia || !p.tituloReferencia.trim()) {
         errores.push(`Pregunta ${pi + 1}: el eje conceptual no puede estar vacío.`);
+      }
+
+      if (p.variantes.length === 0) {
+        errores.push(`Grupo estructural "${p.tituloReferencia || pi + 1}": debe contener al menos una variante de pregunta.`);
       }
 
       p.variantes.forEach((v, vi) => {
@@ -313,7 +372,7 @@ export default function CrearExamenPage() {
     }
 
     const payload: GuardarEvaluacionPayload = {
-      Titulo: selectedFormat === "mixed" ? "Evaluación Mixta Adaptativa" : `Evaluación de tipo ${selectedFormat}`,
+      Titulo: selectedFormat === "mixed" ? `Evaluación Mixta: ${idMateriaDivision}` : `Evaluación de tipo ${selectedFormat}`,
       Descripcion: "Creado desde el configurador avanzado de cátedras de EXAMIO.",
       Tipo: "evaluacion",
       CantidadIntentosMaximos: Number(cantidadIntentos) || 1,
@@ -360,7 +419,7 @@ export default function CrearExamenPage() {
             Configurar Nueva Evaluación
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Diseño adaptativo de consignas dinámicas con banco de reactivos.
+            Diseño de consignas aleatorias con banco de preguntas.
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -375,7 +434,7 @@ export default function CrearExamenPage() {
             disabled={isPending || preguntas.some((p) => p.variantes.some((v) => !v.enunciado))}
             className="bg-indigo-600 text-white px-5 py-2.5 text-xs font-bold rounded-xl hover:bg-indigo-700 shadow-sm transition-all disabled:opacity-50"
           >
-            {isPending ? "Persistiendo en SQL..." : "Guardar y Publicar Examen"}
+            {isPending ? "Guardando..." : "Guardar y Publicar Examen"}
           </Button>
         </div>
       </div>
@@ -384,7 +443,7 @@ export default function CrearExamenPage() {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5 mb-4">
-              🎛️ Formato Predominante del Examen
+              🎛️ Formato del examen
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {types.map((type) => {
@@ -438,9 +497,14 @@ export default function CrearExamenPage() {
                     className="bg-transparent font-bold text-sm text-slate-800 border-none focus:outline-none focus:ring-1 focus:ring-indigo-200 px-2 py-0.5 rounded w-2/3"
                     required
                   />
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
-                    Pregunta {p.id}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
+                      Pregunta {p.id}
+                    </span>
+                    <button type="button" onClick={() => handleRemoveGrupo(p.id)} className="text-slate-400 hover:text-red-500 p-1">
+                      <TrashIcon />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-4 pt-2">
@@ -453,23 +517,28 @@ export default function CrearExamenPage() {
                         <span className="text-xs font-bold text-slate-400">
                           Variante Alternativa {idx + 1} (Aleatoria)
                         </span>
-                        <select
-                          value={variante.tipo}
-                          onChange={(e) =>
-                            handleModificarTipo(
-                              p.id,
-                              variante.id,
-                              e.target.value,
-                            )
-                          }
-                          className="text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-500"
-                        >
-                          <option value="mc">Multiple Choice</option>
-                          <option value="abierta">
-                            A Desarrollar / Ensayo
-                          </option>
-                          <option value="code">Programación / SQL</option>
-                        </select>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={variante.tipo}
+                            onChange={(e) =>
+                              handleModificarTipo(
+                                p.id,
+                                variante.id,
+                                e.target.value,
+                              )
+                            }
+                            className="text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-500"
+                          >
+                            <option value="mc">Multiple Choice</option>
+                            <option value="abierta">
+                              A Desarrollar / Ensayo
+                            </option>
+                            <option value="code">Programación / SQL</option>
+                          </select>
+                          <button type="button" onClick={() => handleRemoveVariante(p.id, variante.id)} className="text-slate-400 hover:text-red-500 p-1">
+                            <TrashIcon />
+                          </button>
+                        </div>
                       </div>
                       <textarea
                         rows={2}
@@ -538,6 +607,9 @@ export default function CrearExamenPage() {
                                 className="block w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-200 text-slate-700 font-medium"
                                 required
                               />
+                              <button type="button" onClick={() => handleRemoveOpcion(p.id, variante.id, opIdx)} className="text-slate-400 hover:text-red-500 p-1">
+                                <TrashIcon />
+                              </button>
                             </div>
                           ))}
                         </div>
@@ -583,9 +655,120 @@ export default function CrearExamenPage() {
         </div>
 
         <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5">
+              ⏳ Tiempo
+            </h3>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                Límite por Intento
+              </label>
+              <div className="relative rounded-xl shadow-sm">
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Ej: 90"
+                    value={duracionMinutos}
+                    onChange={(e) => setDuracionMinutos(e.target.value)}
+                    onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                    className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all"
+                  />
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
+                  <span className="text-xs font-bold text-slate-400">min</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5">
+              🔄 Intentos
+            </h3>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                Cantidad Máxima Permitida
+              </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={cantidadIntentos}
+                  onChange={(e) => setCantidadIntentos(e.target.value)}
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                  className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all text-slate-800 font-medium"
+                  required
+                />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5">
+              📅 Disponibilidad
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                  Fecha de Apertura
+                </label>
+                <input
+                  type="datetime-local"
+                  value={fechaInicio}
+                  onChange={(e) => setFechaInicio(e.target.value)}
+                  className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-600 font-medium focus:outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                  Fecha de Cierre
+                </label>
+                <input
+                  type="datetime-local"
+                  value={fechaFin}
+                  onChange={(e) => setFechaFin(e.target.value)}
+                  className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-600 font-medium focus:outline-none"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5">
+              🏫 Catedra
+            </h3>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                Asignar a Comisión
+              </label>
+              <select
+                value={idMateriaDivision}
+                onChange={(e) => {
+                  console.log("🔍 select onChange:", { value: e.target.value, type: typeof e.target.value });
+                  setIdMateriaDivision(e.target.value);
+                }}
+                disabled={cargandoComisiones || !comisiones || comisiones.length === 0}
+                className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all text-slate-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                required
+              >
+                <option value="" disabled key="default">
+                  {cargandoComisiones
+                    ? "Cargando tus comisiones..."
+                    : !comisiones || comisiones.length === 0
+                      ? "No tienes comisiones asignadas"
+                      : "Seleccioná una comisión..."}
+                </option>
+                {comisiones?.map((com: any, idx: number) => (
+                  <option key={com.idComision ?? `fallback-${idx}`} value={com.idComision}>
+                    {com.nombreMateria} — {com.division}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5 mb-4">
-              🛡️ Protocolo Antifraude
+              🛡️ SEGURIDAD
             </h3>
             <div className="space-y-4">
               {securityMeasures.map((measure) => {
@@ -618,118 +801,6 @@ export default function CrearExamenPage() {
                   </div>
                 );
               })}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5">
-              ⏳ Parámetros de Tiempo
-            </h3>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                Límite por Intento
-              </label>
-              <div className="relative rounded-xl shadow-sm">
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Ej: 90"
-                    value={duracionMinutos}
-                    onChange={(e) => setDuracionMinutos(e.target.value)}
-                    onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                    className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all"
-                  />
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
-                  <span className="text-xs font-bold text-slate-400">min</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5">
-              🔄 Regulación de Intentos
-            </h3>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                Cantidad Máxima Permitida
-              </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={cantidadIntentos}
-                  onChange={(e) => setCantidadIntentos(e.target.value)}
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all text-slate-800 font-medium"
-                  required
-                />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5">
-              📅 Calendario de Disponibilidad
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                  Fecha de Apertura
-                </label>
-                <input
-                  type="datetime-local"
-                  value={fechaInicio}
-                  onChange={(e) => setFechaInicio(e.target.value)}
-                  className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-600 font-medium focus:outline-none"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                  Fecha de Cierre
-                </label>
-                <input
-                  type="datetime-local"
-                  value={fechaFin}
-                  onChange={(e) => setFechaFin(e.target.value)}
-                  className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-600 font-medium focus:outline-none"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5">
-              🏫 Comisión de Destino
-            </h3>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                Publicar en Cátedra
-              </label>
-              <select
-                value={idMateriaDivision}
-                onChange={(e) => {
-                  console.log("🔍 select onChange:", { value: e.target.value, type: typeof e.target.value });
-                  setIdMateriaDivision(e.target.value);
-                }}
-                disabled={cargandoComisiones || !comisiones || comisiones.length === 0}
-                className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all text-slate-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                required
-              >
-                <option value="" disabled key="default">
-                  {cargandoComisiones
-                    ? "Cargando tus comisiones..."
-                    : !comisiones || comisiones.length === 0
-                      ? "No tienes comisiones asignadas"
-                      : "Seleccioná una comisión..."}
-                </option>
-                {comisiones?.map((com: any, idx: number) => (
-                  <option key={com.idComision ?? `fallback-${idx}`} value={com.idComision}>
-                    {com.nombreMateria} — {com.division}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
         </div>

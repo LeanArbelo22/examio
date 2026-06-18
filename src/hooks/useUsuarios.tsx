@@ -4,7 +4,7 @@ import {
   crearUsuario,
   updateUsuario,
   deleteUsuario,
-} from "@/services/api/usuarios.service";
+} from "@/services/api/usuarios.api";
 import type { CreateUsuarioPayload, UpdateUsuarioPayload } from "@/types/index";
 
 export const useGetUsuarios = () => {

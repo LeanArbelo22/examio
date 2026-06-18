@@ -161,16 +161,16 @@ export const professorDashboardData: ProfessorDashboard = {
 
 export const examCategoriesMock = {
   types: [
-    { id: "mixed", title: "Examen Mixto / Combinado", icon: "🧬", desc: "Permite combinar múltiples tipos de preguntas en la misma evaluación." },
-    { id: "choice", title: "Múltiple Option", icon: "📋", desc: "Opciones fijas con única respuesta correcta." },
-    { id: "text", title: "Pregunta a Desarrollar", icon: "✍️", desc: "Campo de texto libre para respuestas redactadas o ensayos." },
-    { id: "code", title: "Programación / SQL", icon: "💻", desc: "Consola integrada para evaluar lógica de código." }
+    { id: "mixed", title: "Examen mixto", icon: "🧬", desc: "Permite combinar múltiples tipos de preguntas en la misma evaluación." },
+    { id: "choice", title: "Múltiple Opción", icon: "📋", desc: "Opciones fijas con única respuesta correcta." },
+    { id: "text", title: "A desarrollar", icon: "✍️", desc: "Campo de texto libre para respuestas redactadas o ensayos." },
+    { id: "code", title: "Programación", icon: "💻", desc: "Consola integrada para evaluar lógica de código." }
   ],
   securityMeasures: [
-    { id: "fullscreen", label: "Pantalla Completa Obligatoria", desc: "Gatilla el entorno bloqueado. Salir anula el intento.", default: true },
-    { id: "clipboard", label: "Bloquear Portapapeles", desc: "Deshabilita copiar enunciados o pegar respuestas.", default: true },
-    { id: "random_order", label: "Orden Aleatorio de Preguntas", desc: "Altera el orden de las preguntas para cada alumno.", default: true },
-    { id: "random_variants", label: "Variantes Aleatorias por Pregunta", desc: "Selecciona una consigna distinta al azar de un grupo de variantes.", default: true }
+    { id: "fullscreen", label: "Pantalla completa obligatoria", desc: "Entorno bloqueado. Salir anula el intento.", default: true },
+    { id: "clipboard", label: "Bloquear portapapeles", desc: "Deshabilita copiar enunciados o pegar respuestas.", default: true },
+    { id: "random_order", label: "Orden aleatorio de preguntas", desc: "Altera el orden de las preguntas para cada alumno.", default: true },
+    { id: "random_variants", label: "Variantes aleatorias por pregunta", desc: "Selecciona una consigna distinta al azar de un grupo de variantes.", default: true }
   ]
 };
 

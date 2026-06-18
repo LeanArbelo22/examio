@@ -68,6 +68,13 @@ export default function InstitucionPage() {
       accentColor: "bg-blue-50 text-blue-700 border-blue-100",
     },
     {
+      title: "Rendimiento Institucional",
+      description: "KPIs globales, análisis de intentos y evaluaciones por carrera, materia y comisión.",
+      icon: "📉",
+      href: "/admin/analitica",
+      accentColor: "bg-indigo-50 text-indigo-700 border-indigo-100",
+    },
+    {
       title: "Métricas Avanzadas",
       description: "Análisis cruzado de rendimiento pedagógico de docentes y carreras.",
       icon: "📈",
