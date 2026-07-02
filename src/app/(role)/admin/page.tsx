@@ -10,7 +10,7 @@ export default function InstitucionPage() {
   const entidadesOperativas = [
     {
       title: "Carreras",
-      description: "Alta, planes de estudio y esquemas curriculares.",
+      description: "Alta, planes de estudio y alumnos.",
       icon: "📜",
       href: "/admin/carreras",
       accentColor: "bg-amber-50 text-amber-700 border-amber-100",
@@ -18,7 +18,7 @@ export default function InstitucionPage() {
     },
     {
       title: "Materias",
-      description: "Asignación de cátedras, contenidos y configuraciones base.",
+      description: "Alta de materias, asignación de comisiones y configuraciones base.",
       icon: "📚",
       href: "/admin/materias", // Corregido el path absoluto
       accentColor: "bg-red-50 text-red-700 border-red-100",
@@ -34,7 +34,7 @@ export default function InstitucionPage() {
     },
     {
       title: "Cuerpo Docente",
-      description: "Auditoría de legajos, asignación a exámenes y reportes de corrección.",
+      description: "Alta y modificación de legajos docentes.",
       icon: "👨‍🏫",
       href: "/admin/docentes",
       accentColor: "bg-indigo-50 text-indigo-700 border-indigo-100",
@@ -42,7 +42,7 @@ export default function InstitucionPage() {
     },
     {
       title: "Alumnos",
-      description: "Matriculación masiva, historial de cursado y control de fraudes.",
+      description: "Matriculación, cursado y control.",
       icon: "🧑‍🎓",
       href: "/admin/alumnos",
       accentColor: "bg-emerald-50 text-emerald-700 border-emerald-100",
@@ -60,13 +60,13 @@ export default function InstitucionPage() {
 
   // Opciones analíticas transversales globales
   const herramientasAnaliticas = [
-    {
+    /* {
       title: "Resultados y Actas",
       description: "Visualización, auditoría y firmas digitales de calificaciones finales.",
       icon: "📊",
       href: "/admin/resultados",
       accentColor: "bg-blue-50 text-blue-700 border-blue-100",
-    },
+    }, */
     {
       title: "Rendimiento Institucional",
       description: "KPIs globales, análisis de intentos y evaluaciones por carrera, materia y comisión.",
@@ -74,7 +74,7 @@ export default function InstitucionPage() {
       href: "/admin/analitica",
       accentColor: "bg-indigo-50 text-indigo-700 border-indigo-100",
     },
-    {
+    /* {
       title: "Métricas Avanzadas",
       description: "Análisis cruzado de rendimiento pedagógico de docentes y carreras.",
       icon: "📈",
@@ -87,7 +87,7 @@ export default function InstitucionPage() {
       icon: "⚙️",
       href: "/admin/configuracion",
       accentColor: "bg-slate-100 text-slate-700 border-slate-200",
-    },
+    }, */
   ];
 
   return (
@@ -96,7 +96,7 @@ export default function InstitucionPage() {
       {/* SECCIÓN 1: Cabecera Ejecutiva e Identificación */}
       <div className="flex items-center justify-between border-b border-slate-200/60 pb-3 mb-2">
         <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-          Métricas de Gestión Global
+          Gestión Global
         </h2>
         
         {/* El identificador de la institución sube acá de forma minimalista */}
@@ -106,7 +106,7 @@ export default function InstitucionPage() {
       </div>
 
       {/* SECCIÓN 2: Micro KPIs de Rendimiento General */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_2px_4px_rgba(0,0,0,0.005)]">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Matrícula Total Viva</p>
           <p className="text-2xl font-black text-slate-800 tracking-tight mt-1">{globalKPIs.alumnosActivos} Alumnos</p>
@@ -116,10 +116,10 @@ export default function InstitucionPage() {
           <p className="text-2xl font-black text-indigo-600 tracking-tight mt-1">{globalKPIs.promedioGeneralInstitucional.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_2px_4px_rgba(0,0,0,0.005)] col-span-2 lg:col-span-1">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Efectividad Antifraude (Foco)</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Efectividad</p>
           <p className="text-2xl font-black text-emerald-600 tracking-tight mt-1">99.8% Estable</p>
         </div>
-      </div>
+      </div> */}
 
       {/* SECCIÓN 3: Grillas de Trabajo Asimétricas */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
@@ -154,7 +154,7 @@ export default function InstitucionPage() {
         </div>
 
         {/* Sub-bloque Derecho (1/4): Centro de Alertas Críticas de Calidad Docente/Alumno */}
-        <div className="space-y-4">
+        {/* <div className="space-y-4">
           <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
             Anomalías en Cátedras
           </h2>
@@ -179,7 +179,7 @@ export default function InstitucionPage() {
               </div>
             ))}
           </div>
-        </div>
+        </div> */}
 
       </div>
     </div>
