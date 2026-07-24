@@ -11,6 +11,7 @@ const routeLabels: Record<string, string> = {
   resultados: "Resultados",
   configuracion: "Configuración",
   historial: "Historial",
+  reportes: "Reportes",
 };
 
 export function Breadcrumbs() {

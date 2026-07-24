@@ -1,76 +1,171 @@
-export class ApiError extends Error {
-  public statusCode: number;
-  public errors?: Array<{ code: string; path: string[]; message: string }>;
+import type { SessionAuthError } from "@/types/auth";
 
-  constructor(message: string, statusCode: number, errors?: Array<{ code: string; path: string[]; message: string }>) {
+interface ApiValidationError {
+  code: string;
+  path: Array<string | number>;
+  message: string;
+}
+
+interface ApiEnvelope<T> {
+  success?: boolean;
+  data?: T;
+  message?: string;
+  code?: string;
+  errors?: ApiValidationError[];
+}
+
+interface BrowserSession {
+  user?: unknown;
+  authError?: SessionAuthError;
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+    public readonly code?: string,
+    public readonly errors?: ApiValidationError[],
+  ) {
     super(message);
     this.name = "ApiError";
-    this.statusCode = statusCode;
-    this.errors = errors;
   }
 }
 
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
+let sessionRefreshPromise: Promise<BrowserSession> | null = null;
+
+function validateEndpoint(endpoint: string): void {
+  if (
+    !endpoint.startsWith("/") ||
+    endpoint.startsWith("//") ||
+    endpoint.includes("://")
+  ) {
+    throw new ApiError("Endpoint de API inválido", 400, "BFF_PATH_INVALID");
+  }
+}
+
+async function parseEnvelope<T>(response: Response): Promise<ApiEnvelope<T>> {
+  const responseText = await response.text();
+  if (!responseText) return {};
+
   try {
-    return localStorage.getItem("examio_api_token");
+    return JSON.parse(responseText) as ApiEnvelope<T>;
   } catch {
-    return null;
+    throw new ApiError(
+      `La API devolvió una respuesta inválida (${response.status})`,
+      response.status,
+      "API_RESPONSE_INVALID",
+    );
   }
 }
 
-export function setApiToken(token: string): void {
-  try {
-    localStorage.setItem("examio_api_token", token);
-  } catch {
-    console.error("No se pudo almacenar el token de API");
+async function refreshBrowserSession(): Promise<BrowserSession> {
+  if (typeof window === "undefined") {
+    throw new ApiError(
+      "La sesión no puede actualizarse fuera del navegador",
+      401,
+      "SESSION_UNAVAILABLE",
+    );
   }
+
+  if (!sessionRefreshPromise) {
+    sessionRefreshPromise = fetch("/api/auth/session", {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new ApiError(
+            "No se pudo actualizar la sesión",
+            response.status,
+            "AUTH_INFRASTRUCTURE_ERROR",
+          );
+        }
+        return (await response.json()) as BrowserSession;
+      })
+      .finally(() => {
+        sessionRefreshPromise = null;
+      });
+  }
+
+  return sessionRefreshPromise;
 }
 
-export function clearApiToken(): void {
-  try {
-    localStorage.removeItem("examio_api_token");
-  } catch {
-    console.error("No se pudo limpiar el token de API");
-  }
+function canReplayBody(body: BodyInit | null | undefined): boolean {
+  return (
+    body === null ||
+    body === undefined ||
+    typeof ReadableStream === "undefined" ||
+    !(body instanceof ReadableStream)
+  );
 }
 
-const API_URL = "http://localhost:55803/api";
+function statusForSessionError(error: SessionAuthError): number {
+  if (error === "REFRESH_CONFLICT") return 409;
+  if (error === "RATE_LIMITED") return 429;
+  if (error === "AUTH_INFRASTRUCTURE_ERROR") return 503;
+  if (error === "AUTH_CONTRACT_ERROR") return 502;
+  return 401;
+}
 
-export async function apiFetch<T>(
+async function executeApiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit,
+  allowRefreshRetry: boolean,
 ): Promise<T> {
-  const token = getToken();
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
-  };
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  const headers = new Headers(options.headers);
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const response = await fetch(`/api/examio${endpoint}`, {
     ...options,
+    credentials: "same-origin",
     headers,
   });
+  const result = await parseEnvelope<T>(response);
 
-  let result: any;
-  try {
-    result = await response.json();
-  } catch {
-    throw new ApiError(`Error parsing server response (${response.status})`, response.status);
+  if (
+    response.status === 401 &&
+    result.code === "ACCESS_TOKEN_EXPIRED" &&
+    allowRefreshRetry &&
+    canReplayBody(options.body)
+  ) {
+    const session = await refreshBrowserSession();
+    if (session.authError) {
+      throw new ApiError(
+        "No se pudo renovar la sesión",
+        statusForSessionError(session.authError),
+        session.authError,
+      );
+    }
+    if (!session.user) {
+      throw new ApiError(
+        "La sesión ya no está disponible",
+        401,
+        "SESSION_UNAVAILABLE",
+      );
+    }
+
+    return executeApiRequest<T>(endpoint, options, false);
   }
 
-  if (!response.ok || result?.success === false) {
+  if (!response.ok || result.success === false) {
     throw new ApiError(
-      result?.message || `Error ${response.status} en la petición a la API`,
+      result.message || `Error ${response.status} en la petición a la API`,
       response.status,
-      result?.errors
+      result.code,
+      result.errors,
     );
   }
 
   return result.data as T;
+}
+
+export async function apiFetch<T>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<T> {
+  validateEndpoint(endpoint);
+  return executeApiRequest<T>(endpoint, options, true);
 }

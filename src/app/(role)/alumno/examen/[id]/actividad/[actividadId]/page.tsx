@@ -8,25 +8,18 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string;
   const idIntento = Number(id);
   const questionIndex = parseInt(actividadId) - 1;
 
-  const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
   const [openText, setOpenText] = useState("");
-  const prevOptionRef = useRef<number | null>(null);
-  const pendingRestoreRef = useRef(false);
 
   const { data: preguntas } = useGetExamenSorteado(idIntento);
-  const currentQuestionRaw = preguntas ? preguntas[questionIndex] : null;
-  const currentQuestion = currentQuestionRaw ? {
-    ...currentQuestionRaw,
-    idPregunta: (currentQuestionRaw as any).IdPregunta ?? currentQuestionRaw.idPregunta,
-    enunciado: (currentQuestionRaw as any).Enunciado ?? currentQuestionRaw.enunciado,
-    tipo: (currentQuestionRaw as any).Tipo ?? currentQuestionRaw.tipo,
-  } : null;
+  const currentQuestion = preguntas?.[questionIndex] ?? null;
 
-  const { data: opciones, refetch: cargarOpciones } = useGetOpcionesPregunta(currentQuestion?.idPregunta || 0, idIntento);
+  const { data: opciones } = useGetOpcionesPregunta(currentQuestion?.idPregunta || 0, idIntento);
   const { mutate: enviarRespuesta } = useGuardarRespuesta();
 
   const openTextRef = useRef(openText);
-  openTextRef.current = openText;
+  useEffect(() => {
+    openTextRef.current = openText;
+  }, [openText]);
 
   useEffect(() => {
     return () => {
@@ -45,37 +38,20 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string;
 
   useEffect(() => {
     if (currentQuestion?.idPregunta) {
-      pendingRestoreRef.current = true;
-      cargarOpciones().then((result) => {
-        const loaded = result.data;
-        setSelectedOptionId(null);
+      Promise.resolve().then(() => {
         const storedText = localStorage.getItem(`examio_rta_abierta_${idIntento}_${currentQuestion.idPregunta}`);
         setOpenText(storedText ?? "");
-        prevOptionRef.current = null;
-        if (loaded && pendingRestoreRef.current) {
-          const preseleccionada = loaded.find((o: any) => o.FueSeleccionada ?? o.fueSeleccionada);
-          if (preseleccionada) {
-            setSelectedOptionId((preseleccionada as any).IdOpcion ?? preseleccionada.idOpcion);
-          }
-          pendingRestoreRef.current = false;
-        }
       });
     }
-  }, [actividadId, currentQuestion?.idPregunta, cargarOpciones]);
+  }, [idIntento, currentQuestion?.idPregunta]);
 
   const handleSeleccionarOpcion = (idOpcion: number) => {
     if (!currentQuestion?.idPregunta) return;
-    prevOptionRef.current = selectedOptionId;
-    setSelectedOptionId(idOpcion);
 
     enviarRespuesta({
       IdIntento: idIntento,
       IdPregunta: currentQuestion.idPregunta,
       IdOpcionNueva: idOpcion,
-    }, {
-      onError: () => {
-        setSelectedOptionId(prevOptionRef.current);
-      },
     });
   };
 
@@ -128,10 +104,10 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string;
           Seleccioná una opción:
         </p>
         
-        {opciones?.map((option: any) => {
-          const idOpcion = option.IdOpcion ?? option.idOpcion;
-          const texto = option.Texto ?? option.texto;
-          const isSelected = selectedOptionId === idOpcion;
+        {opciones?.map((option) => {
+          const idOpcion = option.idOpcion;
+          const texto = option.texto;
+          const isSelected = option.fueSeleccionada === true;
 
           return (
             <div

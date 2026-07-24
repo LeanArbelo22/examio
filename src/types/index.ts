@@ -730,6 +730,97 @@ export interface AdminAnalyticsResponse {
   evaluaciones: AdminEvaluacionItem[];
 }
 
+// ============================================================
+// REPORTES — Rendimiento por Alumno
+// ============================================================
+
+export type ReporteRendimientoEstado = "entregado" | "en_progreso" | "vencido";
+export type ReporteRendimientoOrden = "alumno" | "promedio" | "aprobados" | "intentos";
+export type OrdenDireccion = "asc" | "desc";
+
+export interface ReporteRendimientoFiltros {
+  matricula?: string;
+  idMateria?: string;
+  idMateriaDivision?: string;
+  idActividad?: string;
+  estado?: ReporteRendimientoEstado | "";
+  fechaDesde?: string;
+  fechaHasta?: string;
+  promedioMin?: string;
+  promedioMax?: string;
+  ordenarPor?: ReporteRendimientoOrden;
+  ordenDireccion?: OrdenDireccion;
+  pagina?: number;
+  limite?: number;
+}
+
+export interface ReporteRendimientoPaginacion {
+  pagina: number;
+  limite: number;
+  total: number;
+  totalPaginas: number;
+}
+
+export interface ReporteRendimientoKpis {
+  totalAlumnos: number;
+  conIntentos: number;
+  totalIntentos: number;
+  promedioGeneral: number;
+  tasaAprobacion: number;
+}
+
+export interface ReporteRendimientoAlumno {
+  matricula: number;
+  nombre: string;
+  apellido: string;
+  totalIntentos: number;
+  totalCorregidos: number;
+  promedio: number;
+  aprobados: number;
+  desaprobados: number;
+  porcentajeAprobacion: number;
+}
+
+export interface ReporteRendimientoListado {
+  paginacion: ReporteRendimientoPaginacion;
+  kpis: ReporteRendimientoKpis;
+  alumnos: ReporteRendimientoAlumno[];
+}
+
+export interface ReporteRendimientoDetalleKpis {
+  totalIntentos: number;
+  totalCorregidos: number;
+  promedioGeneral: number;
+  aprobados: number;
+  desaprobados: number;
+  porcentajeAprobacion: number;
+}
+
+export interface ReporteMejorIntento {
+  numeroIntento: number;
+  notaFinal: number;
+  notaAutomatica: number | null;
+  fechaFin: string;
+}
+
+export interface ReporteActividadAlumno {
+  idActividad: number;
+  titulo: string;
+  tipo: TipoActividad;
+  materia: string;
+  division: string;
+  intentos: number;
+  notaMaxima: number;
+  notaPromedio: number;
+  mejorIntento: ReporteMejorIntento | null;
+}
+
+export interface ReporteRendimientoDetalle {
+  alumno: Pick<Alumno, "matricula" | "nombre" | "apellido">;
+  kpis: ReporteRendimientoDetalleKpis;
+  actividades: ReporteActividadAlumno[];
+}
+
 // --- Telemetría ---
 export interface AlertaPayload {
   IdIntento: number;

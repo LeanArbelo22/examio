@@ -4,6 +4,34 @@ import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
 import { useState } from "react";
 import { SessionExpiredModal } from "./SessionExpiredModal";
+import { ApiError } from "@/lib/api";
+
+const SESSION_ERROR_CODES = new Set([
+  "REFRESH_CONFLICT",
+  "REFRESH_TOKEN_INVALID",
+  "REFRESH_TOKEN_EXPIRED",
+  "REFRESH_TOKEN_REVOKED",
+  "REFRESH_TOKEN_REUSED",
+  "SESSION_REVOKED",
+  "SESSION_UNAVAILABLE",
+  "USER_INACTIVE",
+  "RATE_LIMITED",
+  "AUTH_INFRASTRUCTURE_ERROR",
+]);
+
+function notifySessionProblem(error: unknown) {
+  if (
+    error instanceof ApiError &&
+    error.code &&
+    SESSION_ERROR_CODES.has(error.code)
+  ) {
+    window.dispatchEvent(
+      new CustomEvent("EXAMIO_SESSION_PROBLEM", {
+        detail: { code: error.code },
+      }),
+    );
+  }
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   // TODO: Remover en producción - Bypass para desarrollo local
@@ -13,18 +41,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   const [queryClient] = useState(() => new QueryClient({
     queryCache: new QueryCache({
-      onError: (error: any) => {
-        if (error?.status === 401 || error?.message?.includes("401")) {
-          window.dispatchEvent(new CustomEvent("EXAMIO_SESSION_EXPIRED"));
-        }
-      }
+      onError: notifySessionProblem,
     }),
     mutationCache: new MutationCache({
-      onError: (error: any) => {
-        if (error?.status === 401 || error?.message?.includes("401")) {
-          window.dispatchEvent(new CustomEvent("EXAMIO_SESSION_EXPIRED"));
-        }
-      }
+      onError: notifySessionProblem,
     }),
     defaultOptions: {
       queries: {
@@ -35,7 +55,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SessionProvider>
+      <SessionProvider refetchInterval={5 * 60} refetchOnWindowFocus>
         {children}
         <SessionExpiredModal />
       </SessionProvider>
