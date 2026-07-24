@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useQueries,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   guardarEvaluacionCompleta,
   actualizarEstadoEvaluacion,
@@ -23,13 +28,39 @@ import {
   registrarMetricasNavegacion,
   corregirRespuestaAbierta,
 } from "@/services/api/evaluaciones.api";
+import { ApiError } from "@/lib/api";
 import type {
   GuardarEvaluacionPayload,
   IniciarIntentoPayload,
   GuardarRespuestaPayload,
   AlertaPayload,
   NavegacionPayload,
+  OpcionSorteada,
+  PreguntaSorteada,
 } from "@/types/index";
+
+const RECOVERABLE_ANSWER_ERROR_CODES = new Set([
+  "ACCESS_TOKEN_EXPIRED",
+  "REFRESH_CONFLICT",
+  "REFRESH_TOKEN_INVALID",
+  "REFRESH_TOKEN_EXPIRED",
+  "REFRESH_TOKEN_REVOKED",
+  "REFRESH_TOKEN_REUSED",
+  "SESSION_REVOKED",
+  "SESSION_UNAVAILABLE",
+  "USER_INACTIVE",
+  "RATE_LIMITED",
+  "AUTH_INFRASTRUCTURE_ERROR",
+  "BFF_UPSTREAM_UNAVAILABLE",
+]);
+
+function shouldKeepPendingAnswer(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (RECOVERABLE_ANSWER_ERROR_CODES.has(error.code ?? "") ||
+      error.statusCode >= 500)
+  );
+}
 
 // --- HOOKS DEL PROFESOR ---
 
@@ -83,12 +114,55 @@ export const useGetOpcionesPregunta = (idPregunta: number, idIntento: number) =>
     queryKey: ["pregunta", idPregunta, "opciones", idIntento],
     queryFn: () => obtenerOpcionesPregunta(idPregunta, idIntento),
     enabled: !!idPregunta && !!idIntento,
+    staleTime: Infinity,
+  });
+};
+
+export const usePrecargarOpcionesExamen = (
+  idIntento: number,
+  preguntas: PreguntaSorteada[] | undefined,
+) => {
+  return useQueries({
+    queries: (preguntas ?? []).map((pregunta) => ({
+      queryKey: ["pregunta", pregunta.idPregunta, "opciones", idIntento],
+      queryFn: () => obtenerOpcionesPregunta(pregunta.idPregunta, idIntento),
+      enabled: Boolean(idIntento && pregunta.idPregunta),
+      staleTime: Infinity,
+    })),
   });
 };
 
 export const useGuardarRespuesta = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (payload: GuardarRespuestaPayload) => guardarRespuestaAtomica(payload),
+    onMutate: async (payload) => {
+      if (payload.IdOpcionNueva === undefined) return;
+
+      const queryKey = [
+        "pregunta",
+        payload.IdPregunta,
+        "opciones",
+        payload.IdIntento,
+      ] as const;
+      await queryClient.cancelQueries({ queryKey });
+      const previousOptions =
+        queryClient.getQueryData<OpcionSorteada[]>(queryKey);
+
+      queryClient.setQueryData<OpcionSorteada[]>(queryKey, (options) =>
+        options?.map((option) => ({
+          ...option,
+          fueSeleccionada: option.idOpcion === payload.IdOpcionNueva,
+        })),
+      );
+
+      return { previousOptions, queryKey };
+    },
+    onError: (error, _payload, context) => {
+      if (!context?.previousOptions || shouldKeepPendingAnswer(error)) return;
+      queryClient.setQueryData(context.queryKey, context.previousOptions);
+    },
   });
 };
 

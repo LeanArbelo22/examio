@@ -1,13 +1,12 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { signIn, getSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "../ui/Button";
 import { loginAction } from "@/app/login/actions";
-import { setApiToken } from "@/lib/api";
 import teamsLogo from "@/assets/images/teams-logo.svg";
 import moodleLogo from "@/assets/images/moodle-logo.svg";
 
@@ -33,23 +32,25 @@ export function LoginForm() {
           });
 
           if (result?.error) {
-            setGlobalError(
-              result.error === "CredentialsSignin"
-                ? "El correo o la contraseña son incorrectos."
-                : result.error
-            );
+            const messages: Record<string, string> = {
+              CredentialsSignin: "El correo o la contraseña son incorrectos.",
+              USER_INACTIVE: "Tu usuario no se encuentra habilitado.",
+              SESSION_REVOKED: "Tu vinculación institucional no es válida.",
+              RATE_LIMITED: "Hay demasiados intentos. Esperá unos minutos y volvé a intentar.",
+              AUTH_INFRASTRUCTURE_ERROR: "La API de Examio no está disponible temporalmente.",
+              AUTH_CONTRACT_ERROR: "La respuesta de autenticación no es válida.",
+            };
+            setGlobalError(messages[result.error] || "No se pudo iniciar sesión.");
           } else {
-            // Persistir el JWT de api_node para los后续 llamados HTTP
-            const session = await getSession();
-            const apiToken = session?.user?.accessToken;
-            if (apiToken) {
-              setApiToken(apiToken);
-            }
-            // El middleware se encargará de rutear según el rol obtenido de useSession
             router.push("/");
+            router.refresh();
           }
-        } catch (err: any) {
-          setGlobalError(err.message || "Ocurrió un error inesperado.");
+        } catch (error: unknown) {
+          setGlobalError(
+            error instanceof Error
+              ? error.message
+              : "Ocurrió un error inesperado.",
+          );
         }
       };
       executeSignIn();

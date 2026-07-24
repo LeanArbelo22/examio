@@ -1,13 +1,17 @@
 "use client";
 
 import { FullscreenWrapper } from "@/components/ui/FullscreenWrapper";
-import { use, useState, useEffect, useRef } from "react";
+import { use, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   useGetExamenSorteado,
   useFinalizarExamen,
+  usePrecargarOpcionesExamen,
 } from "@/hooks/useEvaluaciones";
 import { Button } from "@/components/ui/Button";
+import { ApiError } from "@/lib/api";
+
+type ExamDocument = Document & { isExitingLegitimately?: boolean };
 
 export default function ActivityLayout({
   children,
@@ -23,20 +27,13 @@ export default function ActivityLayout({
   const idIntento = Number(id);
   const currentActivityId = parseInt(urlParams.actividadId as string) || 1;
 
-  if (!idIntento || isNaN(idIntento)) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-slate-50 text-sm font-bold text-slate-500">
-        Error: ID de intento inválido.
-      </div>
-    );
-  }
-
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const autoSubmittedRef = useRef(false);
 
   const { data: preguntas, isLoading } = useGetExamenSorteado(idIntento);
+  usePrecargarOpcionesExamen(idIntento, preguntas);
   const { mutate: finalizarExamen, isPending: finalizando } =
     useFinalizarExamen();
 
@@ -54,10 +51,10 @@ export default function ActivityLayout({
     }
   };
 
-  const ejecutarCierreTransaccional = () => {
+  const ejecutarCierreTransaccional = useCallback(() => {
     setErrorServidor(null);
 
-    const doc = document as any;
+    const doc = document as ExamDocument;
     doc.isExitingLegitimately = true;
 
     finalizarExamen(idIntento, {
@@ -76,20 +73,40 @@ export default function ActivityLayout({
           router.replace("/alumno");
         }
       },
-      onError: (error: any) => {
+      onError: (error: unknown) => {
         delete doc.isExitingLegitimately;
-        console.error("ERROR EN POST /finalizar-examen:");
-        console.dir(error);
+        setShowConfirmModal(true);
         setErrorServidor(
-          error?.response?.data?.mensaje ||
-            error?.message ||
-            "Error de comunicación transaccional con el backend.",
+          error instanceof ApiError &&
+            (error.statusCode === 401 ||
+              error.statusCode === 409 ||
+              error.statusCode === 429 ||
+              error.statusCode >= 500)
+            ? "No pudimos sincronizar la sesión para entregar. El intento continúa abierto."
+            : error instanceof Error
+              ? error.message
+              : "Error de comunicación transaccional con el backend.",
         );
       },
     });
+  }, [finalizarExamen, idIntento, router]);
+
+  const salirConIntentoAbierto = async () => {
+    const doc = document as Document & { isExitingLegitimately?: boolean };
+    doc.isExitingLegitimately = true;
+    if (document.fullscreenElement) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        // La navegación controlada sigue siendo válida si el navegador rechaza la salida.
+      }
+    }
+    router.replace("/alumno");
   };
 
   useEffect(() => {
+    if (!idIntento || isNaN(idIntento)) return;
+
     const stored = sessionStorage.getItem(`examio_deadline_${idIntento}`);
     if (!stored) return;
 
@@ -106,7 +123,15 @@ export default function ActivityLayout({
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [idIntento]);
+  }, [ejecutarCierreTransaccional, idIntento]);
+
+  if (!idIntento || isNaN(idIntento)) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50 text-sm font-bold text-slate-500">
+        Error: ID de intento inválido.
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -309,6 +334,16 @@ export default function ActivityLayout({
                       : "Entregar Examen"}
                 </Button>
               </div>
+
+              {errorServidor && (
+                <button
+                  type="button"
+                  onClick={salirConIntentoAbierto}
+                  className="mt-4 text-xs font-semibold text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                >
+                  Salir al panel y mantener el intento abierto
+                </button>
+              )}
             </div>
           </div>
         </div>

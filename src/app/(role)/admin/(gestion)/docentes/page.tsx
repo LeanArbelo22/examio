@@ -1,50 +1,23 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Docente, CreateDocentePayload, UpdateDocentePayload } from "@/types/index";
 import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Modal } from "@/components/ui/Modal";
-import { useGetDocentes } from "@/hooks/useDocentes";
+import {
+  useCreateDocente,
+  useDeleteDocente,
+  useGetDocentes,
+  useUpdateDocente,
+} from "@/hooks/useDocentes";
 import { DetalleDocenteModal } from "./DetalleDocenteModal";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function DocentesPage() {
-  const queryClient = useQueryClient();
   const { docentes, isLoading, isError } = useGetDocentes();
-
-  // Cambiamos fetch nativo por mutaciones transaccionales de React Query
-  const { mutate: crearDocente, isPending: isCreating } = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await fetch("http://localhost:55803/api/docentes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error();
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["docentes"] }),
-  });
-
-  const { mutate: modificarDocente, isPending: isUpdating } = useMutation({
-    mutationFn: async ({ legajo, data }: { legajo: number; data: any }) => {
-      const res = await fetch(`http://localhost:55803/api/docentes/${legajo}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error();
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["docentes"] }),
-  });
-
-  const { mutate: inhabilitarDocente } = useMutation({
-    mutationFn: async (legajo: number) => {
-      const res = await fetch(`http://localhost:55803/api/docentes/${legajo}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["docentes"] }),
-  });
+  const { mutate: crearDocente, isPending: isCreating } = useCreateDocente();
+  const { mutate: modificarDocente, isPending: isUpdating } = useUpdateDocente();
+  const { mutate: inhabilitarDocente } = useDeleteDocente();
 
   const [selectedDocente, setSelectedDocente] = useState<Docente | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -61,27 +34,21 @@ export default function DocentesPage() {
 
   const isProcessing = isCreating || isUpdating;
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, filterEstado]);
-
-  useEffect(() => {
-    if (docenteEnEdicion) {
-      setFormData({
-        Nombre: docenteEnEdicion.nombre || "",
-        Apellido: docenteEnEdicion.apellido || "",
-        Correo: docenteEnEdicion.correo || "",
-        Cuil: docenteEnEdicion.cuil || "",
-        Legajo: String(docenteEnEdicion.legajo || "")
-      });
-    } else {
-      setFormData({ Nombre: "", Apellido: "", Correo: "", Cuil: "", Legajo: "" });
-    }
-  }, [docenteEnEdicion]);
-
   const handleEditClick = (docente: Docente) => {
     setDocenteEnEdicion(docente);
+    setFormData({
+      Nombre: docente.nombre || "",
+      Apellido: docente.apellido || "",
+      Correo: docente.correo || "",
+      Cuil: docente.cuil || "",
+      Legajo: String(docente.legajo || ""),
+    });
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleCancelEdit = () => {
+    setDocenteEnEdicion(null);
+    setFormData({ Nombre: "", Apellido: "", Correo: "", Cuil: "", Legajo: "" });
   };
 
   const docentesFiltrados = useMemo(() => {
@@ -110,7 +77,7 @@ export default function DocentesPage() {
       };
       modificarDocente(
         { legajo: docenteEnEdicion.legajo, data },
-        { onSuccess: () => setDocenteEnEdicion(null) }
+        { onSuccess: handleCancelEdit }
       );
     } else {
       const payload: CreateDocentePayload = {
@@ -140,10 +107,16 @@ export default function DocentesPage() {
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-3">
         <input 
           type="text" placeholder="🔍 Buscar por nombre, apellido o legajo..." 
-          value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+          value={searchQuery} onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setCurrentPage(1);
+          }}
           className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 font-medium text-slate-700"
         />
-        <select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none font-medium text-slate-500">
+        <select value={filterEstado} onChange={(e) => {
+          setFilterEstado(e.target.value);
+          setCurrentPage(1);
+        }} className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none font-medium text-slate-500">
           <option value="activos">Estado: Activos</option>
           <option value="inactivos">Estado: Inactivos (Baja Lógica)</option>
           <option value="todos">Mostrar Todos</option>
@@ -244,7 +217,7 @@ export default function DocentesPage() {
               {isProcessing ? "Escribiendo en SQL..." : (docenteEnEdicion ? "Guardar Cambios" : "Confirmar Alta")}
             </Button>
             {docenteEnEdicion && (
-              <button type="button" onClick={() => setDocenteEnEdicion(null)} className="w-full text-xs font-bold text-slate-400 hover:text-slate-600 mt-1.5 transition-colors">Volver a nuevo registro</button>
+              <button type="button" onClick={handleCancelEdit} className="w-full text-xs font-bold text-slate-400 hover:text-slate-600 mt-1.5 transition-colors">Volver a nuevo registro</button>
             )}
           </form>
         </div>

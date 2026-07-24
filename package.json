@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:checked": "node scripts/check-development-environment.mjs && next dev",
+    "env:check": "node scripts/check-development-environment.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -16,6 +18,7 @@
     "next-auth": "^4.24.14",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "recharts": "^3.10.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -1,0 +1,49 @@
+import { useQuery } from "@tanstack/react-query";
+import {
+  obtenerDetalleRendimientoAlumno,
+  obtenerReporteRendimiento,
+} from "@/services/api/reportes.api";
+import type { ReporteRendimientoDetalle, ReporteRendimientoFiltros, ReporteRendimientoListado } from "@/types/index";
+
+function normalizarListado(data: ReporteRendimientoListado | ReporteRendimientoDetalle): ReporteRendimientoListado {
+  if ("paginacion" in data) return data;
+  return {
+    paginacion: { pagina: 1, limite: 1, total: 1, totalPaginas: 1 },
+    kpis: {
+      totalAlumnos: 1,
+      conIntentos: data.kpis.totalIntentos > 0 ? 1 : 0,
+      totalIntentos: data.kpis.totalIntentos,
+      promedioGeneral: data.kpis.promedioGeneral,
+      tasaAprobacion: data.kpis.porcentajeAprobacion,
+    },
+    alumnos: [{ ...data.alumno, totalIntentos: data.kpis.totalIntentos, totalCorregidos: data.kpis.totalCorregidos, promedio: data.kpis.promedioGeneral, aprobados: data.kpis.aprobados, desaprobados: data.kpis.desaprobados, porcentajeAprobacion: data.kpis.porcentajeAprobacion }],
+  };
+}
+
+export const useReporteRendimiento = (filtros: ReporteRendimientoFiltros) =>
+  useQuery({
+    queryKey: ["reportes", "rendimiento", "listado", filtros],
+    queryFn: () => obtenerReporteRendimiento(filtros),
+    select: normalizarListado,
+    placeholderData: (previousData) => previousData,
+  });
+
+export const useDetalleRendimientoAlumno = (
+  matricula: number | null,
+  filtros: ReporteRendimientoFiltros,
+) =>
+  useQuery({
+    queryKey: ["reportes", "rendimiento", "detalle", matricula, filtros],
+    queryFn: () =>
+      obtenerDetalleRendimientoAlumno({
+        ...filtros,
+        matricula: String(matricula),
+        pagina: undefined,
+        limite: undefined,
+        promedioMin: undefined,
+        promedioMax: undefined,
+        ordenarPor: undefined,
+        ordenDireccion: undefined,
+      }),
+    enabled: matricula !== null,
+  });

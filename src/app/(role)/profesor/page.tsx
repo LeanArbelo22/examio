@@ -60,6 +60,11 @@ export default function ProfesorPage() {
         >
           <span>🆕</span> Crear Nuevo Examen
         </Button>
+        <Link href="/profesor/reportes">
+          <Button className="w-full bg-white text-indigo-700 text-xs font-bold py-3 px-5 rounded-xl border border-indigo-200 hover:bg-indigo-50 transition-all shadow-sm sm:w-auto">
+            Reportes
+          </Button>
+        </Link>
       </div>
 
       <div className="flex items-center justify-between">
