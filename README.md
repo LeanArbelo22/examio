@@ -110,6 +110,12 @@ pnpm env:check
 construyen sus destinos desde esa base y no aceptan URLs arbitrarias enviadas por
 el navegador.
 
+El cliente `apiFetch` aplica un timeout de 20 segundos, permite configurar
+`timeoutMs` por operación y respeta el `AbortSignal` del consumidor. El BFF
+limita además cada espera hacia la API a 15 segundos y normaliza su timeout
+como `504 BFF_UPSTREAM_TIMEOUT`. Los servicios comparten el serializador de
+query strings de `src/lib/query-string.ts`.
+
 ## Arquitectura
 
 El flujo previsto para datos remotos es:
@@ -281,8 +287,21 @@ Las ampliaciones de NextAuth en `src/types/next-auth.d.ts` incluyen:
 - El single-flight en memoria evita duplicados dentro de una instancia. La
   idempotencia persistida por la API resuelve concurrencia entre pestañas o
   instancias.
-- La protección completa de respuestas pendientes durante una evaluación
-  pertenece a una etapa separada de `PLAN.md`.
+- Las respuestas de una evaluación utilizan una outbox IndexedDB por
+  intento/pregunta. React Query mantiene la representación visual y la outbox
+  conserva versiones pendientes o confirmadas hasta finalizar el intento.
+
+### Continuidad de evaluaciones
+
+Las respuestas se persisten localmente antes del request. La UI diferencia
+`Guardando`, `Guardado`, `Pendiente de sincronización` y rechazo no recuperable.
+Ante pérdida de conectividad no se ejecuta refresh ni logout: el intento continúa
+visible, las respuestas pendientes se sincronizan al recuperar el evento
+`online` y la entrega espera a que la cola quede vacía.
+
+La outbox usa IndexedDB nativo, conserva solo respuestas académicas y nunca
+credenciales. Si IndexedDB no está disponible, utiliza memoria durante la vista
+y advierte que no debe cerrarse ni recargarse la pestaña.
 
 ## Comunicación con la API
 

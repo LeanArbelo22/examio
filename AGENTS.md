@@ -47,7 +47,7 @@ Examio API
 - `src/components` contiene UI compartida, layouts, formularios, providers y componentes de reportes.
 - `src/hooks` contiene queries y mutaciones de dominio.
 - `src/services/api` traduce operaciones de dominio a contratos HTTP.
-- `src/lib` concentra infraestructura: cliente HTTP, NextAuth, schemas y auxiliares.
+- `src/lib` concentra infraestructura: cliente HTTP, NextAuth, schemas, auxiliares y la outbox IndexedDB del examen.
 - `src/types` contiene entidades, DTOs, payloads y ampliaciones de NextAuth.
 - `src/assets` contiene recursos importados por componentes.
 - Los estilos globales viven en `src/app/globals.css`.
@@ -147,6 +147,9 @@ No modificar auth, sesión, middleware, logout o expiración como efecto colater
 `src/lib/api.ts` expone `apiFetch<T>` y `ApiError`.
 El cliente llama al BFF same-origin `/api/examio/*`, interpreta
 `{ success, data, message, code, errors }` y devuelve `data`.
+`apiFetch` aplica timeout por defecto, acepta `timeoutMs` y compone cualquier `AbortSignal`
+proporcionado por el consumidor. Las query strings de servicios se construyen con
+`src/lib/query-string.ts`; no duplicar serializadores manuales.
 El Route Handler obtiene la sesión NextAuth en servidor, agrega el bearer y solo reenvía hacia
 `EXAMIO_API_URL`. Ante `401 ACCESS_TOKEN_EXPIRED`, el cliente actualiza la sesión y repite una sola vez.
 Los servicios por dominio están en `src/services/api`.
@@ -211,6 +214,9 @@ Al modificar formularios:
 Usar estado local para interacción efímera: inputs, modal abierto, selección o estado visual.
 Usar React Query para estado remoto, caché, carga, error, mutaciones e invalidaciones.
 Usar `SessionProvider` para la sesión; no duplicar el usuario en un contexto nuevo.
+Durante una evaluación, React Query mantiene la representación visual de las
+respuestas y `src/lib/exam-answer-outbox.ts` actúa como respaldo durable hasta
+confirmación/finalización. IndexedDB nunca debe contener tokens ni credenciales.
 No introducir Redux, Zustand o Context global sin una necesidad transversal demostrable y aprobación.
 Preferir estado derivado a copias sincronizadas mediante effects.
 Memoizar solo cuando exista un beneficio concreto o una identidad estable sea necesaria.
@@ -256,7 +262,10 @@ El `Modal` actual no debe asumirse plenamente accesible; revisar su comportamien
   No reemplazar la clave idempotente ni el single-flight sin revisar el contrato de concurrencia de la API.
 - **Errores de sesión durante exámenes:** un fallo definitivo de refresh no debe desmontar la vista,
   cerrar sesión, finalizar ni abandonar el intento automáticamente. La cola completa de respuestas
-  pendientes sigue planificada por separado en `PLAN.md`.
+  pendientes debe conservarse y sincronizarse antes de finalizar.
+- **Outbox de respuestas:** una confirmación solo puede confirmar la misma versión
+  enviada; no eliminar ni sobrescribir una respuesta más nueva por una respuesta
+  tardía. La pérdida de red no debe confundirse con expiración de sesión.
 - **Credenciales solo server-side:** nunca exponer access/refresh tokens mediante `Session.user`,
   respuestas del BFF, logs, variables públicas o almacenamiento del navegador.
 - **URLs y fetch fuera de la capa:** persisten URL hardcodeada y al menos una llamada directa legacy.

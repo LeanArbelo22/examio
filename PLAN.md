@@ -71,7 +71,7 @@ Los tests importaban `src/index.ts`, que conectaba la base y ejecutaba `app.list
 
 ## Fase 1 — Consolidación de autenticación y sesión
 
-**Estado: EN PROGRESO — IMPLEMENTACIÓN FRONTEND COMPLETA, VALIDACIÓN MANUAL PENDIENTE**
+**Estado: COMPLETADA — 2026-07-24**
 
 - [x] Diagramar el flujo actual entre Server Action, `signIn`, CredentialsProvider, JWT y sesión.
 - [x] Aprobar una capa BFF de Next.js basada en la sesión de NextAuth como único límite del navegador con la API.
@@ -84,11 +84,11 @@ Los tests importaban `src/index.ts`, que conectaba la base y ejecutaba `app.list
 - [x] Corregir la detección global de 401 mediante `ApiError.statusCode` y códigos estables.
 - [x] Unificar logout y redirección mediante el evento `signOut` de NextAuth y logout backend idempotente.
 - [x] Confirmar que el botón actual “Extender sesión” no renueva el JWT backend y no debe presentarse como funcional.
-- [~] Implementar renovación silenciosa, rotación y revocación. Implementado y validado estáticamente; falta validar el flujo frontend integrado contra la API.
+- [x] Implementar y validar renovación silenciosa, rotación y revocación contra la API.
 - [x] Reemplazar “Extender sesión” por recuperación real; nunca expulsar automáticamente a un alumno de una evaluación ante el primer 401.
 - [x] Comparar expiraciones: access token de 15 minutos, sesión backend absoluta de 12 horas y `session.maxAge` alineado a 12 horas.
 - [x] Tipar callbacks JWT y sesión sin `any`.
-- [x] Definir pruebas mínimas del flujo por rol; su ejecución manual integrada sigue pendiente.
+- [x] Validar manualmente login por rol, refresh exitoso y fallido, logout y expiración dentro y fuera de una evaluación.
 
 ### Arquitectura aprobada
 
@@ -125,51 +125,93 @@ React Query / servicio
 
 Auditoría frontend realizada sobre el flujo concreto de inicio, guardado de respuestas y finalización.
 
-- [~] Mantener localmente cada respuesta pendiente hasta confirmación. El texto abierto conserva su borrador y las opciones permanecen optimistamente en el caché del intento al navegar; todavía falta una cola durable y confirmación común.
-- [ ] Diferenciar visualmente “Guardando”, “Guardado” y “Pendiente de sincronización”.
-- [ ] Reintentar autoguardados con una política acotada y sin loops.
-- [~] Ante `401 ACCESS_TOKEN_EXPIRED`, renovar y repetir una sola vez. Implementado y validado estáticamente; falta prueba integrada.
+- [x] Mantener localmente cada respuesta pendiente hasta confirmación. Implementado con outbox IndexedDB por intento/pregunta y fallback explícito a memoria; recarga, desconexión y recuperación verificadas manualmente.
+- [x] Diferenciar visualmente “Guardando”, “Guardado”, “Pendiente de sincronización” y rechazo no recuperable.
+- [x] Reintentar autoguardados con una política acotada: tres intentos con espera progresiva, single-flight por intento y nuevo ciclo cada 30 segundos. Opciones y texto abierto con envío automático tras 750 ms sin escritura verificados manualmente.
+- [x] Ante `401 ACCESS_TOKEN_EXPIRED`, renovar y repetir una sola vez; flujo integrado validado manualmente.
 - [x] Evitar cualquier redirección automática fuera de la ruta de examen por el primer 401.
-- [~] Conservar respuestas pendientes cuando falle refresh o conectividad. Las selecciones ya no se revierten ante errores recuperables mientras el intento permanece montado; falta persistencia durable y resincronización automática.
+- [x] Conservar respuestas pendientes cuando falle refresh o conectividad mediante IndexedDB, incluyendo opciones y texto; navegación offline, recarga y recuperación verificadas manualmente.
 - [~] Mostrar recuperación de sesión sobre el examen sin desmontar la vista. El modal preserva la vista; una reautenticación interactiva sin desmontaje continúa pendiente.
 - [x] Mantener contenido y temporizador visibles durante recuperación de sesión.
 - [x] No finalizar ni abandonar el intento cuando falla manualmente la operación de entrega; la vista permanece abierta y permite reintentar.
 - [x] No finalizar, anular, abandonar ni ejecutar `signOut()` automáticamente por errores de sesión dentro de una ruta de examen.
 - [!] Definir con backend cómo se computa el tiempo durante fallas de sesión, red o sincronización.
-- [ ] Proteger contra recarga, cierre de pestaña y desconexión cuando existan respuestas no confirmadas.
-- [~] Evitar envíos duplicados e implementar idempotencia. El backend documenta idempotencia para iniciar/finalizar intento y para repetir la misma opción; el caché evita perder la selección visual, pero falta una estrategia cliente para solicitudes concurrentes y respuestas abiertas.
-- [ ] Sincronizar respuestas pendientes al recuperar sesión o conectividad.
-- [ ] Informar claramente cuándo una respuesta todavía no fue confirmada por el servidor.
-- [!] Definir qué sucede si vence el tiempo mientras existen respuestas pendientes; hoy el temporizador ejecuta finalización automática sin esperar guardados.
-- [~] Hacer que la finalización espere o resuelva explícitamente todas las respuestas pendientes. Ante fallo ya permite seguir revisando, reintentar o salir de forma controlada conservando el intento abierto; todavía no espera una cola de guardados.
-- [~] Guardado actual de respuestas abiertas: persiste el borrador local y envía en `blur` o al desmontar la pregunta, pero el envío al desmontar no espera confirmación y el borrador no representa estado confirmado.
-- [~] Guardado actual de opciones: actualización optimista en el caché por pregunta, restauración al navegar y conservación ante errores recuperables; falta estado visible de sincronización, cola durable y reintento.
+- [x] Proteger contra recarga o cierre de pestaña mediante `beforeunload` cuando existen respuestas no confirmadas; la outbox permite restaurarlas.
+- [x] Evitar envíos duplicados mediante última versión por pregunta, confirmación condicionada por versión y single-flight; cambios rápidos verificados manualmente.
+- [x] Sincronizar respuestas pendientes al recuperar sesión o conectividad mediante evento `online`, reintento manual y ciclos acotados; recuperación de conexión verificada manualmente.
+- [x] Informar claramente cuándo una respuesta está guardando, fue confirmada o todavía permanece pendiente.
+- [~] Si vence el tiempo con respuestas pendientes, registrar la solicitud de entrega, sincronizar primero y finalizar después. El cómputo académico del tiempo continúa bajo autoridad backend.
+- [~] La finalización espera la outbox, queda durablemente solicitada si no hay conexión y ofrece reintento o salida controlada; falta validación manual offline.
+- [x] Guardado de respuestas abiertas: borrador durable por pulsación, autoguardado HTTP tras 750 ms de inactividad, envío en `blur`/navegación, restauración tras recarga y conservación de la versión confirmada; verificado manualmente.
+- [~] Guardado de opciones: actualización optimista, outbox durable, restauración y reintento acotado.
 - [x] Precargar y conservar las opciones de todas las preguntas durante el intento para que una sesión degradada no vacíe preguntas ya preparadas.
 - [x] Suprimir la repetición del modal de sesión una vez aceptado el modo degradado para el intento completo.
 
-La protección de respuestas pendientes se implementará como una etapa separada después de estabilizar BFF y refresh. No debe mezclarse con refactors visuales ni generales.
+### Continuidad ante pérdida de conectividad
+
+- [x] Normalizar la imposibilidad del navegador de alcanzar Next.js como `NETWORK_UNAVAILABLE`, diferenciándola de errores HTTP y `REQUEST_ABORTED`.
+- [x] Tratar `BFF_UPSTREAM_UNAVAILABLE` como indisponibilidad temporal de la API, no como prueba de sesión vencida.
+- [x] No iniciar refresh ni ejecutar `signOut()` por pérdida de red; esperar conectividad o una respuesta efectiva de autenticación.
+- [x] Mostrar durante el examen un único estado no bloqueante de conectividad degradada, manteniendo contenido, opciones, navegación y temporizador visibles.
+- [x] Mantener respuestas nuevas en la outbox durable sin conectividad y marcarlas como pendientes; verificado manualmente.
+- [x] Escuchar recuperación `online` y reanudar sincronización con reintentos acotados y single-flight; verificado manualmente.
+- [~] Mantener fuera del examen los errores de red como errores recuperables sin cerrar sesión; la normalización es global y cada vista conserva su acción local de reintento.
+- [~] Impedir una falsa entrega exitosa: conservar la solicitud, sincronizar primero y finalizar después; falta prueba manual offline.
+- [x] Ofrecer salida controlada manteniendo el intento abierto e informar cuántas respuestas siguen sin confirmación.
+- [x] Detectar recarga de un intento y mostrar “Reanudar evaluación”, informando restauración de respuestas y continuidad del temporizador.
+
+La protección de respuestas pendientes está implementada sin cambios de backend, auth, BFF, middleware, Navbar ni logout. Navegación offline, recuperación, recarga, concurrencia, fallback y autoguardado de texto abierto fueron verificados; resta validar la entrega iniciada sin conexión.
+
+### Auditoría y política configurable de continuidad y supervisión
+
+- [!] Definir y persistir un registro auditable de incidentes durante el intento: pérdida y recuperación de conectividad, expiración o recuperación de sesión, recarga, errores de sincronización o entrega, salida de pantalla completa, minimización, cambio de pestaña o pérdida de foco. Requiere contrato backend, persistencia y criterios de privacidad.
+- [!] Registrar para cada incidente tipo, instante de inicio, instante de recuperación, duración, resultado y contexto mínimo del intento, sin incluir respuestas, tokens ni datos sensibles. La autoridad temporal y el formato definitivo deben acordarse con backend.
+- [!] Definir una configuración por evaluación elegida por el docente para cada clase de incidente: solo registrar, advertir y solicitar retorno, permitir una cantidad acotada o aplicar una consecuencia. Requiere modelo de datos, API, validación server-side y una política funcional explícita.
+- [!] Definir límites independientes y acumulativos cuando corresponda —por ejemplo, una salida de pantalla completa permitida y entrega ante una reincidencia— evitando que el cliente sea la única autoridad para contabilizarlos.
+- [ ] Reemplazar en una etapa posterior el tratamiento actual de salida de pantalla completa como fraude inmediato por una máquina de estados no destructiva: advertir, conservar contenido, respuestas y temporizador, y solicitar volver a pantalla completa. La restricción permanece habilitada hasta abordar ese rediseño.
+- [!] Definir qué consecuencias pueden ejecutarse automáticamente. Una entrega, anulación o penalización por incidentes de navegador no debe implementarse sin reglas backend autoritativas, tolerancia a falsos positivos y aprobación funcional.
+- [ ] Detectar recargas y reanudaciones como incidentes diferenciados. La recuperación durable actual preserva el intento, pero una recarga también puede utilizarse para abandonar pantalla completa sin generar la señal de salida esperada.
+- [ ] Al reanudar después de una recarga, volver a solicitar pantalla completa cuando la evaluación lo requiera y mantener visible la advertencia hasta que el alumno retome, sin descartar respuestas ni reiniciar el temporizador.
+- [!] Diseñar una entrega confiable de telemetría con cola durable, deduplicación e idempotencia. Los eventos ocurridos sin conexión deben sincronizarse al recuperarla y no pueden depender de un único `fetch` durante `beforeunload`.
+- [ ] Informar al alumno de manera clara qué incidente se detectó, qué acción debe realizar, cuántas tolerancias quedan si aplica y si el evento está pendiente de sincronización.
+- [!] Proveer al docente una vista o reporte cronológico de incidentes del intento, diferenciando señales técnicas de una determinación de fraude; requiere endpoint y autorización RBAC docente.
+- [ ] Diseñar pruebas manuales específicas para recarga, salida de fullscreen, cambio de pestaña, minimización, pérdida de foco, desconexión, sesión vencida y combinaciones concurrentes, incluyendo el tiempo hasta retomar.
+
+### Backlog funcional de evaluaciones detectado en validación
+
+- [!] Permitir al docente corregir y comentar una pregunta abierta sin respuesta. Requiere definir si se crea una respuesta vacía o si la corrección/comentario pertenece a la relación intento-pregunta sin `Respuesta` existente.
+- [ ] Renderizar preguntas de programación/SQL como desarrollo y no como opción múltiple; confirmar los valores efectivos de `Tipo` y reutilizar el guardado de texto/código.
+- [ ] Eliminar nombres y títulos de evaluaciones hardcodeados y mostrarlos desde publicación/actividad.
+- [!] Definir la semántica de múltiples intentos: un único examen visible con historial de intentos y una regla explícita para promedio, mejor intento, último intento o intento válido. Requiere decisión funcional y revisión de API/SQL.
+- [ ] Inicializar fecha de inicio y fin al crear una evaluación, como mínimo con la fecha actual y un rango válido.
+- [ ] Limitar años y rangos de fecha a valores académicamente razonables tanto en frontend como en validación backend.
+- [ ] Validar inputs de creación al perder foco, sin esperar el submit, conservando la revalidación final del backend.
+- [ ] Permitir a docente y alumno filtrar o agrupar actividades del dashboard por comisión y materia.
+- [!] Definir la política de revisión posterior a la entrega: habilitar una única consulta cuando todo sea autocorregible o después de la corrección docente si existen respuestas abiertas. Requiere persistir autorización/consumo de esa visualización en backend.
+- [!] Agregar una devolución general opcional del examen además de comentarios por pregunta. Requiere contrato y persistencia backend.
+- [ ] Al continuar un intento abierto después de sesión expirada, desconexión o salida controlada, omitir la pantalla informativa y navegar directamente a la actividad pendiente.
 
 ---
 
 ## Fase 2 — Configuración y acceso centralizado a la API
 
-**Estado: PENDIENTE**
+**Estado: CERRADA EN FRONTEND — INSCRIPCIÓN BLOQUEADA POR CONTRATO BACKEND**
 
-- [ ] Mover la URL de la API a configuración por entorno validada.
-- [ ] Eliminar las URLs `http://localhost:55803/api` duplicadas.
-- [ ] Mantener un único cliente HTTP.
-- [ ] Eliminar llamadas `fetch` directas desde páginas y componentes.
-- [ ] Migrar la pantalla de docentes a servicios y hooks existentes.
-- [ ] Mover la inscripción de alumnos al servicio de su dominio.
-- [ ] Corregir la interpolación de matrícula detectada en la inscripción.
-- [ ] Soportar respuestas JSON, cuerpos vacíos y errores de parseo.
-- [ ] Incorporar timeout y `AbortSignal` cuando corresponda.
-- [ ] Normalizar 401, 403, 404, validación y errores 500.
-- [ ] Centralizar construcción de query strings.
-- [ ] Definir contrato común para errores de validación de la API.
-- [ ] Integrar `GET /api/health` en el diagnóstico frontend.
+- [x] Mover la URL de la API a `EXAMIO_API_URL`, configuración exclusiva del servidor y validada.
+- [x] Eliminar las URLs `http://localhost:55803/api` del código productivo; solo permanecen como ejemplos de desarrollo documentados.
+- [x] Mantener `apiFetch` como único cliente HTTP para servicios y consumidores de UI.
+- [x] Eliminar llamadas `fetch` directas desde páginas y componentes; los `fetch` restantes pertenecen a NextAuth, `apiFetch` y el BFF.
+- [x] Verificar que la pantalla de docentes consume servicios y hooks existentes y retirar la referencia visual al puerto local.
+- [!] Mover la inscripción de alumnos al servicio de su dominio y habilitarla correctamente. La API documentada no expone una operación para crear `InscripcionMateria`; requiere contrato backend `admin`, validación e idempotencia sobre `(IdMateriaDivision, IdAlumno)`.
+- [x] Eliminar la interpolación defectuosa `"/alumnos/${matricula}/inscribir"` y el fallo silencioso. La UI informa el bloqueo y no llama una ruta inexistente.
+- [x] Soportar respuestas JSON, cuerpos vacíos y errores de parseo mediante el contrato común de `apiFetch`.
+- [x] Incorporar timeout por defecto, timeout configurable y composición con `AbortSignal`; el BFF también limita la espera del upstream.
+- [x] Normalizar códigos fallback para 400/422, 401, 403, 404, 409, 429 y 500 sin reemplazar códigos estables del backend.
+- [x] Centralizar construcción de query strings en `src/lib/query-string.ts`.
+- [x] Exponer el contrato común `ApiError` y `ApiValidationError`, preservando `statusCode`, `code`, `message`, `path` y errores de validación.
+- [x] Integrar `GET /api/health` en el diagnóstico frontend mediante `pnpm env:check` y `pnpm dev:checked`.
 
-**Criterio de finalización:** ninguna página o componente realiza `fetch` directo y ningún endpoint contiene una URL hardcodeada.
+**Criterio de finalización frontend verificado:** ninguna página o componente realiza `fetch` directo y ningún endpoint contiene una URL hardcodeada. La inscripción queda explícitamente bloqueada hasta ampliar el contrato de la API; no se simula ni se apunta a una ruta inexistente.
 
 ---
 
@@ -325,8 +367,8 @@ La protección de respuestas pendientes se implementará como una etapa separada
 
 1. [x] Fase 0 — Entorno de desarrollo.
 2. [x] Analizar y aprobar el alcance exacto de la fase 1.
-3. [~] Ejecutar fase 1 — Implementada; validación manual integrada pendiente.
-4. [ ] Ejecutar fase 2 — Cliente API y configuración.
+3. [x] Ejecutar fase 1 — Autenticación, refresh, logout y expiración validados manualmente.
+4. [x] Ejecutar fase 2 — Cliente API y configuración cerrados en frontend; inscripción registrada como dependencia backend.
 5. [ ] Ejecutar fase 3 — Tipado y contratos.
 6. [ ] Normalizar React Query y errores.
 7. [ ] Consolidar componentes, formularios y accesibilidad.
@@ -335,5 +377,6 @@ La protección de respuestas pendientes se implementará como una etapa separada
 
 ## Próximo paso
 
-Ejecutar la matriz manual integrada de autenticación y sesión. Después, iniciar
-como etapa separada la protección de respuestas pendientes durante evaluaciones.
+Iniciar la Fase 3 con una auditoría focalizada de tipos y contratos. En paralelo,
+coordinar con backend el endpoint idempotente de inscripción de alumnos antes de
+reactivar esa operación en la interfaz.

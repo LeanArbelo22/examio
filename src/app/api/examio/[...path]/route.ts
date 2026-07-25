@@ -10,6 +10,7 @@ type RouteContext = {
 };
 
 const ALLOWED_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
+const UPSTREAM_TIMEOUT_MS = 15_000;
 const FORWARDED_REQUEST_HEADERS = [
   "accept",
   "content-type",
@@ -71,6 +72,19 @@ async function handler(request: NextRequest, context: RouteContext): Promise<Res
   }
 
   let upstreamResponse: Response;
+  const upstreamController = new AbortController();
+  let upstreamTimedOut = false;
+  const abortUpstream = () => upstreamController.abort(request.signal.reason);
+  if (request.signal.aborted) {
+    abortUpstream();
+  } else {
+    request.signal.addEventListener("abort", abortUpstream, { once: true });
+  }
+  const timeoutId = setTimeout(() => {
+    upstreamTimedOut = true;
+    upstreamController.abort();
+  }, UPSTREAM_TIMEOUT_MS);
+
   try {
     upstreamResponse = await fetch(
       `${examioApiEndpoint(apiPath)}${request.nextUrl.search}`,
@@ -80,14 +94,25 @@ async function handler(request: NextRequest, context: RouteContext): Promise<Res
         body,
         cache: "no-store",
         redirect: "manual",
+        signal: upstreamController.signal,
       },
     );
   } catch {
+    if (upstreamTimedOut) {
+      return bffError(
+        504,
+        "BFF_UPSTREAM_TIMEOUT",
+        "La API de Examio superó el tiempo de espera",
+      );
+    }
     return bffError(
       503,
       "BFF_UPSTREAM_UNAVAILABLE",
       "La API de Examio no está disponible temporalmente",
     );
+  } finally {
+    clearTimeout(timeoutId);
+    request.signal.removeEventListener("abort", abortUpstream);
   }
 
   const responseHeaders = new Headers();

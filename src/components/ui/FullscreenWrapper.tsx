@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import {
@@ -13,11 +13,19 @@ interface FullscreenWrapperProps {
   idIntento: number; // <-- Inyectamos el ID transaccional del intento actual
 }
 
+type ExamDocument = Document & { isExitingLegitimately?: boolean };
+
 export function FullscreenWrapper({
   children,
   idIntento,
 }: FullscreenWrapperProps) {
   const router = useRouter();
+  const resumeMarker = `examio_exam_entered_${idIntento}`;
+  const [isResuming] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      sessionStorage.getItem(resumeMarker) === "true",
+  );
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(true);
   const [showWarningModal, setShowWarningModal] = useState(false);
@@ -28,36 +36,40 @@ export function FullscreenWrapper({
   const isFinalizingRef = useRef(false);
 
   // Función centralizada para ejecutar la penalización antifraude de EXAMIO
-  const triggerFraudePenalty = async (
-    tipoIncidente: string,
-    detalle: string,
-  ) => {
-    if (isFinalizingRef.current) return;
-    isFinalizingRef.current = true;
+  const triggerFraudePenalty = useCallback(
+    async (tipoIncidente: string, detalle: string) => {
+      if (isFinalizingRef.current) return;
+      isFinalizingRef.current = true;
 
-    if (document.fullscreenElement) {
-      try {
-        await document.exitFullscreen();
-      } catch (err) {
-        console.error("Error al intentar salir de fullscreen:", err);
+      if (document.fullscreenElement) {
+        try {
+          await document.exitFullscreen();
+        } catch (err) {
+          console.error("Error al intentar salir de fullscreen:", err);
+        }
       }
-    }
 
-    setIsFullscreen(false);
-    setShowWarningModal(true);
+      setIsFullscreen(false);
+      setShowWarningModal(true);
 
-    // 1. Impacta el incidente en la tabla AlertaFraude en SQL Server
-    enviarAlerta({ IdIntento: idIntento, TipoIncidente: tipoIncidente, Detalle: detalle });
+      // 1. Impacta el incidente en la tabla AlertaFraude en SQL Server
+      enviarAlerta({
+        IdIntento: idIntento,
+        TipoIncidente: tipoIncidente,
+        Detalle: detalle,
+      });
 
-    // 2. Ejecuta SP_Intento_FinalizarExamen poniendo el estado en 'anulado' o 'entregado' bajo revisión
-    forzarCierreExamen(idIntento);
-  };
+      // 2. Ejecuta SP_Intento_FinalizarExamen poniendo el estado en 'anulado' o 'entregado' bajo revisión
+      forzarCierreExamen(idIntento);
+    },
+    [enviarAlerta, forzarCierreExamen, idIntento],
+  );
 
   // Detectar salida manual de pantalla completa (Tecla ESC)
   useEffect(() => {
     // Listener de cambio de pantalla completa
     const handleFullscreenChange = () => {
-      const doc = document as any;
+      const doc = document as ExamDocument;
       if (doc.isExitingLegitimately) return; // ESCUDO ACTIVO
 
       if (!document.fullscreenElement && isFullscreen) {
@@ -70,7 +82,7 @@ export function FullscreenWrapper({
 
     // Listener de pérdida de foco (Cambiar de pestaña o abrir otra app)
     const handleWindowBlur = () => {
-      const doc = document as any;
+      const doc = document as ExamDocument;
       if (doc.isExitingLegitimately) return; // ESCUDO ACTIVO
 
       triggerFraudePenalty(
@@ -81,7 +93,7 @@ export function FullscreenWrapper({
 
     // Listener de cambio de visibilidad
     const handleVisibilityChange = () => {
-      const doc = document as any;
+      const doc = document as ExamDocument;
       if (doc.isExitingLegitimately) return; // ESCUDO ACTIVO
 
       if (document.visibilityState === "hidden") {
@@ -101,7 +113,7 @@ export function FullscreenWrapper({
       window.removeEventListener("blur", handleWindowBlur);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isFullscreen, idIntento]);
+  }, [isFullscreen, triggerFraudePenalty]);
 
   // Bloqueo estricto de Portapapeles e Inspección de código
   useEffect(() => {
@@ -147,11 +159,12 @@ export function FullscreenWrapper({
       document.removeEventListener("paste", blockClipboard);
       document.removeEventListener("keydown", blockShortcuts);
     };
-  }, [isFullscreen]);
+  }, [enviarAlerta, idIntento, isFullscreen]);
 
   const requestFullscreen = async () => {
     try {
       await document.documentElement.requestFullscreen();
+      sessionStorage.setItem(resumeMarker, "true");
       setIsFullscreen(true);
       setShowFullscreenPrompt(false);
     } catch (err) {
@@ -186,11 +199,14 @@ export function FullscreenWrapper({
                 </svg>
               </div>
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-                Bloqueo de Seguridad Activo
+                {isResuming
+                  ? "Reanudar evaluación"
+                  : "Bloqueo de Seguridad Activo"}
               </h2>
               <p className="mt-2 text-sm text-slate-500 leading-relaxed">
-                Para garantizar la validez de tu examen, la plataforma iniciará
-                el entorno controlado institucional.
+                {isResuming
+                  ? "Restauramos tus preguntas y respuestas guardadas. El temporizador continúa desde el plazo original."
+                  : "Para garantizar la validez de tu examen, la plataforma iniciará el entorno controlado institucional."}
               </p>
               <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-left mt-5 space-y-3">
                 <div className="flex items-start gap-2.5 text-xs text-slate-600 font-medium">
@@ -214,7 +230,7 @@ export function FullscreenWrapper({
                   onClick={requestFullscreen}
                   className="w-full bg-indigo-600 text-white py-3 px-4 text-sm font-bold rounded-xl hover:bg-indigo-700 shadow-sm transition-all"
                 >
-                  Confirmar e Ingresar
+                  {isResuming ? "Continuar examen" : "Confirmar e Ingresar"}
                 </Button>
               </div>
             </div>

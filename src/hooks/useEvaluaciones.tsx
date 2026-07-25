@@ -4,6 +4,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
 import {
   guardarEvaluacionCompleta,
   actualizarEstadoEvaluacion,
@@ -29,6 +30,19 @@ import {
   corregirRespuestaAbierta,
 } from "@/services/api/evaluaciones.api";
 import { ApiError } from "@/lib/api";
+import {
+  clearExamFinalizationRequest,
+  clearExamOutbox,
+  confirmPendingAnswer,
+  enqueuePendingAnswer,
+  getExamOutboxSnapshot,
+  getPendingAnswer,
+  requestExamFinalization,
+  subscribeExamOutbox,
+  updatePendingAnswerState,
+  type ExamOutboxSnapshot,
+  type PendingAnswerRecord,
+} from "@/lib/exam-answer-outbox";
 import type {
   GuardarEvaluacionPayload,
   IniciarIntentoPayload,
@@ -52,6 +66,9 @@ const RECOVERABLE_ANSWER_ERROR_CODES = new Set([
   "RATE_LIMITED",
   "AUTH_INFRASTRUCTURE_ERROR",
   "BFF_UPSTREAM_UNAVAILABLE",
+  "BFF_UPSTREAM_TIMEOUT",
+  "NETWORK_UNAVAILABLE",
+  "REQUEST_TIMEOUT",
 ]);
 
 function shouldKeepPendingAnswer(error: unknown): boolean {
@@ -60,6 +77,73 @@ function shouldKeepPendingAnswer(error: unknown): boolean {
     (RECOVERABLE_ANSWER_ERROR_CODES.has(error.code ?? "") ||
       error.statusCode >= 500)
   );
+}
+
+const syncPromises = new Map<number, Promise<number[]>>();
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function synchronizePendingAnswers(
+  idIntento: number,
+): Promise<number[]> {
+  const existing = syncPromises.get(idIntento);
+  if (existing) return existing;
+
+  const operation = (async () => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) return [];
+
+    const snapshot = await getExamOutboxSnapshot(idIntento);
+    const synchronizedQuestions: number[] = [];
+
+    for (const record of snapshot.answers) {
+      if (record.state === "failed") continue;
+
+      let synchronized = false;
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          await guardarRespuestaAtomica(record.payload);
+          synchronized = await confirmPendingAnswer(
+            record.key,
+            record.version,
+          );
+          if (synchronized) synchronizedQuestions.push(record.idPregunta);
+          break;
+        } catch (error: unknown) {
+          lastError = error;
+          if (!shouldKeepPendingAnswer(error)) {
+            await updatePendingAnswerState(
+              record,
+              "failed",
+              error instanceof Error ? error.message : "Respuesta rechazada",
+            );
+            break;
+          }
+          if (attempt < 2) await wait(750 * 2 ** attempt);
+        }
+      }
+
+      if (!synchronized && shouldKeepPendingAnswer(lastError)) {
+        await updatePendingAnswerState(
+          record,
+          "pending",
+          lastError instanceof Error
+            ? lastError.message
+            : "Sin conexión para sincronizar",
+        );
+        break;
+      }
+    }
+
+    return synchronizedQuestions;
+  })().finally(() => {
+    syncPromises.delete(idIntento);
+  });
+
+  syncPromises.set(idIntento, operation);
+  return operation;
 }
 
 // --- HOOKS DEL PROFESOR ---
@@ -135,10 +219,11 @@ export const usePrecargarOpcionesExamen = (
 export const useGuardarRespuesta = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: (payload: GuardarRespuestaPayload) => guardarRespuestaAtomica(payload),
     onMutate: async (payload) => {
-      if (payload.IdOpcionNueva === undefined) return;
+      const outboxRecord = await enqueuePendingAnswer(payload);
+      if (payload.IdOpcionNueva === undefined) return { outboxRecord };
 
       const queryKey = [
         "pregunta",
@@ -157,13 +242,195 @@ export const useGuardarRespuesta = () => {
         })),
       );
 
-      return { previousOptions, queryKey };
+      return { previousOptions, queryKey, outboxRecord };
     },
-    onError: (error, _payload, context) => {
-      if (!context?.previousOptions || shouldKeepPendingAnswer(error)) return;
-      queryClient.setQueryData(context.queryKey, context.previousOptions);
+    onSuccess: async (_data, _payload, context) => {
+      if (!context?.outboxRecord) return;
+      await confirmPendingAnswer(
+        context.outboxRecord.key,
+        context.outboxRecord.version,
+      );
+    },
+    onError: async (error, _payload, context) => {
+      if (!context?.outboxRecord) return;
+      if (shouldKeepPendingAnswer(error)) {
+        await updatePendingAnswerState(
+          context.outboxRecord,
+          "pending",
+          error instanceof Error ? error.message : "Sin conexión para guardar",
+        );
+        return;
+      }
+
+      await updatePendingAnswerState(
+        context.outboxRecord,
+        "failed",
+        error instanceof Error ? error.message : "Respuesta rechazada",
+      );
+      if (context.previousOptions) {
+        queryClient.setQueryData(context.queryKey, context.previousOptions);
+      }
     },
   });
+
+  const persistPending = useCallback(
+    (payload: GuardarRespuestaPayload) => enqueuePendingAnswer(payload),
+    [],
+  );
+
+  return { ...mutation, persistPending };
+};
+
+export const usePendingAnswer = (
+  idIntento: number,
+  idPregunta: number,
+) => {
+  const [record, setRecord] = useState<PendingAnswerRecord>();
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      void getPendingAnswer(idIntento, idPregunta).then((nextRecord) => {
+        if (active) setRecord(nextRecord);
+      });
+    };
+    refresh();
+    const unsubscribe = subscribeExamOutbox(refresh);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [idIntento, idPregunta]);
+
+  return record;
+};
+
+export const useExamAnswerSync = (idIntento: number) => {
+  const queryClient = useQueryClient();
+  const [snapshot, setSnapshot] = useState<ExamOutboxSnapshot>({
+    answers: [],
+    finalizeRequested: false,
+    durable: true,
+  });
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncRevision, setSyncRevision] = useState(0);
+  const [isOnline, setIsOnline] = useState(
+    () => typeof navigator === "undefined" || navigator.onLine,
+  );
+
+  const refreshSnapshot = useCallback(async () => {
+    if (!idIntento) return;
+    setSnapshot(await getExamOutboxSnapshot(idIntento));
+  }, [idIntento]);
+
+  const syncNow = useCallback(async () => {
+    if (!idIntento) {
+      return {
+        synchronizedQuestions: [],
+        snapshot: {
+          answers: [],
+          finalizeRequested: false,
+          durable: true,
+        } satisfies ExamOutboxSnapshot,
+      };
+    }
+    setIsSyncing(true);
+    try {
+      const synchronizedQuestions =
+        await synchronizePendingAnswers(idIntento);
+      await Promise.all(
+        synchronizedQuestions.map((idPregunta) =>
+          queryClient.invalidateQueries({
+            queryKey: ["pregunta", idPregunta, "opciones", idIntento],
+          }),
+        ),
+      );
+      const nextSnapshot = await getExamOutboxSnapshot(idIntento);
+      setSnapshot(nextSnapshot);
+      setSyncRevision((revision) => revision + 1);
+      return { synchronizedQuestions, snapshot: nextSnapshot };
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [idIntento, queryClient]);
+
+  useEffect(() => {
+    const initialRefresh = window.setTimeout(() => {
+      void refreshSnapshot();
+    }, 0);
+    const unsubscribe = subscribeExamOutbox(() => {
+      void refreshSnapshot();
+    });
+    return () => {
+      window.clearTimeout(initialRefresh);
+      unsubscribe();
+    };
+  }, [refreshSnapshot]);
+
+  useEffect(() => {
+    if (!isOnline) return;
+    const initialSync = window.setTimeout(() => {
+      void syncNow();
+    }, 0);
+    return () => window.clearTimeout(initialSync);
+  }, [isOnline, syncNow]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      void syncNow();
+    };
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [syncNow]);
+
+  useEffect(() => {
+    if (!isOnline || snapshot.answers.length === 0) return;
+    const interval = window.setInterval(() => {
+      void syncNow();
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, [isOnline, snapshot.answers.length, syncNow]);
+
+  useEffect(() => {
+    if (snapshot.answers.length === 0) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [snapshot.answers.length]);
+
+  const requestFinalization = useCallback(async () => {
+    await requestExamFinalization(idIntento);
+    await refreshSnapshot();
+  }, [idIntento, refreshSnapshot]);
+
+  const cancelFinalization = useCallback(async () => {
+    await clearExamFinalizationRequest(idIntento);
+    await refreshSnapshot();
+  }, [idIntento, refreshSnapshot]);
+
+  const clearOutbox = useCallback(async () => {
+    await clearExamOutbox(idIntento);
+    await refreshSnapshot();
+  }, [idIntento, refreshSnapshot]);
+
+  return {
+    snapshot,
+    isOnline,
+    isSyncing,
+    syncRevision,
+    syncNow,
+    requestFinalization,
+    cancelFinalization,
+    clearOutbox,
+  };
 };
 
 export const useFinalizarExamen = () => {
