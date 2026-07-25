@@ -145,7 +145,7 @@ export default function DocentesPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
                     {isLoading ? (
-                      <tr><td colSpan={3} className="p-8 text-center text-slate-400">Consultando tablas en puerto 55803...</td></tr>
+                      <tr><td colSpan={3} className="p-8 text-center text-slate-400">Consultando docentes...</td></tr>
                     ) : docentesPaginados.length === 0 ? (
                       <tr><td colSpan={3} className="p-8 text-center text-slate-400 italic">No se registran profesores con esos criterios de búsqueda.</td></tr>
                     ) : docentesPaginados.map(doc => {

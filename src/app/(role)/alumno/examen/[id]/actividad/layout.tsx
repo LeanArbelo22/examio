@@ -5,6 +5,7 @@ import { use, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   useGetExamenSorteado,
+  useExamAnswerSync,
   useFinalizarExamen,
   usePrecargarOpcionesExamen,
 } from "@/hooks/useEvaluaciones";
@@ -30,14 +31,28 @@ export default function ActivityLayout({
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [isPreparingDelivery, setIsPreparingDelivery] = useState(false);
   const autoSubmittedRef = useRef(false);
+  const deliveryRunningRef = useRef(false);
+  const lastAutomaticSyncRevisionRef = useRef(0);
 
   const { data: preguntas, isLoading } = useGetExamenSorteado(idIntento);
   usePrecargarOpcionesExamen(idIntento, preguntas);
-  const { mutate: finalizarExamen, isPending: finalizando } =
+  const { mutateAsync: finalizarExamen, isPending: finalizando } =
     useFinalizarExamen();
+  const {
+    snapshot: outbox,
+    isOnline,
+    isSyncing,
+    syncRevision,
+    syncNow,
+    requestFinalization,
+    cancelFinalization,
+    clearOutbox,
+  } = useExamAnswerSync(idIntento);
 
   const totalQuestions = preguntas?.length || 0;
+  const isDelivering = finalizando || isSyncing || isPreparingDelivery;
 
   const handlePrevious = () => {
     if (currentActivityId > 1) {
@@ -51,47 +66,99 @@ export default function ActivityLayout({
     }
   };
 
-  const ejecutarCierreTransaccional = useCallback(() => {
+  const ejecutarCierreTransaccional = useCallback(async () => {
+    if (deliveryRunningRef.current) return;
+    deliveryRunningRef.current = true;
+    setIsPreparingDelivery(true);
     setErrorServidor(null);
+    setShowConfirmModal(true);
 
-    const doc = document as ExamDocument;
-    doc.isExitingLegitimately = true;
-
-    finalizarExamen(idIntento, {
-      onSuccess: () => {
-        if (document.fullscreenElement) {
-          document
-            .exitFullscreen()
-            .then(() => {
-              delete doc.isExitingLegitimately;
-              router.replace("/alumno");
-            })
-            .catch(() => {
-              router.replace("/alumno");
-            });
-        } else {
-          router.replace("/alumno");
-        }
-      },
-      onError: (error: unknown) => {
-        delete doc.isExitingLegitimately;
-        setShowConfirmModal(true);
+    try {
+      await requestFinalization();
+      if (!isOnline) {
         setErrorServidor(
-          error instanceof ApiError &&
-            (error.statusCode === 401 ||
-              error.statusCode === 409 ||
-              error.statusCode === 429 ||
-              error.statusCode >= 500)
-            ? "No pudimos sincronizar la sesión para entregar. El intento continúa abierto."
-            : error instanceof Error
-              ? error.message
-              : "Error de comunicación transaccional con el backend.",
+          "No hay conexión. La entrega quedó pendiente y se retomará cuando vuelva la conectividad.",
         );
-      },
-    });
-  }, [finalizarExamen, idIntento, router]);
+        return;
+      }
+      const synchronization = await syncNow();
+      if (synchronization.snapshot.answers.length > 0) {
+        setErrorServidor(
+          isOnline
+            ? "Todavía hay respuestas pendientes. Revisalas o reintentá la sincronización antes de entregar."
+            : "No hay conexión. Tus respuestas permanecen guardadas en este dispositivo y la entrega sigue pendiente.",
+        );
+        return;
+      }
+
+      await finalizarExamen(idIntento);
+      await clearOutbox();
+      sessionStorage.removeItem(`examio_exam_entered_${idIntento}`);
+      sessionStorage.removeItem(`examio_deadline_${idIntento}`);
+      for (const pregunta of preguntas ?? []) {
+        localStorage.removeItem(
+          `examio_rta_abierta_${idIntento}_${pregunta.idPregunta}`,
+        );
+      }
+
+      const doc = document as ExamDocument;
+      doc.isExitingLegitimately = true;
+      if (document.fullscreenElement) {
+        try {
+          await document.exitFullscreen();
+        } catch {
+          // La entrega ya fue confirmada; la navegación no depende de fullscreen.
+        }
+      }
+      router.replace("/alumno");
+    } catch (error: unknown) {
+      setErrorServidor(
+        error instanceof ApiError &&
+          (error.statusCode === 0 ||
+            error.statusCode === 401 ||
+            error.statusCode === 409 ||
+            error.statusCode === 429 ||
+            error.statusCode >= 500)
+          ? "No pudimos completar la entrega. El intento y las respuestas pendientes permanecen protegidos."
+          : error instanceof Error
+            ? error.message
+            : "Error de comunicación transaccional con el backend.",
+      );
+    } finally {
+      deliveryRunningRef.current = false;
+      setIsPreparingDelivery(false);
+    }
+  }, [
+    clearOutbox,
+    finalizarExamen,
+    idIntento,
+    isOnline,
+    preguntas,
+    requestFinalization,
+    router,
+    syncNow,
+  ]);
+
+  useEffect(() => {
+    if (
+      !outbox.finalizeRequested ||
+      outbox.answers.length > 0 ||
+      syncRevision === 0 ||
+      lastAutomaticSyncRevisionRef.current === syncRevision
+    ) {
+      return;
+    }
+    lastAutomaticSyncRevisionRef.current = syncRevision;
+    void ejecutarCierreTransaccional();
+  }, [
+    ejecutarCierreTransaccional,
+    outbox.answers.length,
+    outbox.finalizeRequested,
+    syncRevision,
+  ]);
 
   const salirConIntentoAbierto = async () => {
+    await cancelFinalization();
     const doc = document as Document & { isExitingLegitimately?: boolean };
     doc.isExitingLegitimately = true;
     if (document.fullscreenElement) {
@@ -183,7 +250,7 @@ export default function ActivityLayout({
                   return (
                     <button
                       key={stepNum}
-                      disabled={finalizando}
+                      disabled={isDelivering}
                       onClick={() =>
                         router.push(`/alumno/examen/${id}/actividad/${stepNum}`)
                       }
@@ -207,14 +274,14 @@ export default function ActivityLayout({
               <button
                 type="button"
                 onClick={handlePrevious}
-                disabled={currentActivityId === 1 || finalizando}
+                disabled={currentActivityId === 1 || isDelivering}
                 className="text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-1 py-2 px-3 rounded-lg hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
               >
                 ← Anterior
               </button>
               <button
                 type="button"
-                disabled={finalizando}
+                disabled={isDelivering}
                 onClick={
                   currentActivityId === totalQuestions
                     ? () => setShowConfirmModal(true)
@@ -227,7 +294,7 @@ export default function ActivityLayout({
                 } disabled:opacity-50`}
               >
                 {currentActivityId === totalQuestions
-                  ? finalizando
+                  ? isDelivering
                     ? "Procesando..."
                     : "Finalizar Examen ✓"
                   : "Siguiente →"}
@@ -236,6 +303,29 @@ export default function ActivityLayout({
           </div>
         </main>
       </div>
+
+      {(!isOnline || outbox.answers.length > 0 || !outbox.durable) && (
+        <div
+          role="status"
+          className="fixed bottom-4 left-1/2 z-40 w-[min(92vw,42rem)] -translate-x-1/2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900 shadow-lg"
+        >
+          {!outbox.durable
+            ? "El navegador no permite almacenamiento durable. No cierres ni recargues esta pestaña."
+            : !isOnline
+              ? `Sin conexión. ${outbox.answers.length} respuesta(s) permanecen pendientes en este dispositivo.`
+              : `${outbox.answers.length} respuesta(s) pendiente(s) de sincronización.`}
+          {isOnline && outbox.answers.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void syncNow()}
+              disabled={isSyncing}
+              className="ml-2 underline underline-offset-2 disabled:opacity-50"
+            >
+              {isSyncing ? "Sincronizando…" : "Reintentar ahora"}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* MODAL DE CONFIRMACIÓN IN-DOM */}
       {showConfirmModal && (
@@ -308,8 +398,9 @@ export default function ActivityLayout({
 
               <div className="flex gap-3 w-full mt-6">
                 <Button
-                  disabled={finalizando}
+                  disabled={isDelivering}
                   onClick={() => {
+                    void cancelFinalization();
                     setShowConfirmModal(false);
                     setErrorServidor(null);
                   }}
@@ -320,14 +411,14 @@ export default function ActivityLayout({
 
                 <Button
                   onClick={ejecutarCierreTransaccional}
-                  disabled={finalizando}
+                  disabled={isDelivering}
                   className={`w-full text-white py-2.5 text-xs font-bold rounded-xl shadow-sm transition-all ${
                     errorServidor
                       ? "bg-rose-600 hover:bg-rose-700"
                       : "bg-emerald-600 hover:bg-emerald-700"
                   } disabled:opacity-50`}
                 >
-                  {finalizando
+                  {isDelivering
                     ? "Procesando..."
                     : errorServidor
                       ? "Reintentar Entrega"

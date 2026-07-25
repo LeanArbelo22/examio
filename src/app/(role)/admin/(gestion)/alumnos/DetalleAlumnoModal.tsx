@@ -5,13 +5,10 @@ import { useGetMateriasAlumno } from "@/hooks/useAlumnos";
 import { useGetCarreras } from "@/hooks/useCarreras";
 import { useGetMaterias } from "@/hooks/useMaterias";
 import { useGetComisiones } from "@/hooks/useComisiones";
-import { apiFetch } from "@/lib/api";
-import { useQueryClient } from "@tanstack/react-query";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Button } from "@/components/ui/Button";
 
 export const DetalleAlumnoModal = ({ matricula }: { matricula: number }) => {
-  const queryClient = useQueryClient();
   const { data: inscripciones, isLoading: loadIns, isError: errIns } = useGetMateriasAlumno(matricula);
   
   // COPRÓSITOS DE FILTRADO EN CASCADA
@@ -38,29 +35,14 @@ export const DetalleAlumnoModal = ({ matricula }: { matricula: number }) => {
     return comisiones.filter(c => c.materia === materiaObj.nombre);
   }, [comisiones, formMateria, materias]);
 
-  const [isInscribing, setIsInscribing] = useState(false);
+  const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
 
-  const handleInscribir = async (e: React.FormEvent) => {
+  const handleInscribir = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formComision) return;
-
-    setIsInscribing(true);
-    try {
-      // NOTA: Este endpoint no está expuesto en la API Node actual.
-      // Se inyecta directamente como fetch de respaldo para no romper el flujo.
-      await apiFetch("/alumnos/${matricula}/inscribir", {
-        method: "POST",
-        body: JSON.stringify({ IdMateriaDivision: Number(formComision) }),
-      });
-      queryClient.invalidateQueries({ queryKey: ["alumnos", matricula, "materias"] });
-      setFormCarrera("");
-      setFormMateria("");
-      setFormComision("");
-    } catch {
-      // Silencioso para no interrumpir UX si el endpoint no existe
-    } finally {
-      setIsInscribing(false);
-    }
+    setEnrollmentError(
+      "La API todavía no ofrece el contrato necesario para inscribir alumnos en una comisión.",
+    );
   };
 
   return (
@@ -103,8 +85,10 @@ export const DetalleAlumnoModal = ({ matricula }: { matricula: number }) => {
           </select>
         </div>
 
-        <Button type="submit" disabled={isInscribing || !formComision} className="w-full bg-slate-900 text-white text-xs font-bold py-2 rounded-xl">
-          {isInscribing ? "Escribiendo Registro en SQL..." : "Confirmar Inscripción de Alumno"}
+        {enrollmentError && <ErrorMessage message={enrollmentError} />}
+
+        <Button type="submit" disabled={!formComision} className="w-full bg-slate-900 text-white text-xs font-bold py-2 rounded-xl">
+          Confirmar Inscripción de Alumno
         </Button>
       </form>
 
@@ -120,8 +104,8 @@ export const DetalleAlumnoModal = ({ matricula }: { matricula: number }) => {
           <p className="text-xs text-slate-400 italic text-center py-4 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">El legajo no registra asignaturas cursando actualmente.</p>
         ) : (
           <div className="divide-y divide-slate-100 border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
-            {inscripciones.map((ins: any, idx: number) => (
-              <div key={idx} className="p-4 bg-white flex justify-between items-center group hover:bg-slate-50/40 transition-colors">
+            {inscripciones.map((ins) => (
+              <div key={`${ins.matricula}-${ins.materia}-${ins.division}`} className="p-4 bg-white flex justify-between items-center group hover:bg-slate-50/40 transition-colors">
                 <div>
                   {/* Mapeo de alias exactos de SP_Alumno_VerMaterias: ins.Materia e ins.Division */}
                   <p className="font-bold text-slate-800 tracking-tight text-sm">
