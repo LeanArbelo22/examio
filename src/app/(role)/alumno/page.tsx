@@ -23,10 +23,10 @@ export default function AlumnoPage() {
   const { data: intentosRealizados = [] } = useGetIntentosDetallados(identificador);
   const { data: historial = [] } = useGetHistorialCorregido(identificador);
 
-  const activas = (pendingActivities ?? []).filter((e: any) => !e.intentosAgotados);
-  const entregados = (intentosRealizados ?? []).filter((i: any) => i.estado !== "en_progreso");
+  const activas = pendingActivities.filter((evaluacion) => !evaluacion.intentosAgotados);
+  const entregados = intentosRealizados.filter((intento) => intento.estado !== "en_progreso");
 
-  const ultimosResultados = (historial ?? []).slice(0, 3);
+  const ultimosResultados = historial.slice(0, 3);
 
   const promedio = stats?.promedioGeneral != null ? Number(stats.promedioGeneral).toFixed(1) : "0.0";
   const porcentaje = stats?.porcentajeAprobacion != null ? `${Math.round(stats.porcentajeAprobacion)}%` : "0%";
@@ -55,11 +55,13 @@ export default function AlumnoPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {activas.map((exam: any) => {
-            const idPublicacion = exam.IdPublicacion ?? exam.idPublicacion;
-            const materia = exam.Materia ?? exam.materia;
-            const duracionMinutos = exam.DuracionMinutos ?? exam.duracionMinutos;
-            const fechaFin = exam.FechaFin ?? exam.fechaFin;
+          {activas.map((exam) => {
+            const {
+              idPublicacion,
+              materia,
+              duracionMinutos,
+              fechaFin,
+            } = exam;
 
             return (
               <div
@@ -125,7 +127,7 @@ export default function AlumnoPage() {
           <div className="mt-8">
             <h3 className="text-base font-bold text-slate-500 tracking-tight mb-3">Exámenes entregados</h3>
             <div className="space-y-2">
-              {entregados.map((exam: any) => (
+              {entregados.map((exam) => (
                 <div
                   key={exam.idIntento}
                   className="flex items-center justify-between gap-4 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3"

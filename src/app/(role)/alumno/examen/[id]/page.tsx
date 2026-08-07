@@ -6,16 +6,18 @@ import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSession } from "next-auth/react";
 import {
-  useGetDetallePublicacion,
   useIniciarIntento,
   useGetExamenesPendientes,
 } from '@/hooks/useEvaluaciones';
+import { FeedbackMessage } from "@/components/ui/FeedbackMessage";
+import { getUserErrorMessage } from "@/lib/errors";
 
 export default function ExamStartPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
   const { data: session } = useSession();
   const [isLaunching, setIsLaunching] = useState(false);
+  const [launchError, setLaunchError] = useState<string | null>(null);
 
   const idPublicacion = Number(id);
 
@@ -24,22 +26,26 @@ export default function ExamStartPage({ params }: { params: Promise<{ id: string
     ? Number(session.user.identificadorInstitucional) 
     : 0;
 
-  // 2. Traemos la cabecera real de la publicación desde SQL Server
-  const { data: examData, isLoading, isError } = useGetDetallePublicacion(idPublicacion);
-  const { data: pendientes } = useGetExamenesPendientes(matriculaAlumno);
+  const {
+    data: pendientes,
+    isLoading,
+    isError,
+  } = useGetExamenesPendientes(matriculaAlumno);
   const { mutate: iniciarIntento } = useIniciarIntento();
+  const examData = pendientes?.find(
+    (evaluacion) => evaluacion.idPublicacion === idPublicacion,
+  );
 
   useEffect(() => {
-    if (!Array.isArray(pendientes)) return;
+    if (isLoading) return;
     if (isError) {
       router.replace("/alumno");
       return;
     }
-    const examen = pendientes.find((e: any) => (e.IdPublicacion ?? e.idPublicacion) === idPublicacion);
-    if (!examen || examen.intentosAgotados) {
+    if (!examData || examData.intentosAgotados) {
       router.replace("/alumno");
     }
-  }, [pendientes, idPublicacion, isError, router]);
+  }, [examData, isError, isLoading, router]);
 
   if (isLoading) {
     return (
@@ -58,41 +64,38 @@ export default function ExamStartPage({ params }: { params: Promise<{ id: string
   }
 
   const mappedExam = {
-    ...examData,
     carrera: examData.carrera,
-    catedra: examData.catedra,
-    subject: examData.subject,
-    professor: examData.professor,
+    catedra: examData.materia,
+    subject: examData.titulo,
+    professor: examData.docente,
     duration: examData.duracionMinutos,
-    descripcion: examData.descripcion,
     dueDate: examData.fechaFin,
     recursosPermitidos: examData.recursosPermitidos,
   };
 
   const handleStartExam = () => {
     setIsLaunching(true);
-    
-    console.log("DEBUG handleStartExam:", { idPublicacion, matriculaAlumno, sessionUser: session?.user });
+    setLaunchError(null);
     
     iniciarIntento(
       { IdPublicacion: idPublicacion, IdAlumno: matriculaAlumno },
       {
-        onSuccess: (data: any) => {
-          console.log("DEBUG iniciarIntento onSuccess response:", JSON.stringify(data));
-          const idIntento = Array.isArray(data) ? data[0]?.idIntento : data.IdIntento ?? data.idIntento;
+        onSuccess: (data) => {
+          const { idIntento } = data;
           if (!idIntento) {
             setIsLaunching(false);
-            alert("La API no devolvió un ID de intento válido.");
+            setLaunchError("No se pudo iniciar el intento correctamente.");
             return;
           }
           const deadline = Date.now() + (mappedExam.duration || 90) * 60 * 1000;
           sessionStorage.setItem(`examio_deadline_${idIntento}`, String(deadline));
           router.push(`/alumno/examen/${idIntento}/actividad/1`);
         },
-        onError: (error: any) => {
-          console.log("DEBUG iniciarIntento onError:", error);
+        onError: (error) => {
           setIsLaunching(false);
-          alert("Error de consistencia al impactar el inicio del intento en SQL.");
+          setLaunchError(
+            getUserErrorMessage(error, "No se pudo iniciar el examen."),
+          );
         }
       }
     );
@@ -127,12 +130,17 @@ export default function ExamStartPage({ params }: { params: Promise<{ id: string
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
+            {launchError && (
+              <div className="mb-4">
+                <FeedbackMessage variant="error" message={launchError} />
+              </div>
+            )}
             <h3 className="text-lg font-bold text-slate-800 tracking-tight mb-4 flex items-center gap-2">
               📝 Instrucciones Generales
             </h3>
             
             <div className="text-sm text-slate-600 space-y-3 leading-relaxed">
-              <p>{mappedExam.descripcion || "Sin descripción adicional provista por la cátedra."}</p>
+              <p>Leé atentamente cada consigna antes de responder.</p>
               <p>• Asegúrate de contar con una conexión estable a internet durante la resolución.</p>
               <p>• La navegación entre reactivos quedará registrada con telemetría de permanencia.</p>
             </div>

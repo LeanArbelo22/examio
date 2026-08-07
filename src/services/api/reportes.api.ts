@@ -4,7 +4,16 @@ import type {
   ReporteRendimientoDetalle,
   ReporteRendimientoFiltros,
   ReporteRendimientoListado,
+  ReporteEvaluacionesFiltros,
+  ReporteEvaluacionesListado,
 } from "@/types/index";
+
+export const obtenerReporteRendimientoEvaluaciones = (
+  filtros: ReporteEvaluacionesFiltros,
+): Promise<ReporteEvaluacionesListado> =>
+  apiFetch<ReporteEvaluacionesListado>(
+    `/reportes/rendimiento-evaluaciones${buildQueryString(filtros)}`,
+  );
 
 export const obtenerReporteRendimiento = (
   filtros: ReporteRendimientoFiltros,

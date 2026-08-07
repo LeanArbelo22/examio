@@ -14,7 +14,7 @@ Nunca debe asumirse que ocultar una acción o proteger una ruta en el cliente re
 ## Stack real
 
 - Next.js 16 con App Router y React 19.
-- TypeScript 5; la configuración actual todavía no usa modo estricto completo.
+- TypeScript 5 con `strict: true`.
 - Tailwind CSS 4 y estilos globales en `src/app/globals.css`.
 - Fuente Geist mediante `next/font`.
 - NextAuth 4 con Credentials Provider y sesión JWT.
@@ -49,13 +49,16 @@ Examio API
 - `src/services/api` traduce operaciones de dominio a contratos HTTP.
 - `src/lib` concentra infraestructura: cliente HTTP, NextAuth, schemas, auxiliares y la outbox IndexedDB del examen.
 - `src/types` contiene entidades, DTOs, payloads y ampliaciones de NextAuth.
+  `index.ts` es el barrel compatible; las definiciones viven en `shared`, `api`,
+  `auth`, `alumnos`, `academic`, `evaluaciones`, `administracion` y `reportes`.
 - `src/assets` contiene recursos importados por componentes.
 - Los estilos globales viven en `src/app/globals.css`.
 
 No existen actualmente `src/context`, `src/utils`, `src/styles` ni `src/providers`.
 Los providers se encuentran en `src/components/providers`.
 El estado compartido de servidor se resuelve con React Query y la sesión con `SessionProvider`.
-El manejo de errores todavía es mixto: `ApiError`, `ErrorMessage`, estados locales y algunos `alert()`.
+`src/lib/errors.ts` clasifica `ApiError`, produce mensajes seguros y agrupa errores de validación.
+El feedback común usa `FeedbackMessage`, `RequestErrorState`, `LoadingState` y `EmptyState`.
 
 ## Mapa rápido del repositorio
 
@@ -178,10 +181,14 @@ Consultar `docs/DATABASE.md` cuando la tarea dependa de entidades, relaciones o 
 Antes de crear UI, buscar por nombre y revisar un caso equivalente.
 Componentes compartidos conocidos:
 
-- UI: `Button`, `Modal`, `ErrorMessage`, `DashboardCard`, `Breadcrumbs`, `FullscreenWrapper`.
+- UI: `Button`, `Modal`, `FeedbackMessage`, `RequestErrorState`, `LoadingState`,
+  `EmptyState`, `Pagination`, `StatusBadge`, `ErrorMessage`, `DashboardCard`,
+  `Breadcrumbs`, `FullscreenWrapper`.
+- Administración: `ManagementPageHeader`, `ManagementFilterPanel` y
+  `ManagementSectionHeader`.
 - Layout: `Navbar`, `Header`, `Footer`.
 - Reportes: `ReportLayout`, `ReportFilterPanel`, `ReportKpiGrid`, `ReportTable`, `ChartCard`,
-  `ReportCharts` y `StudentReportDetail`.
+  `ReportSkeleton`, gráficos específicos por reporte y `StudentReportDetail`.
 
 Los componentes verdaderamente genéricos pertenecen a `src/components/ui` o al dominio compartido correspondiente.
 Los componentes específicos pueden permanecer junto a la feature si aún no existe reutilización real.
@@ -197,7 +204,10 @@ Usar PascalCase para componentes, prefijo `use` para hooks y alias `@/` para imp
 
 No hay una solución universal de formularios instalada.
 El login usa Zod, Server Action y `useActionState`.
-Los CRUD existentes usan principalmente estado controlado y validación HTML nativa.
+La creación de examen usa `src/lib/schemas/examSchema.ts`, estado controlado y
+un transformador independiente en `src/lib/exam-form.ts`. Materias valida el
+patrón reducido con su propio schema. `FormFieldError` presenta errores por path.
+Otros CRUD todavía usan principalmente estado controlado y validación HTML nativa.
 El backend siempre debe volver a validar datos y permisos.
 
 Al modificar formularios:
@@ -207,6 +217,8 @@ Al modificar formularios:
 - Asociar labels, ayudas y errores a sus campos.
 - Mostrar mensajes funcionales; no revelar errores internos de la API.
 - Transformar al casing esperado en el límite del servicio, no dispersarlo por la vista.
+- Validar campos al perder foco y volver a validar el formulario completo al enviar.
+- Para fechas locales, validar fecha real, orden temporal y una ventana de año razonable antes de convertir a ISO.
 - No incorporar React Hook Form u otra dependencia sin un caso aprobado que justifique el cambio.
 
 ## Estado y datos
@@ -222,28 +234,38 @@ Preferir estado derivado a copias sincronizadas mediante effects.
 Memoizar solo cuando exista un beneficio concreto o una identidad estable sea necesaria.
 
 Las query keys son arrays serializables, jerárquicos y comienzan por dominio.
-Deben incluir filtros, paginación y cualquier valor que cambie la respuesta.
-La query y su invalidación deben compartir jerarquía.
-Las fábricas centralizadas de keys están planificadas, pero todavía no son la convención implementada.
+Se construyen con las fábricas de `src/lib/query-keys.ts`; queries e invalidaciones
+deben usar la misma fábrica e incluir filtros, paginación y cualquier valor que
+cambie la respuesta. Los hooks exponen el objeto estándar de React Query; algunos
+mantienen aliases históricos de datos/estado solo por compatibilidad transitoria.
+
+React Query gestiona estado remoto confirmado. El estado local controla interacción
+efímera y la outbox IndexedDB del examen conserva respuestas pendientes; no trasladar
+esas respuestas a React Query como única fuente durable.
 
 ## Testing
 
-Actualmente no existe infraestructura ni suite automatizada del frontend.
-No asumir Jest, Vitest, React Testing Library, MSW o Playwright como disponibles.
-Su evaluación e incorporación están registradas en `PLAN.md` y requieren aprobación.
+El testing usa Vitest 4, jsdom, React Testing Library, `user-event`, `jest-dom` y
+MSW 2. Los tests se ubican junto al módulo probado como `*.test.ts` o `*.test.tsx`;
+la configuración común vive en `vitest.config.ts` y `vitest.setup.ts`.
+`src/test/msw/server.ts` expone el servidor Node compartido para simular `fetch`.
+Declarar handlers por test, usar rutas BFF same-origin y mantener
+`onUnhandledRequest: "error"`; no crear mocks globales permisivos ni simular tokens.
+Playwright no está instalado y su incorporación requiere la etapa y aprobación
+registradas en `PLAN.md`.
 
 Hasta que exista esa infraestructura, validar de forma proporcional:
 
 ```bash
 pnpm eslint <archivos-modificados>
+pnpm test:run
 pnpm tsc --noEmit --incremental false
 pnpm build
 ```
 
 Usar ESLint focalizado durante el desarrollo.
-La suite global presenta errores preexistentes; distinguirlos de regresiones en archivos modificados.
+Ejecutar primero el archivo o patrón de test relacionado y luego `pnpm test:run`.
 Ejecutar el build para cambios de routing, límites Server/Client, configuración o integración relevante.
-Cuando haya tests, ubicar primero los relacionados y ejecutar el archivo o patrón específico antes de toda la suite.
 Los tests del backend y su estrategia de mocks no constituyen tests del frontend.
 
 ## Estilos y UI
@@ -270,12 +292,14 @@ El `Modal` actual no debe asumirse plenamente accesible; revisar su comportamien
   respuestas del BFF, logs, variables públicas o almacenamiento del navegador.
 - **URLs y fetch fuera de la capa:** persisten URL hardcodeada y al menos una llamada directa legacy.
   No replicarlas; revisar el plan antes de centralizarlas.
-- **Contratos débiles:** `strict` no está completo, existen `any` e interfaces duplicadas.
-  Verificar el contrato efectivo antes de reutilizar o eliminar tipos.
-- **React Query no normalizado:** nombres de retorno, keys e invalidaciones varían entre dominios.
-  Seguir el patrón del dominio afectado y no crear una tercera variante.
-- **Errores y feedback heterogéneos:** conviven `ApiError`, `ErrorMessage`, estados locales y `alert()`.
-  Mantener consistencia local; cualquier sistema transversal requiere diseño previo.
+- **Contratos estrictos:** `strict` está activo, no quedan `any` explícitos y los tipos
+  están separados por dominio detrás de un barrel compatible. Verificar siempre
+  el contrato efectivo antes de mover, reutilizar o eliminar tipos.
+- **Aliases históricos de React Query:** algunos hooks conservan aliases de retorno por compatibilidad.
+  Las implementaciones nuevas deben usar el resultado estándar y las fábricas de query keys existentes.
+- **Errores especializados del examen:** el flujo de evaluación maneja sesión, conectividad,
+  respuestas pendientes y fullscreen localmente para no desmontar el intento. No sustituirlo por
+  un error boundary genérico ni eliminar sus avisos sin revisar la política antifraude.
 - **Componentes y páginas monolíticas:** varias pantallas administrativas contienen UI y lógica repetida.
   No refactorizarlas incidentalmente al desarrollar otra feature.
 - **Mocks en código productivo:** algunos dashboards todavía dependen de datos auxiliares/mock.
@@ -301,9 +325,11 @@ El frontend dispone de `pnpm env:check`, `pnpm dev:checked` y documentación de 
 La API expone un health check público que identifica `examio-api` y diferencia disponibilidad HTTP de SQL Server.
 La documentación de frontend, API y base de datos ya está separada.
 
-El primer reporte reutilizable está integrado en `/profesor/reportes`.
-Usa Recharts, filtros sincronizables, paginación/ordenamiento y la familia de componentes de reportes.
-Su generalización debe validarse con un segundo reporte antes de ampliar abstracciones.
+Los reportes por alumno y por publicación de evaluación están integrados en
+`/profesor/reportes`. Comparten layout, filtros, KPIs, tabla, skeleton y tarjetas
+de gráficos; cada reporte conserva sus gráficos y reglas de dominio. Las series
+del reporte por evaluación son agregaciones globales del backend. Las del reporte
+por alumno todavía representan sólo la página visible y deben describirse como tales.
 No se reemplazó la navegación completa del docente ni se creó un sidebar global.
 
 Las fases de autenticación, cliente API, tipado, React Query, errores, testing y accesibilidad siguen gobernadas por `PLAN.md`.

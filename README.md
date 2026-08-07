@@ -20,12 +20,14 @@ Cuando exista una diferencia entre documentación y comportamiento, el código y
 
 - Next.js 16 con App Router.
 - React 19.
-- TypeScript 5.
+- TypeScript 5 con `strict: true`.
 - Tailwind CSS 4.
 - NextAuth 4 con Credentials Provider.
 - TanStack React Query 5.
 - Zod 4.
 - Recharts 3.
+- Vitest 4, jsdom y React Testing Library para tests unitarios y de componentes.
+- Mock Service Worker 2 para simular contratos HTTP en tests sin levantar la API.
 - ESLint 9 con reglas de Next.js.
 - pnpm como gestor de dependencias.
 
@@ -62,11 +64,33 @@ Otros comandos:
 
 ```bash
 pnpm lint
+pnpm test:run
 pnpm build
 pnpm start
 ```
 
-Actualmente el frontend no posee infraestructura de tests automatizados. Su incorporación está registrada en [PLAN.md](./PLAN.md).
+Para desarrollar tests en modo interactivo usar `pnpm test`. Los archivos se ubican junto
+al módulo probado con sufijo `*.test.ts` o `*.test.tsx`.
+
+Las librerías de testing cumplen responsabilidades separadas:
+
+- **Vitest:** runner, assertions, mocks de funciones y ejecución en modo interactivo o CI.
+- **jsdom:** implementación del DOM para ejecutar componentes React sin navegador real.
+- **React Testing Library:** render y consultas orientadas a la experiencia del usuario.
+- **user-event:** interacciones de usuario más fieles que invocar handlers directamente.
+- **jest-dom:** matchers legibles para estado, visibilidad y accesibilidad del DOM.
+- **MSW:** intercepta `fetch` en los tests y responde mediante contratos HTTP declarativos.
+  La configuración usa `setupServer` de Node; no genera un Service Worker productivo,
+  no intercepta el navegador real y no requiere que la API Examio esté levantada.
+
+El servidor compartido vive en `src/test/msw/server.ts`; se inicia desde
+`vitest.setup.ts`, restaura handlers después de cada test y falla ante requests no
+declarados. Los tests de `apiFetch` simulan las rutas same-origin `/api/examio/*` y
+`/api/auth/session`, conservando la frontera BFF sin conocer tokens.
+
+La cobertura actual incluye schemas, transformadores, utilidades, componentes simples,
+el contrato de inicio de intento y el cliente HTTP con refresh/reintento. Los tests de
+hooks y Playwright permanecen como etapas posteriores en [PLAN.md](./PLAN.md).
 
 ## Variables de entorno
 
@@ -145,6 +169,22 @@ Responsabilidades:
 | Infraestructura | `src/lib` | Cliente HTTP, NextAuth, schemas y datos auxiliares |
 | Contratos | `src/types` | Entidades, DTOs, payloads y ampliaciones de NextAuth |
 | Assets | `src/assets` | Imágenes y recursos importados por componentes |
+
+Las escrituras hacia la API conservan el PascalCase documentado por sus schemas.
+Las respuestas se consumen en camelCase después de la normalización del backend.
+`src/types/index.ts` funciona como barrel compatible. Las definiciones están
+separadas en `shared`, `api`, `auth`, `alumnos`, `academic`, `evaluaciones`,
+`administracion` y `reportes`.
+
+Las query keys se construyen con fábricas de `src/lib/query-keys.ts`. Los hooks
+exponen el resultado estándar de TanStack Query y mantienen algunos aliases
+anteriores solo para compatibilidad. React Query representa datos remotos
+confirmados; la outbox IndexedDB conserva las respuestas de examen pendientes.
+
+Los errores HTTP se clasifican en `src/lib/errors.ts`, que distingue validación,
+autenticación, autorización, ausencia, conflicto, red, timeout y servidor. Los
+mensajes técnicos se limitan a desarrollo; la interfaz muestra mensajes funcionales
+seguros y conserva los errores de validación asociados a campos.
 
 No existen actualmente `src/context`, `src/utils`, `src/styles` ni `src/providers`. Los providers están en `src/components/providers` y los estilos globales en `src/app/globals.css`.
 
@@ -401,7 +441,7 @@ Las query keys son arrays serializables. El primer elemento representa el domini
 | Examen | `["examen", "sorteo", idIntento]`, `["pregunta", idPregunta, "opciones", idIntento]` |
 | Intentos | `["intento", id, "completo"]`, `["intentos", "alumno", idAlumno]` |
 | Materias | `["materias"]`, `["comisionesMateria", id]`, `["alumnosMateria", id]` |
-| Reportes | `["reportes", "rendimiento", "listado", filtros]`, `["reportes", "rendimiento", "detalle", matricula, filtros]` |
+| Reportes | `["reportes", "rendimiento", "listado", filtros]`, `["reportes", "rendimiento", "detalle", matricula, filtros]`, `["reportes", "rendimiento-evaluaciones", "listado", filtros]` |
 | Usuarios | `["usuarios"]` |
 
 ### Reglas para nuevas query keys
@@ -413,7 +453,29 @@ Las query keys son arrays serializables. El primer elemento representa el domini
 - No incluir funciones, instancias de clases ni valores no serializables.
 - Evitar crear una convención nueva si ya existe una equivalente.
 
-La creación de fábricas centralizadas de query keys está planificada para la fase 4.
+Las fábricas centralizadas de query keys viven en `src/lib/query-keys.ts`.
+
+## Formularios y validación
+
+El login, la creación de examen y materias usan Zod con alcances acordes a su
+complejidad. La creación de examen separa:
+
+```text
+estado controlado
+  → examFormSchema
+  → errores por path
+  → toGuardarEvaluacionPayload
+  → servicio HTTP
+```
+
+Los campos se validan al perder foco y el formulario completo vuelve a validarse
+al enviar. `FormFieldError` conecta mensajes con `aria-invalid` y
+`aria-describedby`. Apertura y cierre tienen valores iniciales editables, orden
+temporal obligatorio y una ventana máxima de diez años.
+
+No se incorporó React Hook Form: el modelo controlado existente y Zod cubren los
+campos dinámicos sin sumar otra dependencia. Los CRUD simples mantienen schemas
+y transformaciones pequeños, sin una abstracción universal de formularios.
 
 ## Componentes reutilizables
 
@@ -421,10 +483,21 @@ La creación de fábricas centralizadas de query keys está planificada para la 
 
 - `Button`
 - `Modal`
+- `FeedbackMessage`
+- `RequestErrorState`
+- `LoadingState`
+- `EmptyState`
+- `Pagination`
+- `StatusBadge`
 - `ErrorMessage`
 - `DashboardCard`
 - `Breadcrumbs`
 - `FullscreenWrapper`
+
+`FeedbackMessage` aporta regiones accesibles `alert` o `status`.
+`RequestErrorState` normaliza mensajes y solo ofrece reintento cuando el error
+es recuperable. Administración y docente tienen límites `error.tsx`; el área
+del alumno conserva manejo local para no desmontar una evaluación activa.
 
 ### Layout
 
@@ -438,11 +511,28 @@ La creación de fábricas centralizadas de query keys está planificada para la 
 - `ReportFilterPanel`
 - `ReportKpiGrid`
 - `ReportTable`
+- `ReportSkeleton`
 - `ChartCard`
 - `ReportCharts`
+- `EvaluationReportCharts`
 - `StudentReportDetail`
 
-Antes de crear un componente nuevo se debe comprobar si existe uno equivalente. Los componentes de reportes deben validarse con un segundo reporte antes de generalizarse más.
+Los reportes por alumno y por publicación de evaluación comparten esta familia.
+Los gráficos permanecen específicos de cada dominio: el reporte por evaluación
+consume agregaciones globales del backend; los gráficos por alumno representan
+explícitamente la página visible, aunque sus KPIs son globales.
+
+### Administración
+
+- `ManagementPageHeader`
+- `ManagementFilterPanel`
+- `ManagementSectionHeader`
+
+Alumnos y materias validan estos componentes junto con `Pagination`. No existe
+una `DataTable` universal: las acciones y estados de las gestiones todavía no
+justifican esa abstracción.
+
+Antes de crear un componente nuevo se debe comprobar si existe uno equivalente.
 
 ## Estilos
 

@@ -39,7 +39,11 @@ export class ApiError extends Error {
 
 let sessionRefreshPromise: Promise<BrowserSession> | null = null;
 
-function normalizeFetchError(error: unknown, timedOut = false): ApiError {
+function normalizeFetchError(
+  error: unknown,
+  timedOut = false,
+  callerAborted = false,
+): ApiError {
   if (error instanceof ApiError) return error;
   if (timedOut) {
     return new ApiError(
@@ -49,6 +53,7 @@ function normalizeFetchError(error: unknown, timedOut = false): ApiError {
     );
   }
   if (
+    callerAborted ||
     typeof DOMException !== "undefined" &&
     error instanceof DOMException &&
     error.name === "AbortError"
@@ -220,7 +225,11 @@ async function executeApiRequest<T>(
       signal: composedSignal.signal,
     });
   } catch (error: unknown) {
-    throw normalizeFetchError(error, composedSignal.didTimeout());
+    throw normalizeFetchError(
+      error,
+      composedSignal.didTimeout(),
+      callerSignal?.aborted === true,
+    );
   } finally {
     composedSignal.cleanup();
   }

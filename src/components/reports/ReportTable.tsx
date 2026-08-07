@@ -25,6 +25,7 @@ interface ReportTableProps<T, TSort extends string> {
   total: number;
   onPageChange: (page: number) => void;
   emptyMessage?: string;
+  itemLabel?: string;
 }
 
 const alignClasses = { left: "text-left", center: "text-center", right: "text-right" };
@@ -42,6 +43,7 @@ export function ReportTable<T, TSort extends string>({
   total,
   onPageChange,
   emptyMessage = "No hay resultados para los filtros seleccionados.",
+  itemLabel = "resultados",
 }: ReportTableProps<T, TSort>) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
@@ -99,7 +101,7 @@ export function ReportTable<T, TSort extends string>({
         </div>
       )}
       <footer className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-slate-400">{total.toLocaleString("es-AR")} alumnos · Página {page} de {Math.max(totalPages, 1)}</p>
+        <p className="text-xs text-slate-400">{total.toLocaleString("es-AR")} {itemLabel} · Página {page} de {Math.max(totalPages, 1)}</p>
         <div className="flex gap-2">
           <Button type="button" disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 disabled:cursor-not-allowed disabled:opacity-40">Anterior</Button>
           <Button type="button" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 disabled:cursor-not-allowed disabled:opacity-40">Siguiente</Button>

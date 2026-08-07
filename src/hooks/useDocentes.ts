@@ -9,22 +9,23 @@ import {
   getMateriasPorDocente,
   obtenerComisionesPorDocente,
 } from "@/services/api/docentes.api";
-import type { CreateDocentePayload, UpdateDocentePayload, AsignarComisionPayload } from "@/types/index";
+import type { CreateDocentePayload, UpdateDocentePayload } from "@/types/index";
+import { comisionKeys, docenteKeys, isValidId } from "@/lib/query-keys";
 
 export const useGetDocentes = () => {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["docentes"],
+  const query = useQuery({
+    queryKey: docenteKeys.all,
     queryFn: getDocentes,
   });
 
-  return { docentes: data, isLoading, isError };
+  return { ...query, docentes: query.data };
 };
 
 export const useCreateDocente = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: CreateDocentePayload) => createDocente(payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["docentes"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: docenteKeys.all }),
   });
 };
 
@@ -33,7 +34,7 @@ export const useUpdateDocente = () => {
   return useMutation({
     mutationFn: ({ legajo, data }: { legajo: number; data: UpdateDocentePayload }) =>
       updateDocente(legajo, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["docentes"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: docenteKeys.all }),
   });
 };
 
@@ -41,7 +42,7 @@ export const useDeleteDocente = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteDocente,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["docentes"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: docenteKeys.all }),
   });
 };
 
@@ -51,30 +52,30 @@ export const useAssignDocente = () => {
     mutationFn: ({ Legajo, IdMateriaDivision }: { Legajo: number; IdMateriaDivision: number }) =>
       asignarDocenteAComision(Legajo, { IdMateriaDivision }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["comisiones"] });
+      queryClient.invalidateQueries({ queryKey: comisionKeys.all });
     },
   });
 };
 
 export const useGetDocentesPorEstado = (estado: boolean) => {
   return useQuery({
-    queryKey: ["docentes", "estado", estado],
+    queryKey: docenteKeys.estado(estado),
     queryFn: () => getDocentesPorEstado(estado),
   });
 };
 
 export const useGetMateriasPorDocente = (legajo: number | null) => {
   return useQuery({
-    queryKey: ["docentes", legajo, "materias"],
+    queryKey: docenteKeys.materias(legajo!),
     queryFn: () => getMateriasPorDocente(legajo!),
-    enabled: !!legajo,
+    enabled: isValidId(legajo),
   });
 };
 
 export const useGetComisionesDocente = (legajo: number) => {
   return useQuery({
-    queryKey: ["docente", legajo, "comisiones"],
+    queryKey: docenteKeys.comisiones(legajo),
     queryFn: () => obtenerComisionesPorDocente(legajo),
-    enabled: !!legajo,
+    enabled: isValidId(legajo),
   });
 };

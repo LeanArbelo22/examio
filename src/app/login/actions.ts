@@ -2,7 +2,22 @@
 
 import { loginSchema } from "@/lib/schemas/loginSchema";
 
-export async function loginAction(prevState: any, formData: FormData) {
+export interface LoginActionState {
+  success: boolean;
+  data?: {
+    email: string;
+    password: string;
+  };
+  errors: {
+    email: string | null;
+    password: string | null;
+  } | null;
+}
+
+export async function loginAction(
+  _prevState: LoginActionState,
+  formData: FormData,
+): Promise<LoginActionState> {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
@@ -24,7 +39,10 @@ export async function loginAction(prevState: any, formData: FormData) {
   // 2. Si es válido, devolvemos los datos limpios para el signIn en el cliente
   return {
     success: true,
-    data: result.data,
+    data: {
+      email: result.data.email!,
+      password: result.data.password,
+    },
     errors: null,
   };
 }

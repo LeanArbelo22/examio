@@ -9,36 +9,38 @@ import {
 } from "@/services/api/materias.api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CreateMateriaPayload, UpdateMateriaPayload, AsignarDivisionPayload } from "@/types/index";
+import { comisionKeys, isValidId, materiaKeys } from "@/lib/query-keys";
+import { logClientError } from "@/lib/errors";
 
 export const useGetMaterias = () => {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["materias"],
+  const query = useQuery({
+    queryKey: materiaKeys.all,
     queryFn: getMaterias,
   });
 
   return {
-    materias: data,
-    isLoading,
-    isError,
+    ...query,
+    materias: query.data,
   };
 };
 
 export const useCreateMateria = () => {
   const queryClient = useQueryClient();
 
-  const { mutate, isPending } = useMutation({
+  const mutation = useMutation({
     mutationFn: (payload: CreateMateriaPayload) => postMateria(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["materias"] });
+      queryClient.invalidateQueries({ queryKey: materiaKeys.all });
     },
     onError: (error: Error) => {
-      console.error("Error al crear la materia:", error.message);
+      logClientError(error, { feature: "materias:create" });
     },
   });
 
   return {
-    createMateria: mutate,
-    isCreating: isPending,
+    ...mutation,
+    createMateria: mutation.mutate,
+    isCreating: mutation.isPending,
   };
 };
 
@@ -48,10 +50,10 @@ export const useUpdateMateria = () => {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateMateriaPayload }) => updateMateria(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["materias"] });
+      queryClient.invalidateQueries({ queryKey: materiaKeys.all });
     },
     onError: (error: Error) => {
-      console.error("Error al actualizar la materia:", error.message);
+      logClientError(error, { feature: "materias:update" });
     },
   });
 };
@@ -62,27 +64,27 @@ export const useDeleteMateria = () => {
   return useMutation({
     mutationFn: deleteMateria,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["materias"] });
+      queryClient.invalidateQueries({ queryKey: materiaKeys.all });
     },
     onError: (error: Error) => {
-      console.error("Error al eliminar la materia:", error.message);
+      logClientError(error, { feature: "materias:delete" });
     },
   });
 };
 
 export const useGetComisionesPorMateria = (materiaId: number | null) => {
   return useQuery({
-    queryKey: ["comisionesMateria", materiaId],
+    queryKey: materiaKeys.comisiones(materiaId!),
     queryFn: () => getComisionesPorMateria(materiaId!),
-    enabled: !!materiaId,
+    enabled: isValidId(materiaId),
   });
 };
 
 export const useGetAlumnosPorMateria = (materiaId: number | null) => {
   return useQuery({
-    queryKey: ["alumnosMateria", materiaId],
+    queryKey: materiaKeys.alumnos(materiaId!),
     queryFn: () => getAlumnosPorMateria(materiaId!),
-    enabled: !!materiaId,
+    enabled: isValidId(materiaId),
   });
 };
 
@@ -92,8 +94,8 @@ export const useAsignarDivisionAMateria = () => {
     mutationFn: ({ idMateria, payload }: { idMateria: number; payload: AsignarDivisionPayload }) =>
       asignarDivisionAMateria(idMateria, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["comisionesMateria"] });
-      queryClient.invalidateQueries({ queryKey: ["comisiones"] });
+      queryClient.invalidateQueries({ queryKey: materiaKeys.all });
+      queryClient.invalidateQueries({ queryKey: comisionKeys.all });
     },
   });
 };

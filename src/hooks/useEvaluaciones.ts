@@ -13,7 +13,6 @@ import {
   obtenerOpcionesPregunta,
   guardarRespuestaAtomica,
   finalizarExamenOficial,
-  getHistorialPorAlumno,
   obtenerEvaluacionesPendientes,
   obtenerEstadisticasAlumno,
   obtenerIntentosDetallados,
@@ -22,7 +21,6 @@ import {
   obtenerAlumnosInscriptos,
   obtenerIntentoCompleto,
   calificarIntento,
-  obtenerDetallePublicacion,
   obtenerDetalleEvaluacion,
   registrarAlertaAntifraude,
   getAlertasByIntento,
@@ -52,6 +50,13 @@ import type {
   OpcionSorteada,
   PreguntaSorteada,
 } from "@/types/index";
+import {
+  alumnoKeys,
+  docenteKeys,
+  evaluacionKeys,
+  intentoKeys,
+  isValidId,
+} from "@/lib/query-keys";
 
 const RECOVERABLE_ANSWER_ERROR_CODES = new Set([
   "ACCESS_TOKEN_EXPIRED",
@@ -163,17 +168,17 @@ export const useActualizarEstadoEvaluacion = () => {
 
 export const useGetEvaluacionesDocente = (legajo: number) => {
   return useQuery({
-    queryKey: ["docente", legajo, "evaluaciones"],
+    queryKey: docenteKeys.evaluaciones(legajo),
     queryFn: () => obtenerEvaluacionesDocente(legajo),
-    enabled: !!legajo,
+    enabled: isValidId(legajo),
   });
 };
 
 export const useGetAlumnosInscriptos = (idPublicacion: number) => {
   return useQuery({
-    queryKey: ["evaluacion", idPublicacion, "alumnos"],
+    queryKey: evaluacionKeys.alumnos(idPublicacion),
     queryFn: () => obtenerAlumnosInscriptos(idPublicacion),
-    enabled: !!idPublicacion,
+    enabled: isValidId(idPublicacion),
   });
 };
 
@@ -187,17 +192,17 @@ export const useIniciarIntento = () => {
 
 export const useGetExamenSorteado = (idIntento: number) => {
   return useQuery({
-    queryKey: ["examen", "sorteo", idIntento],
+    queryKey: evaluacionKeys.sorteo(idIntento),
     queryFn: () => obtenerExamenSorteado(idIntento),
-    enabled: !!idIntento,
+    enabled: isValidId(idIntento),
   });
 };
 
 export const useGetOpcionesPregunta = (idPregunta: number, idIntento: number) => {
   return useQuery({
-    queryKey: ["pregunta", idPregunta, "opciones", idIntento],
+    queryKey: evaluacionKeys.opciones(idIntento, idPregunta),
     queryFn: () => obtenerOpcionesPregunta(idPregunta, idIntento),
-    enabled: !!idPregunta && !!idIntento,
+    enabled: isValidId(idPregunta) && isValidId(idIntento),
     staleTime: Infinity,
   });
 };
@@ -208,9 +213,9 @@ export const usePrecargarOpcionesExamen = (
 ) => {
   return useQueries({
     queries: (preguntas ?? []).map((pregunta) => ({
-      queryKey: ["pregunta", pregunta.idPregunta, "opciones", idIntento],
+      queryKey: evaluacionKeys.opciones(idIntento, pregunta.idPregunta),
       queryFn: () => obtenerOpcionesPregunta(pregunta.idPregunta, idIntento),
-      enabled: Boolean(idIntento && pregunta.idPregunta),
+      enabled: isValidId(idIntento) && isValidId(pregunta.idPregunta),
       staleTime: Infinity,
     })),
   });
@@ -225,12 +230,10 @@ export const useGuardarRespuesta = () => {
       const outboxRecord = await enqueuePendingAnswer(payload);
       if (payload.IdOpcionNueva === undefined) return { outboxRecord };
 
-      const queryKey = [
-        "pregunta",
-        payload.IdPregunta,
-        "opciones",
+      const queryKey = evaluacionKeys.opciones(
         payload.IdIntento,
-      ] as const;
+        payload.IdPregunta,
+      );
       await queryClient.cancelQueries({ queryKey });
       const previousOptions =
         queryClient.getQueryData<OpcionSorteada[]>(queryKey);
@@ -341,7 +344,7 @@ export const useExamAnswerSync = (idIntento: number) => {
       await Promise.all(
         synchronizedQuestions.map((idPregunta) =>
           queryClient.invalidateQueries({
-            queryKey: ["pregunta", idPregunta, "opciones", idIntento],
+            queryKey: evaluacionKeys.opciones(idIntento, idPregunta),
           }),
         ),
       );
@@ -438,24 +441,16 @@ export const useFinalizarExamen = () => {
   return useMutation({
     mutationFn: finalizarExamenOficial,
     onSuccess: (_, idIntento) => {
-      queryClient.invalidateQueries({ queryKey: ["examen", "sorteo", idIntento] });
+      queryClient.invalidateQueries({ queryKey: evaluacionKeys.sorteo(idIntento) });
     },
-  });
-};
-
-export const useGetHistorialPorAlumno = (idAlumno: number) => {
-  return useQuery({
-    queryKey: ["intentos", "alumno", idAlumno],
-    queryFn: () => getHistorialPorAlumno(idAlumno),
-    enabled: !!idAlumno,
   });
 };
 
 export const useGetIntentoCompleto = (idIntento: number) => {
   return useQuery({
-    queryKey: ["intento", idIntento, "completo"],
+    queryKey: intentoKeys.detail(idIntento),
     queryFn: () => obtenerIntentoCompleto(idIntento),
-    enabled: !!idIntento,
+    enabled: isValidId(idIntento),
   });
 };
 
@@ -465,56 +460,48 @@ export const useMutateCalificarIntento = () => {
     mutationFn: ({ idIntento, notaFinal }: { idIntento: number; notaFinal: number }) =>
       calificarIntento(idIntento, notaFinal),
     onSuccess: (_, { idIntento }) => {
-      queryClient.invalidateQueries({ queryKey: ["intento", idIntento, "completo"] });
+      queryClient.invalidateQueries({ queryKey: intentoKeys.detail(idIntento) });
     },
   });
 };
 
 export const useGetExamenesPendientes = (matricula: number) => {
   return useQuery({
-    queryKey: ["alumno", matricula, "pendientes"],
+    queryKey: alumnoKeys.pendientes(matricula),
     queryFn: () => obtenerEvaluacionesPendientes(matricula),
-    enabled: !!matricula,
+    enabled: isValidId(matricula),
   });
 };
 
 export const useGetEstadisticasAlumno = (matricula: number) => {
   return useQuery({
-    queryKey: ["alumno", matricula, "estadisticas"],
+    queryKey: alumnoKeys.estadisticas(matricula),
     queryFn: () => obtenerEstadisticasAlumno(matricula),
-    enabled: !!matricula,
+    enabled: isValidId(matricula),
   });
 };
 
 export const useGetIntentosDetallados = (idAlumno: number) => {
   return useQuery({
-    queryKey: ["alumno", idAlumno, "intentos", "detallados"],
+    queryKey: alumnoKeys.intentosDetallados(idAlumno),
     queryFn: () => obtenerIntentosDetallados(idAlumno),
-    enabled: !!idAlumno,
+    enabled: isValidId(idAlumno),
   });
 };
 
 export const useGetHistorialCorregido = (idAlumno: number) => {
   return useQuery({
-    queryKey: ["alumno", idAlumno, "historial", "corregido"],
+    queryKey: alumnoKeys.historialCorregido(idAlumno),
     queryFn: () => obtenerHistorialCorregido(idAlumno),
-    enabled: !!idAlumno,
-  });
-};
-
-export const useGetDetallePublicacion = (idPublicacion: number) => {
-  return useQuery({
-    queryKey: ["publicacion", idPublicacion],
-    queryFn: () => obtenerDetallePublicacion(idPublicacion),
-    enabled: !!idPublicacion,
+    enabled: isValidId(idAlumno),
   });
 };
 
 export const useGetDetalleEvaluacion = (id: number) => {
   return useQuery({
-    queryKey: ["evaluacion", id, "detalle"],
+    queryKey: evaluacionKeys.detail(id),
     queryFn: () => obtenerDetalleEvaluacion(id),
-    enabled: !!id,
+    enabled: isValidId(id),
   });
 };
   
@@ -535,7 +522,7 @@ export const useCorregirRespuestaAbierta = (idIntento: number) => {
         comentariosDocente,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["intento", idIntento, "completo"] });
+      queryClient.invalidateQueries({ queryKey: intentoKeys.detail(idIntento) });
     },
   });
 };
@@ -549,9 +536,9 @@ export const useRegistrarAlerta = () => {
 
 export const useGetAlertasByIntento = (idIntento: number) => {
   return useQuery({
-    queryKey: ["alertas", idIntento],
+    queryKey: intentoKeys.alertas(idIntento),
     queryFn: () => getAlertasByIntento(idIntento),
-    enabled: !!idIntento,
+    enabled: isValidId(idIntento),
   });
 };
 

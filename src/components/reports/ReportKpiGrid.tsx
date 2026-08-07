@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 export interface ReportKpiItem {
+  id?: string;
   label: string;
   value: string;
   helper?: string;
@@ -19,7 +20,7 @@ export function ReportKpiGrid({ items }: { items: ReportKpiItem[] }) {
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       {items.map((item) => (
-        <article key={item.label} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_4px_rgba(0,0,0,0.005)]">
+        <article key={item.id ?? item.label} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_4px_rgba(0,0,0,0.005)]">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{item.label}</p>

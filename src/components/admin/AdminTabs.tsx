@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import type { AdminIntentoItem, AdminEvaluacionItem } from "@/types/index";
+import {
+  StatusBadge,
+  type StatusBadgeTone,
+} from "@/components/ui/StatusBadge";
 
 interface AdminTabsProps {
   intentos: AdminIntentoItem[];
@@ -51,17 +55,23 @@ function ClockIcon() {
   );
 }
 
-function getEstadoBadge(estado: string) {
-  const map: Record<string, string> = {
-    entregado: "bg-emerald-50 text-emerald-600 border-emerald-100",
-    en_progreso: "bg-amber-50 text-amber-600 border-amber-100",
-    vencido: "bg-slate-50 text-slate-500 border-slate-200",
-    anulado: "bg-red-50 text-red-600 border-red-100",
-    publicada: "bg-indigo-50 text-indigo-600 border-indigo-100",
-    borrador: "bg-slate-100 text-slate-500 border-slate-200",
-    archivada: "bg-rose-50 text-rose-600 border-rose-100",
+function getEstadoTone(estado: string): StatusBadgeTone {
+  const map: Record<string, StatusBadgeTone> = {
+    entregado: "success",
+    en_progreso: "warning",
+    vencido: "neutral",
+    anulado: "danger",
+    publicada: "indigo",
+    borrador: "neutral",
+    archivada: "danger",
   };
-  return map[estado] ?? "bg-slate-50 text-slate-500 border-slate-200";
+  return map[estado] ?? "neutral";
+}
+
+function formatEstado(estado: string) {
+  return estado === "en_progreso"
+    ? "En progreso"
+    : estado.charAt(0).toUpperCase() + estado.slice(1);
 }
 
 function formatoFecha(iso: string) {
@@ -156,9 +166,10 @@ function IntentosTable({ intentos }: { intentos: AdminIntentoItem[] }) {
               )}
             </td>
             <td className="px-4 py-3 text-center">
-              <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${getEstadoBadge(it.estado)}`}>
-                {it.estado === "en_progreso" ? "En Progreso" : it.estado.charAt(0).toUpperCase() + it.estado.slice(1)}
-              </span>
+              <StatusBadge
+                label={formatEstado(it.estado)}
+                tone={getEstadoTone(it.estado)}
+              />
             </td>
             <td className="px-4 py-3 text-right">
               <span className="text-sm font-black text-slate-800">{it.notaFinal?.toFixed(2) ?? "—"}</span>
@@ -205,9 +216,10 @@ function EvaluacionesTable({ evaluaciones }: { evaluaciones: AdminEvaluacionItem
             <td className="px-4 py-3 text-slate-500">{ev.nombreDivision}</td>
             <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatoFecha(ev.fechaPublicacion)}</td>
             <td className="px-4 py-3 text-center">
-              <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${getEstadoBadge(ev.estado)}`}>
-                {ev.estado.charAt(0).toUpperCase() + ev.estado.slice(1)}
-              </span>
+              <StatusBadge
+                label={formatEstado(ev.estado)}
+                tone={getEstadoTone(ev.estado)}
+              />
             </td>
             <td className="px-4 py-3 text-center">
               <span className="inline-flex items-center gap-1 text-slate-700 font-bold">

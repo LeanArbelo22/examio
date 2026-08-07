@@ -23,11 +23,12 @@ export function LoginForm() {
   // Efecto que reacciona cuando la acción de validación en servidor fue exitosa
   useEffect(() => {
     if (state.success && state.data) {
+      const credentials = state.data;
       const executeSignIn = async () => {
         try {
           const result = await signIn("credentials", {
-            email: state.data.email,
-            password: state.data.password,
+            email: credentials.email,
+            password: credentials.password,
             redirect: false,
           });
 

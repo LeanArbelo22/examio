@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Comision } from "@/types/index";
 import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
@@ -35,10 +35,6 @@ export default function ComisionesPage() {
   // ==========================================
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, filterCarrera, filterDocente]);
 
   // ==========================================
   // MODALES
@@ -117,12 +113,12 @@ export default function ComisionesPage() {
 
       {/* PANEL DE FILTROS */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-[0_2px_6px_rgba(0,0,0,0.005)] grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <input type="text" placeholder="🔍 Buscar por asignatura..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-700" />
-        <select value={filterCarrera} onChange={(e) => setFilterCarrera(e.target.value)} className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-500">
+        <input type="text" placeholder="🔍 Buscar por asignatura..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }} className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-700" />
+        <select value={filterCarrera} onChange={(e) => { setFilterCarrera(e.target.value); setCurrentPage(1); }} className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-500">
           <option value="">Filtrar por Carrera (Todas)</option>
                 {carreras?.filter(c => c.estado).map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
-        <select value={filterDocente} onChange={(e) => setFilterDocente(e.target.value)} className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-500">
+        <select value={filterDocente} onChange={(e) => { setFilterDocente(e.target.value); setCurrentPage(1); }} className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-500">
           <option value="">Filtrar por Docente (Todos)</option>
           {listaDocentesUnicos.map((doc, idx) => <option key={idx} value={doc}>{doc}</option>)}
         </select>
@@ -260,7 +256,7 @@ function AlumnosComisionList({ materiaNombre, divisionFiltro }: { materiaNombre:
 
   const alumnosFiltradosComision = useMemo(() => {
     if (!alumnos) return [];
-    return alumnos.filter((al: any) => al.division.trim().toUpperCase() === divisionFiltro.trim().toUpperCase());
+    return alumnos.filter((alumno) => alumno.division.trim().toUpperCase() === divisionFiltro.trim().toUpperCase());
   }, [alumnos, divisionFiltro]);
 
   if (!materiaId || isLoadingAlumnos) return <p className="text-xs text-slate-400 text-center py-4">Mapeando nómina relacional...</p>;
@@ -269,14 +265,14 @@ function AlumnosComisionList({ materiaNombre, divisionFiltro }: { materiaNombre:
   return (
     <div className="space-y-2 divide-y divide-slate-100 max-h-80 overflow-y-auto pr-1">
       {alumnosFiltradosComision.length > 0 ? (
-        alumnosFiltradosComision.map((al: any) => (
+        alumnosFiltradosComision.map((al) => (
           <div key={al.matricula} className="py-2.5 first:pt-0 flex justify-between items-center">
             <p className="font-bold text-slate-700 text-sm">{al.nombreAlumno}</p>
             <span className="text-[11px] font-mono font-bold bg-indigo-50 border border-indigo-100/30 text-indigo-700 px-2 py-0.5 rounded-md">Leg: {al.matricula}</span>
           </div>
         ))
       ) : (
-        <p className="text-xs text-slate-400 italic py-4 text-center">No se registran alumnos matriculados específicamente en la división "{divisionFiltro}".</p>
+        <p className="text-xs text-slate-400 italic py-4 text-center">No se registran alumnos matriculados específicamente en la división &quot;{divisionFiltro}&quot;.</p>
       )}
     </div>
   );
