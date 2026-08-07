@@ -1,6 +1,6 @@
 "use client";
 
-import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { RequestErrorState } from "@/components/ui/RequestErrorState";
 import { Modal } from "@/components/ui/Modal";
 import { ReportKpiGrid } from "./ReportKpiGrid";
 import { useDetalleRendimientoAlumno } from "@/hooks/useReportes";
@@ -18,7 +18,12 @@ export function StudentReportDetail({ matricula, filters, onClose }: StudentRepo
   return (
     <Modal isOpen={matricula !== null} onClose={onClose} title={data ? `${data.alumno.nombre} ${data.alumno.apellido} · ${data.alumno.matricula}` : "Detalle de rendimiento"}>
       {isLoading && <DetailSkeleton />}
-      {isError && <ErrorMessage message={(error as Error).message || "No se pudo cargar el detalle del alumno."} />}
+      {isError && (
+        <RequestErrorState
+          error={error}
+          fallback="No se pudo cargar el detalle del alumno."
+        />
+      )}
       {data && (
         <div className="space-y-5">
           <ReportKpiGrid items={[

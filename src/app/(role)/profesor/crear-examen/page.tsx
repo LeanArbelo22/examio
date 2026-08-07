@@ -1,31 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/Button";
+import { FeedbackMessage } from "@/components/ui/FeedbackMessage";
+import { FormFieldError } from "@/components/forms/FormFieldError";
+import { ExamBasicInfoFields } from "@/components/forms/ExamBasicInfoFields";
+import { ExamSettingsSidebar } from "@/components/forms/ExamSettingsSidebar";
 import { examCategoriesMock, bancoPreguntasMock } from "@/lib/db-mock";
-import { GuardarEvaluacionPayload, TipoPregunta } from "@/types/index";
+import { TipoPregunta } from "@/types/index";
 import { guardarEvaluacionCompleta } from "@/services/api/evaluaciones.api";
 import { useGetComisionesDocente } from "@/hooks/useDocentes";
-
-interface VarianteOpcion {
-  texto: string;
-  esCorrecta: boolean;
-}
-
-interface Variante {
-  id: string;
-  enunciado: string;
-  tipo: string;
-  opciones?: VarianteOpcion[];
-}
-
-interface PreguntaEstructura {
-  id: number;
-  tituloReferencia: string;
-  variantes: Variante[];
-}
+import { getUserErrorMessage } from "@/lib/errors";
+import { toGuardarEvaluacionPayload } from "@/lib/exam-form";
+import {
+  defaultExamSchedule,
+  examFormSchema,
+  type ExamFormValues,
+  type ExamQuestionGroup,
+} from "@/lib/schemas/examSchema";
+import { validationErrorsFromZod } from "@/lib/form-validation";
 
 function TrashIcon() {
   return (
@@ -48,15 +43,22 @@ function TrashIcon() {
 export default function CrearExamenPage() {
   const router = useRouter();
   const { types, securityMeasures } = examCategoriesMock;
+  const [initialSchedule] = useState(defaultExamSchedule);
   const ahoraLocal = new Date(
     new Date().getTime() - new Date().getTimezoneOffset() * 60000,
   )
     .toISOString()
     .slice(0, 16);
+  const maxDate = `${new Date().getFullYear() + 10}-12-31T23:59`;
 
   const { data: session } = useSession();
   const [isPending, setIsPending] = useState(false);
   const [erroresValidacion, setErroresValidacion] = useState<string[]>([]); // 👈 Estado para el panel de errores
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [feedback, setFeedback] = useState<{
+    variant: "error" | "success" | "info";
+    message: string;
+  } | null>(null);
 
   const legajoDocente = session?.user?.identificadorInstitucional
     ? Number(session.user.identificadorInstitucional)
@@ -65,10 +67,12 @@ export default function CrearExamenPage() {
     useGetComisionesDocente(legajoDocente);
 
   const [idMateriaDivision, setIdMateriaDivision] = useState<string>("");
+  const [titulo, setTitulo] = useState("");
+  const [descripcion, setDescripcion] = useState("");
   const [duracionMinutos, setDuracionMinutos] = useState("90");
   const [cantidadIntentos, setCantidadIntentos] = useState<string>("1");
-  const [fechaInicio, setFechaInicio] = useState<string>("");
-  const [fechaFin, setFechaFin] = useState<string>("");
+  const [fechaInicio, setFechaInicio] = useState(initialSchedule.fechaInicio);
+  const [fechaFin, setFechaFin] = useState(initialSchedule.fechaFin);
 
   const [selectedFormat, setSelectedFormat] = useState("mixed");
   const [securityConfig, setSecurityConfig] = useState<Record<string, boolean>>(
@@ -78,7 +82,7 @@ export default function CrearExamenPage() {
     ),
   );
 
-  const [preguntas, setPreguntas] = useState<PreguntaEstructura[]>([
+  const [preguntas, setPreguntas] = useState<ExamQuestionGroup[]>([
     {
       id: 1,
       tituloReferencia: "Grupo o eje conceptual 1 (Ej: Derivadas)",
@@ -204,7 +208,7 @@ export default function CrearExamenPage() {
   const handleModificarTipo = (
     preguntaId: number,
     varianteId: string,
-    nuevoTipo: string,
+    nuevoTipo: TipoPregunta,
   ) => {
     setPreguntas((prev) =>
       prev.map((p) =>
@@ -257,7 +261,7 @@ export default function CrearExamenPage() {
     varianteId: string,
     opcionIdx: number,
     campo: "texto" | "esCorrecta",
-    valor: any,
+    valor: string | boolean,
   ) => {
     setPreguntas((prev) =>
       prev.map((p) =>
@@ -309,160 +313,64 @@ export default function CrearExamenPage() {
           : p,
       ),
     );
-    alert(
-      "Consigna reutilizada e importada con éxito desde el Banco de EXAMIO.",
-    );
+    setFeedback({
+      variant: "success",
+      message: "Consigna reutilizada e importada desde el Banco de EXAMIO.",
+    });
   };
 
-  function validarExamen(): string[] {
-    const errores: string[] = [];
+  const currentForm = (): ExamFormValues => ({
+    titulo,
+    descripcion,
+    idMateriaDivision,
+    duracionMinutos,
+    cantidadIntentos,
+    fechaInicio,
+    fechaFin,
+    preguntas,
+  });
 
-    const idMateriaDivisionNum = Number(idMateriaDivision);
-    if (
-      !idMateriaDivision ||
-      !Number.isInteger(idMateriaDivisionNum) ||
-      idMateriaDivisionNum <= 0
-    ) {
-      errores.push(
-        "Seleccioná una comisión institucional válida para publicar el examen.",
-      );
-    }
-
-    if (!fechaInicio) {
-      errores.push("Configurá la fecha de apertura.");
-    }
-    if (!fechaFin) {
-      errores.push("Configurá la fecha de cierre.");
-    }
-    if (fechaInicio && new Date(fechaInicio) < new Date()) {
-      errores.push(
-        "La fecha de apertura no puede ser anterior al momento actual.",
-      );
-    }
-    if (
-      fechaInicio &&
-      fechaFin &&
-      new Date(fechaFin) <= new Date(fechaInicio)
-    ) {
-      errores.push(
-        "La fecha de cierre debe ser posterior a la fecha de apertura.",
-      );
-    }
-
-    const intentos = Number(cantidadIntentos);
-    if (!cantidadIntentos || !Number.isInteger(intentos) || intentos < 1) {
-      errores.push(
-        "La cantidad máxima de intentos debe ser un número entero mayor o igual a 1.",
-      );
-    }
-
-    if (preguntas.length === 0) {
-      errores.push(
-        "El examen debe contener al menos un Grupo de Preguntas estructural.",
-      );
-    }
-
-    preguntas.forEach((p, pi) => {
-      if (!p.tituloReferencia || !p.tituloReferencia.trim()) {
-        errores.push(
-          `Pregunta ${pi + 1}: el eje conceptual no puede estar vacío.`,
-        );
-      }
-
-      if (p.variantes.length === 0) {
-        errores.push(
-          `Grupo estructural "${p.tituloReferencia || pi + 1}": debe contener al menos una variante de pregunta.`,
-        );
-      }
-
-      p.variantes.forEach((v, vi) => {
-        if (!v.enunciado || !v.enunciado.trim()) {
-          errores.push(
-            `Pregunta ${pi + 1}, Variante ${vi + 1}: el enunciado no puede estar vacío.`,
-          );
-        }
-
-        if (v.tipo === "mc" || v.tipo === "vf") {
-          const opciones = v.opciones || [];
-
-          if (opciones.length < 2) {
-            errores.push(
-              `Pregunta ${pi + 1}: debe tener al menos 2 opciones de respuesta.`,
-            );
-          }
-
-          const correctas = opciones.filter((o) => o.esCorrecta).length;
-          if (correctas !== 1) {
-            errores.push(
-              `Pregunta ${pi + 1}: debes marcar exactamente una opción como la respuesta correcta.`,
-            );
-          }
-
-          opciones.forEach((o, oi) => {
-            if (!o.texto || !o.texto.trim()) {
-              errores.push(
-                `Pregunta ${pi + 1}, Opción ${oi + 1}: el texto de la opción no puede estar vacío.`,
-              );
-            }
-          });
-        }
-      });
+  const validateField = (field: string) => {
+    const result = examFormSchema.safeParse(currentForm());
+    const errors = result.success ? {} : validationErrorsFromZod(result.error.issues);
+    setFieldErrors((current) => {
+      const next = { ...current };
+      if (errors[field]) next[field] = errors[field];
+      else delete next[field];
+      return next;
     });
-
-    return errores;
-  }
+  };
 
   const handleGuardarExamenCompleto = async () => {
     setErroresValidacion([]); // Limpiamos errores previos
-    const idMateriaDivisionNum = Number(idMateriaDivision);
-
-    const errores = validarExamen();
-    if (errores.length > 0) {
-      setErroresValidacion(errores);
+    const validation = examFormSchema.safeParse(currentForm());
+    if (!validation.success) {
+      const errors = validationErrorsFromZod(validation.error.issues);
+      setFieldErrors(errors);
+      setErroresValidacion([...new Set(validation.error.issues.map((issue) => issue.message))]);
       // Hacemos un scroll suave arriba de todo para que el usuario note el banner inmediatamente
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
-    const payload: GuardarEvaluacionPayload = {
-      Titulo:
-        selectedFormat === "mixed"
-          ? `Evaluación Mixta: ${idMateriaDivision}`
-          : `Evaluación de tipo ${selectedFormat}`,
-      Descripcion:
-        "Creado desde el configurador avanzado de cátedras de EXAMIO.",
-      Tipo: "evaluacion",
-      CantidadIntentosMaximos: Number(cantidadIntentos) || 1,
-      FechaInicio: new Date(fechaInicio).toISOString(),
-      FechaFin: new Date(fechaFin).toISOString(),
-      IdMateriaDivision: idMateriaDivisionNum,
-      DuracionMinutos: Number(duracionMinutos) || null,
-      RecursosPermitidos: Object.keys(securityConfig)
+    const recursosPermitidos = Object.keys(securityConfig)
         .filter((key) => securityConfig[key])
         .map((key) => securityMeasures.find((m) => m.id === key)?.label)
-        .join(", "),
-      GruposPreguntas: preguntas.map((p) => ({
-        TituloReferencia: p.tituloReferencia,
-        Variantes: p.variantes.map((v) => ({
-          Enunciado: v.enunciado,
-          Tipo: v.tipo as TipoPregunta,
-          Opciones: v.opciones?.map((op) => ({
-            Texto: op.texto,
-            EsCorrecta: op.esCorrecta,
-          })),
-        })),
-      })),
-    };
-
-    console.log("📦 Payload a enviar:", JSON.stringify(payload, null, 2));
+        .filter((label): label is string => Boolean(label))
+        .join(", ");
+    const payload = toGuardarEvaluacionPayload(
+      validation.data,
+      recursosPermitidos,
+    );
 
     try {
       setIsPending(true);
       await guardarEvaluacionCompleta(payload);
-      alert("¡Éxito! El examen se guardó y se publicó correctamente.");
       router.push("/profesor");
-    } catch (err: any) {
-      setErroresValidacion([err.message || "Error crítico al guardar el examen."]);
+    } catch (error: unknown) {
+      setErroresValidacion([
+        getUserErrorMessage(error, "No se pudo guardar el examen."),
+      ]);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setIsPending(false);
@@ -489,16 +397,20 @@ export default function CrearExamenPage() {
           </Button>
           <Button
             onClick={handleGuardarExamenCompleto}
-            disabled={
-              isPending ||
-              preguntas.some((p) => p.variantes.some((v) => !v.enunciado))
-            }
+            disabled={isPending}
             className="bg-indigo-600 text-white px-5 py-2.5 text-xs font-bold rounded-xl hover:bg-indigo-700 shadow-sm transition-all disabled:opacity-50"
           >
             {isPending ? "Guardando..." : "Guardar y Publicar Examen"}
           </Button>
         </div>
       </div>
+
+      {feedback && (
+        <FeedbackMessage
+          variant={feedback.variant}
+          message={feedback.message}
+        />
+      )}
 
       {/* 🚨 PANEL DE ERRORES ESTILIZADO CON TAILWIND 🚨 */}
       {erroresValidacion.length > 0 && (
@@ -511,7 +423,7 @@ export default function CrearExamenPage() {
               </h4>
               <ul className="list-disc list-inside text-xs text-red-700 font-medium space-y-1 pt-1">
                 {erroresValidacion.map((error, idx) => (
-                  <li key={idx} className="leading-relaxed">{error}</li>
+                  <li key={`${idx}-${error}`} className="leading-relaxed">{error}</li>
                 ))}
               </ul>
             </div>
@@ -527,6 +439,15 @@ export default function CrearExamenPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         <div className="lg:col-span-2 space-y-6">
+          <ExamBasicInfoFields
+            title={titulo}
+            description={descripcion}
+            errors={fieldErrors}
+            onTitleChange={setTitulo}
+            onDescriptionChange={setDescripcion}
+            onBlur={validateField}
+          />
+
           <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5 mb-4">
               🎛️ Formato del examen
@@ -568,21 +489,30 @@ export default function CrearExamenPage() {
               </Button>
             </div>
 
-            {preguntas.map((p) => (
+            {preguntas.map((p, groupIndex) => (
               <div
                 key={p.id}
                 className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-[0_4px_12px_rgba(0,0,0,0.01)] space-y-4"
               >
-                <div className="flex items-center justify-between bg-slate-50 border border-slate-100 -mx-6 -mt-6 p-4 rounded-t-2xl">
-                  <input
-                    type="text"
-                    value={p.tituloReferencia}
-                    onChange={(e) =>
-                      handleModificarEjeConceptual(p.id, e.target.value)
-                    }
-                    className="bg-transparent font-bold text-sm text-slate-800 border-none focus:outline-none focus:ring-1 focus:ring-indigo-200 px-2 py-0.5 rounded w-2/3"
-                    required
-                  />
+                <div className="flex items-start justify-between bg-slate-50 border border-slate-100 -mx-6 -mt-6 p-4 rounded-t-2xl">
+                  <div className="w-2/3">
+                    <input
+                      type="text"
+                      aria-label={`Título del grupo ${p.id}`}
+                      value={p.tituloReferencia}
+                      onChange={(e) =>
+                        handleModificarEjeConceptual(p.id, e.target.value)
+                      }
+                      onBlur={() => validateField(`preguntas.${groupIndex}.tituloReferencia`)}
+                      aria-invalid={Boolean(fieldErrors[`preguntas.${groupIndex}.tituloReferencia`])}
+                      aria-describedby={fieldErrors[`preguntas.${groupIndex}.tituloReferencia`] ? `group-${p.id}-error` : undefined}
+                      className="w-full rounded border-none bg-transparent px-2 py-0.5 text-sm font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-200"
+                    />
+                    <FormFieldError
+                      id={`group-${p.id}-error`}
+                      message={fieldErrors[`preguntas.${groupIndex}.tituloReferencia`]}
+                    />
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
                       Pregunta {p.id}
@@ -590,6 +520,7 @@ export default function CrearExamenPage() {
                     <button
                       type="button"
                       onClick={() => handleRemoveGrupo(p.id)}
+                      aria-label={`Eliminar grupo ${p.id}`}
                       className="text-slate-400 hover:text-red-500 p-1"
                     >
                       <TrashIcon />
@@ -609,12 +540,13 @@ export default function CrearExamenPage() {
                         </span>
                         <div className="flex items-center gap-2">
                           <select
+                            aria-label={`Tipo de la variante ${idx + 1}`}
                             value={variante.tipo}
                             onChange={(e) =>
                               handleModificarTipo(
                                 p.id,
                                 variante.id,
-                                e.target.value,
+                                e.target.value as TipoPregunta,
                               )
                             }
                             className="text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-500"
@@ -630,6 +562,7 @@ export default function CrearExamenPage() {
                             onClick={() =>
                               handleRemoveVariante(p.id, variante.id)
                             }
+                            aria-label={`Eliminar variante ${idx + 1}`}
                             className="text-slate-400 hover:text-red-500 p-1"
                           >
                             <TrashIcon />
@@ -647,8 +580,14 @@ export default function CrearExamenPage() {
                             e.target.value,
                           )
                         }
+                        onBlur={() => validateField(`preguntas.${groupIndex}.variantes.${idx}.enunciado`)}
+                        aria-invalid={Boolean(fieldErrors[`preguntas.${groupIndex}.variantes.${idx}.enunciado`])}
+                        aria-describedby={fieldErrors[`preguntas.${groupIndex}.variantes.${idx}.enunciado`] ? `variant-${variante.id}-error` : undefined}
                         className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all resize-none"
-                        required
+                      />
+                      <FormFieldError
+                        id={`variant-${variante.id}-error`}
+                        message={fieldErrors[`preguntas.${groupIndex}.variantes.${idx}.enunciado`]}
                       />
 
                       {(variante.tipo === "mc" || variante.tipo === "vf") && (
@@ -674,6 +613,7 @@ export default function CrearExamenPage() {
                             >
                               <input
                                 type="radio"
+                                aria-label={`Marcar opción ${opIdx + 1} como correcta`}
                                 name={`correcta-${variante.id}`}
                                 checked={opcion.esCorrecta}
                                 onChange={(e) =>
@@ -687,37 +627,55 @@ export default function CrearExamenPage() {
                                 }
                                 className="h-4 w-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
                               />
-                              <input
-                                type="text"
-                                placeholder={`Opción ${opIdx + 1}...`}
-                                value={opcion.texto}
-                                onChange={(e) =>
-                                  handleModificarOpcion(
-                                    p.id,
-                                    variante.id,
-                                    opIdx,
-                                    "texto",
-                                    e.target.value,
-                                  )
-                                }
-                                className="block w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-200 text-slate-700 font-medium"
-                                required
-                              />
+                              <div className="flex-1">
+                                <input
+                                  type="text"
+                                  aria-label={`Texto de la opción ${opIdx + 1}`}
+                                  placeholder={`Opción ${opIdx + 1}...`}
+                                  value={opcion.texto}
+                                  onChange={(e) =>
+                                    handleModificarOpcion(
+                                      p.id,
+                                      variante.id,
+                                      opIdx,
+                                      "texto",
+                                      e.target.value,
+                                    )
+                                  }
+                                  onBlur={() => validateField(`preguntas.${groupIndex}.variantes.${idx}.opciones.${opIdx}.texto`)}
+                                  aria-invalid={Boolean(fieldErrors[`preguntas.${groupIndex}.variantes.${idx}.opciones.${opIdx}.texto`])}
+                                  aria-describedby={fieldErrors[`preguntas.${groupIndex}.variantes.${idx}.opciones.${opIdx}.texto`] ? `option-${variante.id}-${opIdx}-error` : undefined}
+                                  className="block w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-200 text-slate-700 font-medium"
+                                />
+                                <FormFieldError
+                                  id={`option-${variante.id}-${opIdx}-error`}
+                                  message={fieldErrors[`preguntas.${groupIndex}.variantes.${idx}.opciones.${opIdx}.texto`]}
+                                />
+                              </div>
                               <button
                                 type="button"
                                 onClick={() =>
                                   handleRemoveOpcion(p.id, variante.id, opIdx)
                                 }
+                                aria-label={`Eliminar opción ${opIdx + 1}`}
                                 className="text-slate-400 hover:text-red-500 p-1"
                               >
                                 <TrashIcon />
                               </button>
                             </div>
                           ))}
+                          <FormFieldError
+                            id={`options-${variante.id}-error`}
+                            message={fieldErrors[`preguntas.${groupIndex}.variantes.${idx}.opciones`]}
+                          />
                         </div>
                       )}
                     </div>
                   ))}
+                  <FormFieldError
+                    id={`group-${p.id}-variants-error`}
+                    message={fieldErrors[`preguntas.${groupIndex}.variantes`]}
+                  />
                 </div>
 
                 <div className="flex items-center gap-2 pt-2 justify-between border-t border-slate-100 mt-2">
@@ -756,166 +714,27 @@ export default function CrearExamenPage() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5">
-              ⏳ Tiempo
-            </h3>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                Límite por Intento
-              </label>
-              <div className="relative rounded-xl shadow-sm">
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="Ej: 90"
-                  value={duracionMinutos}
-                  onChange={(e) => setDuracionMinutos(e.target.value)}
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all"
-                />
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
-                  <span className="text-xs font-bold text-slate-400">min</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5">
-              🔄 Intentos
-            </h3>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                Cantidad Máxima Permitida
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={cantidadIntentos}
-                onChange={(e) => setCantidadIntentos(e.target.value)}
-                onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all text-slate-800 font-medium"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5">
-              📅 Disponibilidad
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                  Fecha de Apertura
-                </label>
-                <input
-                  type="datetime-local"
-                  value={fechaInicio}
-                  min={ahoraLocal}
-                  onChange={(e) => setFechaInicio(e.target.value)}
-                  className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-600 font-medium focus:outline-none"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                  Fecha de Cierre
-                </label>
-                <input
-                  type="datetime-local"
-                  value={fechaFin}
-                  min={fechaInicio || ahoraLocal}
-                  onChange={(e) => setFechaFin(e.target.value)}
-                  className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 text-slate-600 font-medium focus:outline-none"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5">
-              🏫 Catedra
-            </h3>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                Asignar a Comisión
-              </label>
-              <select
-                value={idMateriaDivision}
-                onChange={(e) => {
-                  console.log("🔍 select onChange:", {
-                    value: e.target.value,
-                    type: typeof e.target.value,
-                  });
-                  setIdMateriaDivision(e.target.value);
-                }}
-                disabled={
-                  cargandoComisiones || !comisiones || comisiones.length === 0
-                }
-                className="block w-full px-4 py-2.5 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all text-slate-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                required
-              >
-                <option value="" disabled key="default">
-                  {cargandoComisiones
-                    ? "Cargando tus comisiones..."
-                    : !comisiones || comisiones.length === 0
-                      ? "No tienes comisiones asignadas"
-                      : "Seleccioná una comisión..."}
-                </option>
-                {comisiones?.map((com: any, idx: number) => (
-                  <option
-                    key={com.idComision ?? `fallback-${idx}`}
-                    value={com.idComision}
-                  >
-                    {com.nombreMateria} — {com.division}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5 mb-4">
-              🛡️ SEGURIDAD
-            </h3>
-            <div className="space-y-4">
-              {securityMeasures.map((measure) => {
-                const isActive = !!securityConfig[measure.id];
-                return (
-                  <div
-                    key={measure.id}
-                    className="flex items-start justify-between gap-4 p-1"
-                  >
-                    <div className="space-y-0.5">
-                      <label
-                        className="text-xs font-bold text-slate-700 block cursor-pointer"
-                        onClick={() => handleToggleSecurity(measure.id)}
-                      >
-                        {measure.label}
-                      </label>
-                      <p className="text-[11px] text-slate-400 leading-normal font-medium">
-                        {measure.desc}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleSecurity(measure.id)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${isActive ? "bg-indigo-600" : "bg-slate-200"}`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isActive ? "translate-x-4" : "translate-x-0"}`}
-                      />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        <ExamSettingsSidebar
+          duration={duracionMinutos}
+          attempts={cantidadIntentos}
+          startDate={fechaInicio}
+          endDate={fechaFin}
+          commissionId={idMateriaDivision}
+          commissions={comisiones ?? []}
+          loadingCommissions={cargandoComisiones}
+          minDate={ahoraLocal}
+          maxDate={maxDate}
+          errors={fieldErrors}
+          securityMeasures={securityMeasures}
+          securityConfig={securityConfig}
+          onDurationChange={setDuracionMinutos}
+          onAttemptsChange={setCantidadIntentos}
+          onStartDateChange={setFechaInicio}
+          onEndDateChange={setFechaFin}
+          onCommissionChange={setIdMateriaDivision}
+          onToggleSecurity={handleToggleSecurity}
+          onBlur={validateField}
+        />
       </div>
     </div>
   );

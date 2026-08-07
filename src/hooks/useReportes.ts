@@ -2,8 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import {
   obtenerDetalleRendimientoAlumno,
   obtenerReporteRendimiento,
+  obtenerReporteRendimientoEvaluaciones,
 } from "@/services/api/reportes.api";
-import type { ReporteRendimientoDetalle, ReporteRendimientoFiltros, ReporteRendimientoListado } from "@/types/index";
+import type {
+  ReporteEvaluacionesFiltros,
+  ReporteRendimientoDetalle,
+  ReporteRendimientoFiltros,
+  ReporteRendimientoListado,
+} from "@/types/index";
+import { isValidId, reporteKeys } from "@/lib/query-keys";
 
 function normalizarListado(data: ReporteRendimientoListado | ReporteRendimientoDetalle): ReporteRendimientoListado {
   if ("paginacion" in data) return data;
@@ -22,9 +29,18 @@ function normalizarListado(data: ReporteRendimientoListado | ReporteRendimientoD
 
 export const useReporteRendimiento = (filtros: ReporteRendimientoFiltros) =>
   useQuery({
-    queryKey: ["reportes", "rendimiento", "listado", filtros],
+    queryKey: reporteKeys.listado(filtros),
     queryFn: () => obtenerReporteRendimiento(filtros),
     select: normalizarListado,
+    placeholderData: (previousData) => previousData,
+  });
+
+export const useReporteRendimientoEvaluaciones = (
+  filtros: ReporteEvaluacionesFiltros,
+) =>
+  useQuery({
+    queryKey: reporteKeys.evaluaciones(filtros),
+    queryFn: () => obtenerReporteRendimientoEvaluaciones(filtros),
     placeholderData: (previousData) => previousData,
   });
 
@@ -33,7 +49,7 @@ export const useDetalleRendimientoAlumno = (
   filtros: ReporteRendimientoFiltros,
 ) =>
   useQuery({
-    queryKey: ["reportes", "rendimiento", "detalle", matricula, filtros],
+    queryKey: reporteKeys.detalle(matricula!, filtros),
     queryFn: () =>
       obtenerDetalleRendimientoAlumno({
         ...filtros,
@@ -45,5 +61,5 @@ export const useDetalleRendimientoAlumno = (
         ordenarPor: undefined,
         ordenDireccion: undefined,
       }),
-    enabled: matricula !== null,
+    enabled: isValidId(matricula),
   });

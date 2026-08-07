@@ -48,8 +48,8 @@ export const DetalleCarreraModal = ({ carreraId }: DetalleCarreraModalProps) => 
           ) : (
             <div className="space-y-2 divide-y divide-slate-100 max-h-80 overflow-y-auto pr-1">
               {plan && plan.length > 0 ? (
-                plan.map((materia: any, index: number) => (
-                  <div key={index} className="py-2.5 first:pt-0 flex justify-between items-center">
+                plan.map((materia) => (
+                  <div key={`${materia.nombreMateria}-${materia.nroSemestre}`} className="py-2.5 first:pt-0 flex justify-between items-center">
                     <h4 className="font-bold text-slate-700 text-sm">{materia.nombreMateria}</h4>
                     <span className="text-[11px] font-mono font-bold bg-slate-50 border border-slate-100 text-slate-500 px-2 py-0.5 rounded-md">
                       Semestre {materia.nroSemestre}
@@ -71,7 +71,7 @@ export const DetalleCarreraModal = ({ carreraId }: DetalleCarreraModalProps) => 
           ) : (
             <div className="space-y-2 divide-y divide-slate-100 max-h-80 overflow-y-auto pr-1">
               {alumnos && alumnos.length > 0 ? (
-                alumnos.map((alumno: any) => (
+                alumnos.map((alumno) => (
                   <div key={alumno.matricula} className="py-2.5 first:pt-0 flex justify-between items-center">
                     <p className="font-bold text-slate-700 text-sm">{alumno.nombreAlumno}</p>
                     <p className="text-[11px] font-mono font-bold bg-indigo-50 border border-indigo-100/30 text-indigo-700 px-2 py-0.5 rounded-md">

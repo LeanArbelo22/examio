@@ -5,11 +5,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { RequestErrorState } from "@/components/ui/RequestErrorState";
 import { ReportLayout } from "@/components/reports/ReportLayout";
 import { ReportFilterPanel, type ReportFilterDefinition } from "@/components/reports/ReportFilterPanel";
 import { ReportKpiGrid } from "@/components/reports/ReportKpiGrid";
 import { ReportTable, type ReportColumn } from "@/components/reports/ReportTable";
 import { ReportCharts } from "@/components/reports/ReportCharts";
+import { ReportSkeleton } from "@/components/reports/ReportSkeleton";
 import { StudentReportDetail } from "@/components/reports/StudentReportDetail";
 import { useGetMaterias } from "@/hooks/useMaterias";
 import { useGetComisiones } from "@/hooks/useComisiones";
@@ -135,16 +137,18 @@ export function RendimientoReport() {
     <ReportFilterPanel key={searchParams.toString()} filters={visibleFilters} definitions={filterDefinitions} onSearch={search} onClear={() => { setFilterValidationError(null); router.replace(pathname, { scroll: false }); }} />
     {filterValidationError && <ErrorMessage message={filterValidationError} />}
     {isLoading && <ReportSkeleton />}
-    {isError && <div className="space-y-3"><ErrorMessage message={(error as Error).message || "No se pudo cargar el reporte."} /><Button onClick={() => refetch()} className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white">Reintentar</Button></div>}
+    {isError && (
+      <RequestErrorState
+        error={error}
+        fallback="No se pudo cargar el reporte."
+        onRetry={() => void refetch()}
+      />
+    )}
     {data && <div className={`space-y-6 transition-opacity ${isFetching ? "opacity-60" : "opacity-100"}`} aria-busy={isFetching}>
       <ReportKpiGrid items={[{ label: "Promedio general", value: data.kpis.promedioGeneral.toFixed(2), helper: "Sobre 10", tone: "indigo" }, { label: "Total de alumnos", value: data.kpis.totalAlumnos.toLocaleString("es-AR"), helper: `${data.kpis.conIntentos} con intentos`, tone: "blue" }, { label: "Total de intentos", value: data.kpis.totalIntentos.toLocaleString("es-AR"), tone: "amber" }, { label: "Tasa de aprobación", value: `${data.kpis.tasaAprobacion.toFixed(1)}%`, tone: "emerald" }]} />
       {data.alumnos.length > 0 && <ReportCharts alumnos={data.alumnos} />}
-      <ReportTable columns={columns} rows={data.alumnos} rowKey={(row) => row.matricula} sortBy={filters.ordenarPor ?? "alumno"} sortDirection={filters.ordenDireccion ?? "asc"} onSort={(ordenarPor, ordenDireccion) => updateUrl({ ordenarPor, ordenDireccion, pagina: 1 })} onRowClick={(row) => setSelectedStudent(row.matricula)} page={data.paginacion.pagina} totalPages={data.paginacion.totalPaginas} total={data.paginacion.total} onPageChange={(pagina) => updateUrl({ pagina })} />
+      <ReportTable columns={columns} rows={data.alumnos} rowKey={(row) => row.matricula} sortBy={filters.ordenarPor ?? "alumno"} sortDirection={filters.ordenDireccion ?? "asc"} onSort={(ordenarPor, ordenDireccion) => updateUrl({ ordenarPor, ordenDireccion, pagina: 1 })} onRowClick={(row) => setSelectedStudent(row.matricula)} page={data.paginacion.pagina} totalPages={data.paginacion.totalPaginas} total={data.paginacion.total} itemLabel="alumnos" onPageChange={(pagina) => updateUrl({ pagina })} />
     </div>}
     <StudentReportDetail matricula={selectedStudent} filters={filters} onClose={() => setSelectedStudent(null)} />
   </ReportLayout>;
-}
-
-function ReportSkeleton() {
-  return <div className="space-y-5" aria-label="Cargando reporte"><div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-2xl bg-slate-100" />)}</div><div className="grid gap-4 xl:grid-cols-2">{Array.from({ length: 2 }, (_, index) => <div key={index} className="h-80 animate-pulse rounded-2xl bg-slate-100" />)}</div><div className="h-80 animate-pulse rounded-2xl bg-slate-100" /></div>;
 }

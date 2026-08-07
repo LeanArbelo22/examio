@@ -48,7 +48,7 @@ export const DetalleMateriaModal = ({ materiaId }: DetalleMateriaModalProps) => 
           ) : (
             <div className="space-y-2 divide-y divide-slate-100 max-h-80 overflow-y-auto pr-1">
               {comisiones && comisiones.length > 0 ? (
-                comisiones.map((comision: any) => (
+                comisiones.map((comision) => (
                   <div key={comision.idComision} className="py-2.5 first:pt-0 flex justify-between items-center">
                     <div>
                       <h4 className="font-bold text-slate-700 text-sm">División: {comision.division}</h4>
@@ -79,7 +79,7 @@ export const DetalleMateriaModal = ({ materiaId }: DetalleMateriaModalProps) => 
           ) : (
             <div className="space-y-2 divide-y divide-slate-100 max-h-80 overflow-y-auto pr-1">
               {alumnos && alumnos.length > 0 ? (
-                alumnos.map((alumno: any) => (
+                alumnos.map((alumno) => (
                   <div key={alumno.matricula} className="py-2.5 first:pt-0 flex justify-between items-center">
                     <div>
                       <h4 className="font-bold text-slate-700 text-sm">{alumno.nombreAlumno}</h4>

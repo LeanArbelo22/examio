@@ -16,7 +16,12 @@ import {
   HistorialCorregidoItem,
   AlertaAntifraude,
 } from "@/types/index";
-import { apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
+
+interface IniciarIntentoApiResult {
+  idIntento: number;
+  status?: string;
+}
 
 // EVALUACIONES
 export const guardarEvaluacionCompleta = (payload: GuardarEvaluacionPayload): Promise<{ idActividad: number }> =>
@@ -55,18 +60,32 @@ export const obtenerEvaluacionesDocente = (legajo: number): Promise<EvaluacionDo
 export const obtenerAlumnosInscriptos = (idPublicacion: number): Promise<AlumnoIntento[]> =>
   apiFetch<AlumnoIntento[]>(`/evaluaciones/${idPublicacion}/alumnos`);
 
-export const obtenerDetallePublicacion = (idPublicacion: number): Promise<any> =>
-  apiFetch<any>(`/evaluaciones/publicacion/${idPublicacion}`);
-
 export const obtenerDetalleEvaluacion = (id: number): Promise<EvaluacionDetalle> =>
   apiFetch<EvaluacionDetalle>(`/evaluaciones/${id}/detalle`);
 
 // INTENTOS
-export const iniciarIntentoExamen = (payload: IniciarIntentoPayload): Promise<{ idIntento: number }> =>
-  apiFetch<{ idIntento: number }>("/intentos/iniciar", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+export const iniciarIntentoExamen = async (
+  payload: IniciarIntentoPayload,
+): Promise<{ idIntento: number }> => {
+  const results = await apiFetch<IniciarIntentoApiResult[]>(
+    "/intentos/iniciar",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+  const result = results[0];
+
+  if (!result || !Number.isInteger(result.idIntento) || result.idIntento <= 0) {
+    throw new ApiError(
+      "La API no devolvió un intento válido",
+      502,
+      "INVALID_UPSTREAM_RESPONSE",
+    );
+  }
+
+  return { idIntento: result.idIntento };
+};
 
 export const guardarRespuestaAtomica = (payload: GuardarRespuestaPayload): Promise<void> =>
   apiFetch<void>("/intentos/guardar-respuesta", {
@@ -79,9 +98,6 @@ export const finalizarExamenOficial = (idIntento: number): Promise<{ notaFinal: 
     method: "POST",
     body: JSON.stringify({}),
   });
-
-export const getHistorialPorAlumno = (idAlumno: number): Promise<any[]> =>
-  apiFetch<any[]>(`/intentos/alumno/${idAlumno}`);
 
 export const obtenerIntentoCompleto = (idIntento: number): Promise<IntentoCompleto> =>
   apiFetch<IntentoCompleto>(`/intentos/${idIntento}/completo`);

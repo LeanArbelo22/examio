@@ -1,4 +1,11 @@
-import { Alumno, AlumnoMateria, CreateAlumnoPayload, UpdateAlumnoPayload } from "@/types/index";
+import {
+  Alumno,
+  AlumnoMateria,
+  CreateAlumnoPayload,
+  InscripcionAlumnoResult,
+  InscribirAlumnoPayload,
+  UpdateAlumnoPayload,
+} from "@/types/index";
 import { apiFetch } from "@/lib/api";
 
 export const getAlumnos = (): Promise<Alumno[]> => apiFetch<Alumno[]>("/alumnos");
@@ -17,3 +24,12 @@ export const deleteAlumno = (matricula: number): Promise<void> =>
 
 export const getMateriasAlumno = (matricula: number): Promise<AlumnoMateria[]> =>
   apiFetch<AlumnoMateria[]>(`/alumnos/${matricula}/materias`);
+
+export const inscribirAlumno = (
+  matricula: number,
+  payload: InscribirAlumnoPayload,
+): Promise<InscripcionAlumnoResult> =>
+  apiFetch<InscripcionAlumnoResult>(`/alumnos/${matricula}/inscripciones`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });

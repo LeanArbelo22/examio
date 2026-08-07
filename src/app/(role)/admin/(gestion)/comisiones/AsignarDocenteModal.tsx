@@ -26,11 +26,8 @@ export const AsignarDocenteModal = ({ comisionId, docenteActualNombre, onSuccess
     e.preventDefault();
     if (!selectedDocenteLegajo) return;
 
-    // Si el usuario selecciona desasignar, pasamos un null controlado al backend
-    const legajoPayload = selectedDocenteLegajo === "NULL" ? null : Number(selectedDocenteLegajo);
-
     assignDocente(
-      { Legajo: legajoPayload, IdMateriaDivision: comisionId },
+      { Legajo: Number(selectedDocenteLegajo), IdMateriaDivision: comisionId },
       { onSuccess: () => onSuccess() }
     );
   };
@@ -57,7 +54,6 @@ export const AsignarDocenteModal = ({ comisionId, docenteActualNombre, onSuccess
           required
         >
           <option value="">-- Seleccioná un docente titular --</option>
-          <option value="NULL">🚫 Desasignar Titular Actual (Vacante)</option>
           {opcionesDocentes.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}

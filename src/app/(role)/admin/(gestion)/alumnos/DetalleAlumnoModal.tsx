@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useGetMateriasAlumno } from "@/hooks/useAlumnos";
+import { useGetMateriasAlumno, useInscribirAlumno } from "@/hooks/useAlumnos";
 import { useGetCarreras } from "@/hooks/useCarreras";
 import { useGetMaterias } from "@/hooks/useMaterias";
 import { useGetComisiones } from "@/hooks/useComisiones";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { FeedbackMessage } from "@/components/ui/FeedbackMessage";
 import { Button } from "@/components/ui/Button";
+import { getUserErrorMessage } from "@/lib/errors";
 
 export const DetalleAlumnoModal = ({ matricula }: { matricula: number }) => {
   const { data: inscripciones, isLoading: loadIns, isError: errIns } = useGetMateriasAlumno(matricula);
+  const inscribirAlumno = useInscribirAlumno();
   
   // COPRÓSITOS DE FILTRADO EN CASCADA
   const { carreras } = useGetCarreras();
@@ -35,14 +38,37 @@ export const DetalleAlumnoModal = ({ matricula }: { matricula: number }) => {
     return comisiones.filter(c => c.materia === materiaObj.nombre);
   }, [comisiones, formMateria, materias]);
 
-  const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
+  const [enrollmentFeedback, setEnrollmentFeedback] = useState<{
+    variant: "error" | "success";
+    message: string;
+  } | null>(null);
 
-  const handleInscribir = (e: React.FormEvent) => {
+  const handleInscribir = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formComision) return;
-    setEnrollmentError(
-      "La API todavía no ofrece el contrato necesario para inscribir alumnos en una comisión.",
-    );
+
+    setEnrollmentFeedback(null);
+    try {
+      await inscribirAlumno.mutateAsync({
+        matricula,
+        payload: { IdMateriaDivision: Number(formComision) },
+      });
+      setFormCarrera("");
+      setFormMateria("");
+      setFormComision("");
+      setEnrollmentFeedback({
+        variant: "success",
+        message: "Alumno inscripto correctamente.",
+      });
+    } catch (error: unknown) {
+      setEnrollmentFeedback({
+        variant: "error",
+        message: getUserErrorMessage(
+          error,
+          "No se pudo inscribir al alumno en la comisión.",
+        ),
+      });
+    }
   };
 
   return (
@@ -85,10 +111,15 @@ export const DetalleAlumnoModal = ({ matricula }: { matricula: number }) => {
           </select>
         </div>
 
-        {enrollmentError && <ErrorMessage message={enrollmentError} />}
+        {enrollmentFeedback && (
+          <FeedbackMessage
+            variant={enrollmentFeedback.variant}
+            message={enrollmentFeedback.message}
+          />
+        )}
 
-        <Button type="submit" disabled={!formComision} className="w-full bg-slate-900 text-white text-xs font-bold py-2 rounded-xl">
-          Confirmar Inscripción de Alumno
+        <Button type="submit" disabled={!formComision || inscribirAlumno.isPending} className="w-full bg-slate-900 text-white text-xs font-bold py-2 rounded-xl">
+          {inscribirAlumno.isPending ? "Inscribiendo alumno..." : "Confirmar Inscripción de Alumno"}
         </Button>
       </form>
 

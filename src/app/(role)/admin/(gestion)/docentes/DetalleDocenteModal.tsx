@@ -20,7 +20,7 @@ export const DetalleDocenteModal = ({ legajo }: { legajo: number }) => {
         </p>
       ) : (
         <div className="divide-y divide-slate-100 border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
-          {asignaciones.map((ins: any) => (
+          {asignaciones.map((ins) => (
             <div key={ins.idComision} className="p-4 bg-white flex justify-between items-center group hover:bg-slate-50/40 transition-colors">
               <div>
                 {/* Mapeo de alias exactos de SP_Docente_VerMaterias: ins.nombreMateria e ins.carrera */}

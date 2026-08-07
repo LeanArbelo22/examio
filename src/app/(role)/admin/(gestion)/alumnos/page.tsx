@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Alumno, CreateAlumnoPayload, UpdateAlumnoPayload } from "@/types/index";
 import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
+import { ManagementFilterPanel } from "@/components/admin/ManagementFilterPanel";
+import { ManagementPageHeader } from "@/components/admin/ManagementPageHeader";
+import { ManagementSectionHeader } from "@/components/admin/ManagementSectionHeader";
 import {
   useGetAlumnos,
   useCreateAlumno,
@@ -38,32 +42,26 @@ export default function AlumnosPage() {
 
   const isProcessing = isCreating || isUpdating;
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, filterEstado]);
-
-  useEffect(() => {
-    if (alumnoEnEdicion) {
-      setFormData({
-        Nombre: alumnoEnEdicion.nombre || "",
-        Apellido: alumnoEnEdicion.apellido || "",
-        Correo: alumnoEnEdicion.correo || "",
-        Cuil: alumnoEnEdicion.cuil || "",
-        Matricula: String(alumnoEnEdicion.matricula || ""),
-      });
-    } else {
-      setFormData({
-        Nombre: "",
-        Apellido: "",
-        Correo: "",
-        Cuil: "",
-        Matricula: "",
-      });
-    }
-  }, [alumnoEnEdicion]);
+  const clearForm = () => {
+    setAlumnoEnEdicion(null);
+    setFormData({
+      Nombre: "",
+      Apellido: "",
+      Correo: "",
+      Cuil: "",
+      Matricula: "",
+    });
+  };
 
   const handleEditClick = (alumno: Alumno) => {
     setAlumnoEnEdicion(alumno);
+    setFormData({
+      Nombre: alumno.nombre || "",
+      Apellido: alumno.apellido || "",
+      Correo: alumno.correo || "",
+      Cuil: alumno.cuil || "",
+      Matricula: String(alumno.matricula || ""),
+    });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -111,7 +109,7 @@ export default function AlumnosPage() {
       };
       updateAlumno(
         { matricula: alumnoEnEdicion.matricula, data: payload },
-        { onSuccess: () => setAlumnoEnEdicion(null) },
+        { onSuccess: clearForm },
       );
     } else {
       const payload: CreateAlumnoPayload = {
@@ -136,27 +134,28 @@ export default function AlumnosPage() {
 
   return (
     <div className="space-y-6 antialiased">
-      <div className="border-b border-slate-200/60 pb-4">
-        <h1 className="text-xl font-black text-slate-900 tracking-tight sm:text-2xl">
-          Legajos Estudiantiles (ABM Alumnos)
-        </h1>
-        <p className="text-xs text-slate-400 mt-0.5">
-          Control centralizado de matrículas, altas de CUIL e inscripciones
-          operativas.
-        </p>
-      </div>
+      <ManagementPageHeader
+        title="Legajos Estudiantiles (ABM Alumnos)"
+        description="Control centralizado de matrículas, altas de CUIL e inscripciones operativas."
+      />
 
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <ManagementFilterPanel columnCount={2}>
         <input
           type="text"
           placeholder="🔍 Buscar por nombre, apellido o matrícula..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setCurrentPage(1);
+          }}
           className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 font-medium text-slate-700"
         />
         <select
           value={filterEstado}
-          onChange={(e) => setFilterEstado(e.target.value)}
+          onChange={(e) => {
+            setFilterEstado(e.target.value);
+            setCurrentPage(1);
+          }}
           className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none font-medium text-slate-500"
         >
           <option value="activo">Estado: Activos</option>
@@ -164,18 +163,14 @@ export default function AlumnosPage() {
           <option value="suspendido">Estado: Suspendidos</option>
           <option value="todos">Mostrar Todos</option>
         </select>
-      </div>
+      </ManagementFilterPanel>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Nómina Homologada
-            </h2>
-            <span className="text-[10px] font-mono bg-slate-100 font-bold px-2 py-0.5 text-slate-500 rounded-md">
-              Coincidencias: {alumnosFiltrados.length}
-            </span>
-          </div>
+          <ManagementSectionHeader
+            title="Nómina Homologada"
+            summary={`Coincidencias: ${alumnosFiltrados.length}`}
+          />
 
           {isError ? (
             <ErrorMessage message="Error al conectar con el microservicio transaccional de alumnos." />
@@ -266,29 +261,13 @@ export default function AlumnosPage() {
                 </table>
               </div>
 
-              <div className="flex items-center justify-between bg-white px-4 py-3 rounded-2xl border border-slate-200 shadow-sm text-xs font-semibold text-slate-500">
-                <span>
-                  Página {currentPage} de {totalPages}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((p) => p - 1)}
-                    className="px-3 py-1.5 bg-slate-50 text-slate-600 border-slate-200"
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    type="button"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage((p) => p + 1)}
-                    className="px-3 py-1.5 bg-slate-50 text-slate-600 border-slate-200"
-                  >
-                    Siguiente
-                  </Button>
-                </div>
-              </div>
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                total={alumnosFiltrados.length}
+                itemLabel="alumnos"
+                onPageChange={setCurrentPage}
+              />
             </div>
           )}
         </div>
@@ -393,7 +372,7 @@ export default function AlumnosPage() {
             {alumnoEnEdicion && (
               <button
                 type="button"
-                onClick={() => setAlumnoEnEdicion(null)}
+                onClick={clearForm}
                 className="w-full text-xs font-bold text-slate-400 hover:text-slate-600 mt-1.5 transition-colors"
               >
                 Volver a nuevo registro

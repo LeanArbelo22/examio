@@ -1,10 +1,22 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Materia, CreateMateriaPayload, UpdateMateriaPayload } from "@/types/index";
 import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Modal } from "@/components/ui/Modal";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { LoadingState } from "@/components/ui/LoadingState";
+import { Pagination } from "@/components/ui/Pagination";
+import { ManagementFilterPanel } from "@/components/admin/ManagementFilterPanel";
+import { ManagementPageHeader } from "@/components/admin/ManagementPageHeader";
+import { ManagementSectionHeader } from "@/components/admin/ManagementSectionHeader";
+import { FormFieldError } from "@/components/forms/FormFieldError";
+import {
+  materiaFormSchema,
+  type MateriaFormInput,
+} from "@/lib/schemas/materiaSchema";
+import { validationErrorsFromZod } from "@/lib/form-validation";
 import { useGetCarreras } from "@/hooks/useCarreras";
 import { useGetMaterias, useCreateMateria, useUpdateMateria, useDeleteMateria } from "@/hooks/useMaterias";
 import { DetalleMateriaModal } from "./DetalleMateriaModal";
@@ -20,7 +32,8 @@ export default function MateriasPage() {
   const [selectedMateria, setSelectedMateria] = useState<Materia | null>(null);
   const [materiaEnEdicion, setMateriaEnEdicion] = useState<Materia | null>(null);
 
-  const [formData, setFormData] = useState({ Nombre: "", Semestre: "", IdCarrera: "" });
+  const [formData, setFormData] = useState<MateriaFormInput>({ Nombre: "", Semestre: "", IdCarrera: "" });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // FILTROS
   const [searchQuery, setSearchQuery] = useState("");
@@ -32,11 +45,6 @@ export default function MateriasPage() {
   // ==========================================
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 30;
-
-  // Resetear a la página 1 cada vez que el usuario escribe un filtro
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, filterCarrera, filterSemestre]);
 
   const isLoading = isLoadingMaterias || isLoadingCarreras;
   const isError = isErrorMaterias || isErrorCarreras;
@@ -85,48 +93,78 @@ export default function MateriasPage() {
     return carreras.filter((c) => c.estado);
   }, [carreras]);
 
-  useEffect(() => {
-    if (materiaEnEdicion) {
-      setFormData({ Nombre: materiaEnEdicion.nombre, Semestre: String(materiaEnEdicion.semestre), IdCarrera: String(materiaEnEdicion.idCarrera) });
-    } else {
-      setFormData({ Nombre: "", Semestre: "", IdCarrera: "" });
-    }
-  }, [materiaEnEdicion]);
+  const clearForm = () => {
+    setMateriaEnEdicion(null);
+    setFormData({ Nombre: "", Semestre: "", IdCarrera: "" });
+    setFormErrors({});
+  };
+
+  const handleEditClick = (materia: Materia) => {
+    setMateriaEnEdicion(materia);
+    setFormData({
+      Nombre: materia.nombre,
+      Semestre: String(materia.semestre),
+      IdCarrera: String(materia.idCarrera),
+    });
+    setFormErrors({});
+  };
+
+  const validateFormField = (field: keyof MateriaFormInput) => {
+    const result = materiaFormSchema.safeParse(formData);
+    const errors = result.success ? {} : validationErrorsFromZod(result.error.issues);
+    setFormErrors((current) => {
+      const next = { ...current };
+      if (errors[field]) next[field] = errors[field];
+      else delete next[field];
+      return next;
+    });
+  };
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const validation = materiaFormSchema.safeParse(formData);
+    if (!validation.success) {
+      setFormErrors(validationErrorsFromZod(validation.error.issues));
+      return;
+    }
 
     if (materiaEnEdicion) {
-      const data: UpdateMateriaPayload = { Nombre: formData.Nombre, Semestre: Number(formData.Semestre) };
+      const data: UpdateMateriaPayload = { Nombre: validation.data.Nombre, Semestre: validation.data.Semestre };
       updateMateria(
         { id: materiaEnEdicion.id, data },
-        { onSuccess: () => setMateriaEnEdicion(null) },
+        { onSuccess: clearForm },
       );
     } else {
-      const payload: CreateMateriaPayload = { Nombre: formData.Nombre, Semestre: Number(formData.Semestre), IdCarrera: Number(formData.IdCarrera) };
+      const payload: CreateMateriaPayload = validation.data;
       createMateria(payload, { onSuccess: () => setFormData({ Nombre: "", Semestre: "", IdCarrera: "" }) });
     }
   };
 
   return (
     <div className="space-y-6 antialiased">
-      <div className="border-b border-slate-200/60 pb-4">
-        <h1 className="text-xl font-black text-slate-900 tracking-tight sm:text-2xl">Asignaturas Académicas (ABM Materias)</h1>
-        <p className="text-xs text-slate-400 mt-0.5">Gestioná el mapa de cátedras institucionales y asignación semestral.</p>
-      </div>
+      <ManagementPageHeader
+        title="Asignaturas Académicas (ABM Materias)"
+        description="Gestioná el mapa de cátedras institucionales y asignación semestral."
+      />
 
       {/* PANEL DE FILTROS */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-[0_2px_6px_rgba(0,0,0,0.005)] grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <ManagementFilterPanel columnCount={3}>
         <input
           type="text"
           placeholder="🔍 Buscar materia..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setCurrentPage(1);
+          }}
           className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-700"
         />
         <select
           value={filterCarrera}
-          onChange={(e) => setFilterCarrera(e.target.value)}
+          onChange={(e) => {
+            setFilterCarrera(e.target.value);
+            setCurrentPage(1);
+          }}
           className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-500"
         >
           <option value="">Filtrar por Carrera (Todas)</option>
@@ -136,7 +174,10 @@ export default function MateriasPage() {
         </select>
         <select
           value={filterSemestre}
-          onChange={(e) => setFilterSemestre(e.target.value)}
+          onChange={(e) => {
+            setFilterSemestre(e.target.value);
+            setCurrentPage(1);
+          }}
           className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-500"
         >
           <option value="">Filtrar por Semestre (Todos)</option>
@@ -144,22 +185,22 @@ export default function MateriasPage() {
             <option key={s} value={s}>Semestre {s}</option>
           ))}
         </select>
-      </div>
+      </ManagementFilterPanel>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* TABLA PRINCIPAL */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Planificación Activa</h2>
-            <span className="text-[10px] font-mono bg-slate-100 font-bold px-2 py-0.5 text-slate-500 rounded-md">Total filtradas: {totalMateriasFiltradas.length}</span>
-          </div>
+          <ManagementSectionHeader
+            title="Planificación Activa"
+            summary={`Total filtradas: ${totalMateriasFiltradas.length}`}
+          />
 
           {isLoading ? (
-            <div className="text-sm font-medium text-slate-400 p-8 text-center bg-white border border-slate-200/60 rounded-2xl">Sincronizando asignaturas...</div>
+            <LoadingState message="Sincronizando asignaturas..." />
           ) : isError ? (
             <ErrorMessage message="Error crítico al mapear las asignaturas." />
           ) : materiasPaginadas.length === 0 ? (
-            <div className="text-sm font-medium text-slate-400 p-8 text-center bg-white border border-dashed border-slate-200 rounded-2xl">Ninguna materia coincide con la búsqueda.</div>
+            <EmptyState title="Ninguna materia coincide con la búsqueda." />
           ) : (
             <div className="space-y-4">
               <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
@@ -183,7 +224,7 @@ export default function MateriasPage() {
                           <td className="p-4 text-right">
                             <div className="flex gap-2 justify-end opacity-80 group-hover:opacity-100 transition-opacity">
                               <button type="button" onClick={() => { setSelectedMateria(materia); setIsModalOpen(true); }} className="text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition-colors">🗓️ Comisiones y Alumnos</button>
-                              <button type="button" onClick={() => setMateriaEnEdicion(materia)} className="text-xs font-bold text-slate-600 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg transition-colors border border-slate-200">Editar</button>
+                              <button type="button" onClick={() => handleEditClick(materia)} className="text-xs font-bold text-slate-600 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg transition-colors border border-slate-200">Editar</button>
                               <button type="button" onClick={() => { if (window.confirm(`¿Inhabilitar?`)) eliminarMateria(materia.id); }} className="text-xs font-bold text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors">Inhabilitar</button>
                             </div>
                           </td>
@@ -195,29 +236,13 @@ export default function MateriasPage() {
               </div>
 
               {/* CONTROLES DE PAGINACIÓN */}
-              <div className="flex items-center justify-between bg-white px-4 py-3 rounded-2xl border border-slate-200/80 shadow-sm text-xs font-semibold text-slate-500 select-none">
-                <div>
-                  Mostrando página <strong className="text-slate-800">{currentPage}</strong> de <strong className="text-slate-800">{totalPages}</strong>
-                </div>
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((p) => p - 1)}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold transition-colors disabled:opacity-40 disabled:hover:bg-slate-50 disabled:cursor-not-allowed"
-                  >
-                    Anterior
-                  </button>
-                  <button
-                    type="button"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage((p) => p + 1)}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold transition-colors disabled:opacity-40 disabled:hover:bg-slate-50 disabled:cursor-not-allowed"
-                  >
-                    Siguiente
-                  </button>
-                </div>
-              </div>
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                total={totalMateriasFiltradas.length}
+                itemLabel="materias"
+                onPageChange={setCurrentPage}
+              />
             </div>
           )}
         </div>
@@ -227,21 +252,24 @@ export default function MateriasPage() {
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{materiaEnEdicion ? "Editor" : "Nuevo"}</h2>
           <form onSubmit={handleFormSubmit} className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Nombre de la Materia</label>
-              <input type="text" value={formData.Nombre} onChange={(e) => setFormData({ ...formData, Nombre: e.target.value })} placeholder="Ej: Matemáticas II" className="block w-full px-3 py-2 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-800" required />
+              <label htmlFor="materia-nombre" className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Nombre de la Materia</label>
+              <input id="materia-nombre" type="text" maxLength={100} value={formData.Nombre} onChange={(e) => setFormData({ ...formData, Nombre: e.target.value })} onBlur={() => validateFormField("Nombre")} aria-invalid={Boolean(formErrors.Nombre)} aria-describedby={formErrors.Nombre ? "materia-nombre-error" : undefined} placeholder="Ej: Matemáticas II" className="block w-full px-3 py-2 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-800" />
+              <FormFieldError id="materia-nombre-error" message={formErrors.Nombre} />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Número de Semestre</label>
-              <input type="number" min="1" value={formData.Semestre} onChange={(e) => setFormData({ ...formData, Semestre: e.target.value })} placeholder="Ej: 2" className="block w-full px-3 py-2 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-mono font-bold text-slate-800" required />
+              <label htmlFor="materia-semestre" className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Número de Semestre</label>
+              <input id="materia-semestre" type="number" min="1" value={formData.Semestre} onChange={(e) => setFormData({ ...formData, Semestre: e.target.value })} onBlur={() => validateFormField("Semestre")} aria-invalid={Boolean(formErrors.Semestre)} aria-describedby={formErrors.Semestre ? "materia-semestre-error" : undefined} placeholder="Ej: 2" className="block w-full px-3 py-2 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-mono font-bold text-slate-800" />
+              <FormFieldError id="materia-semestre-error" message={formErrors.Semestre} />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Carrera Universitaria</label>
-              <select value={formData.IdCarrera} onChange={(e) => setFormData({ ...formData, IdCarrera: e.target.value })} disabled={!!materiaEnEdicion} className="block w-full px-3 py-2 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-600 disabled:opacity-50" required>
+              <label htmlFor="materia-carrera" className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Carrera Universitaria</label>
+              <select id="materia-carrera" value={formData.IdCarrera} onChange={(e) => setFormData({ ...formData, IdCarrera: e.target.value })} onBlur={() => validateFormField("IdCarrera")} aria-invalid={Boolean(formErrors.IdCarrera)} aria-describedby={formErrors.IdCarrera ? "materia-carrera-error" : undefined} disabled={!!materiaEnEdicion} className="block w-full px-3 py-2 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-slate-600 disabled:opacity-50">
                 <option value="" disabled>Seleccioná la carrera...</option>
                 {opcionesCarreras.map((c) => (
                   <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
+              <FormFieldError id="materia-carrera-error" message={formErrors.IdCarrera} />
             </div>
             <Button type="submit" disabled={isCreating || isUpdating} className="w-full bg-indigo-600 text-white text-xs font-bold py-2.5 px-4 rounded-xl hover:bg-indigo-700 transition-all shadow-sm">
               {isCreating || isUpdating ? "Escribiendo en SQL..." : "Guardar Asignatura"}

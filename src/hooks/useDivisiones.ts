@@ -7,20 +7,21 @@ import {
   deleteDivision,
 } from "@/services/api/divisiones.api";
 import type { CreateDivisionPayload } from "@/types/index";
+import { divisionKeys, isValidId } from "@/lib/query-keys";
 
 export const useGetDivisiones = () => {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["divisiones"],
+  const query = useQuery({
+    queryKey: divisionKeys.all,
     queryFn: getDivisiones,
   });
-  return { divisiones: data, isLoading, isError };
+  return { ...query, divisiones: query.data };
 };
 
 export const useGetDivisionPorId = (id: number | null) => {
   return useQuery({
-    queryKey: ["division", id],
+    queryKey: divisionKeys.detail(id!),
     queryFn: () => getDivisionPorId(id!),
-    enabled: !!id,
+    enabled: isValidId(id),
   });
 };
 
@@ -28,7 +29,7 @@ export const useCreateDivision = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: CreateDivisionPayload) => createDivision(payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["divisiones"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: divisionKeys.all }),
   });
 };
 
@@ -36,7 +37,7 @@ export const useUpdateDivision = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => updateDivision(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["divisiones"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: divisionKeys.all }),
   });
 };
 
@@ -44,6 +45,6 @@ export const useDeleteDivision = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteDivision,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["divisiones"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: divisionKeys.all }),
   });
 };

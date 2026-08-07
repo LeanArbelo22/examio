@@ -195,15 +195,15 @@ La protección de respuestas pendientes está implementada sin cambios de backen
 
 ## Fase 2 — Configuración y acceso centralizado a la API
 
-**Estado: CERRADA EN FRONTEND — INSCRIPCIÓN BLOQUEADA POR CONTRATO BACKEND**
+**Estado: COMPLETADA — 2026-07-25**
 
 - [x] Mover la URL de la API a `EXAMIO_API_URL`, configuración exclusiva del servidor y validada.
 - [x] Eliminar las URLs `http://localhost:55803/api` del código productivo; solo permanecen como ejemplos de desarrollo documentados.
 - [x] Mantener `apiFetch` como único cliente HTTP para servicios y consumidores de UI.
 - [x] Eliminar llamadas `fetch` directas desde páginas y componentes; los `fetch` restantes pertenecen a NextAuth, `apiFetch` y el BFF.
 - [x] Verificar que la pantalla de docentes consume servicios y hooks existentes y retirar la referencia visual al puerto local.
-- [!] Mover la inscripción de alumnos al servicio de su dominio y habilitarla correctamente. La API documentada no expone una operación para crear `InscripcionMateria`; requiere contrato backend `admin`, validación e idempotencia sobre `(IdMateriaDivision, IdAlumno)`.
-- [x] Eliminar la interpolación defectuosa `"/alumnos/${matricula}/inscribir"` y el fallo silencioso. La UI informa el bloqueo y no llama una ruta inexistente.
+- [x] Mover la inscripción de alumnos a `alumnos.api` y `useAlumnos`, consumiendo `POST /alumnos/:matricula/inscripciones`.
+- [x] Corregir la interpolación de matrícula, eliminar el fallo silencioso y usar el contrato backend idempotente con rol `admin`.
 - [x] Soportar respuestas JSON, cuerpos vacíos y errores de parseo mediante el contrato común de `apiFetch`.
 - [x] Incorporar timeout por defecto, timeout configurable y composición con `AbortSignal`; el BFF también limita la espera del upstream.
 - [x] Normalizar códigos fallback para 400/422, 401, 403, 404, 409, 429 y 500 sin reemplazar códigos estables del backend.
@@ -211,103 +211,131 @@ La protección de respuestas pendientes está implementada sin cambios de backen
 - [x] Exponer el contrato común `ApiError` y `ApiValidationError`, preservando `statusCode`, `code`, `message`, `path` y errores de validación.
 - [x] Integrar `GET /api/health` en el diagnóstico frontend mediante `pnpm env:check` y `pnpm dev:checked`.
 
-**Criterio de finalización frontend verificado:** ninguna página o componente realiza `fetch` directo y ningún endpoint contiene una URL hardcodeada. La inscripción queda explícitamente bloqueada hasta ampliar el contrato de la API; no se simula ni se apunta a una ruta inexistente.
+**Criterio de finalización verificado:** ninguna página o componente realiza `fetch` directo, ningún endpoint contiene una URL hardcodeada y la inscripción utiliza el contrato efectivo documentado por la API.
 
 ---
 
 ## Fase 3 — Tipado y contratos
 
-**Estado: PENDIENTE**
+**Estado: COMPLETADA — 2026-07-25**
 
-- [ ] Eliminar interfaces duplicadas de `src/types/index.ts`.
-- [ ] Confirmar el contrato correcto antes de eliminar cada duplicado.
-- [ ] Separar tipos por dominio manteniendo exports compatibles.
-- [ ] Distinguir entidades, respuestas y payloads.
-- [ ] Reemplazar `any` comenzando por auth, API, evaluaciones y reportes.
-- [ ] Estabilizar PascalCase para requests y camelCase para responses.
-- [ ] Evitar compatibilidad simultánea PascalCase/camelCase en componentes.
-- [ ] Activar `noImplicitAny` de forma progresiva.
-- [ ] Activar `strictNullChecks` después de resolver nulabilidad.
-- [ ] Evaluar finalmente `strict: true`.
+- [x] Eliminar interfaces duplicadas de `src/types/index.ts`.
+- [x] Confirmar el contrato correcto antes de eliminar cada duplicado.
+- [x] Separar tipos por dominio manteniendo exports compatibles mediante el barrel `src/types/index.ts`.
+- [x] Distinguir entidades, respuestas y payloads en `shared`, `api`, `auth`, `alumnos`, `academic`, `evaluaciones`, `administracion` y `reportes`.
+- [x] Reemplazar todos los `any` explícitos de `src`.
+- [x] Estabilizar PascalCase para requests y camelCase para responses.
+- [x] Evitar compatibilidad simultánea PascalCase/camelCase en componentes.
+- [x] Activar `noImplicitAny`.
+- [x] Activar `strictNullChecks` después de resolver la nulabilidad detectada.
+- [x] Activar y validar `strict: true`.
 
 ---
 
 ## Fase 4 — Convenciones de TanStack Query
 
-**Estado: PENDIENTE**
+**Estado: COMPLETADA — 2026-07-25**
 
-- [ ] Crear fábricas de query keys por dominio.
-- [ ] Normalizar el retorno de hooks.
-- [ ] Normalizar condiciones `enabled`.
-- [ ] Auditar invalidaciones después de mutaciones.
-- [ ] Usar `placeholderData` solo cuando mejore UX.
-- [ ] Crear nuevos hooks sin JSX como archivos `.ts`.
-- [ ] Eliminar imports no utilizados.
-- [ ] Documentar la separación entre estado remoto y estado local.
+- [x] Crear fábricas jerárquicas de query keys por dominio en `src/lib/query-keys.ts`.
+- [x] Normalizar el retorno de hooks exponiendo el objeto estándar de React Query; se conservan aliases existentes como compatibilidad transitoria.
+- [x] Normalizar condiciones `enabled` mediante validación explícita de identificadores positivos.
+- [x] Auditar invalidaciones después de mutaciones y alinearlas con las mismas fábricas de keys.
+- [x] Usar `placeholderData` solo en la paginación del reporte, donde evita parpadeos y conserva contexto.
+- [x] Renombrar todos los hooks sin JSX de `.tsx` a `.ts`.
+- [x] Eliminar imports no utilizados detectados por ESLint.
+- [x] Documentar la separación entre estado remoto de React Query, estado local de UI y outbox durable del examen.
 
 ---
 
 ## Fase 5 — Errores y feedback al usuario
 
-**Estado: PENDIENTE**
+**Estado: COMPLETADA (2026-07-25)**
 
-- [ ] Consolidar `ApiError` y categorías de error.
-- [ ] Crear estados reutilizables de carga, vacío y error.
-- [ ] Reutilizar `ErrorMessage` dentro del sistema común.
-- [ ] Eliminar `alert()` de flujos normales.
-- [ ] Evaluar un sistema de toast accesible.
-- [ ] Agregar `error.tsx` en segmentos críticos.
-- [ ] Registrar detalles técnicos solo en desarrollo.
-- [ ] Mantener mensajes seguros en producción.
+- [x] Consolidar `ApiError` en categorías funcionales y mensajes seguros mediante `src/lib/errors.ts`.
+- [x] Crear estados reutilizables de carga, vacío y error.
+- [x] Integrar `ErrorMessage` con el sistema común de feedback accesible.
+- [x] Eliminar `alert()` de los flujos normales migrados en esta fase.
+- [x] Evaluar un sistema de toast accesible: no se agrega una dependencia global; el feedback
+  inline con regiones `alert`/`status` cubre los flujos actuales sin introducir estado transversal.
+- [x] Agregar `error.tsx` en los segmentos críticos de administración y docente.
+  No se agrega un límite genérico al segmento alumno porque podría desmontar una evaluación activa;
+  ese flujo conserva su tratamiento local especializado.
+- [x] Registrar detalles técnicos del cliente solo en desarrollo.
+- [x] Mantener mensajes funcionales seguros en producción y preservar errores de validación por campo.
+
+El `alert()` que solicita permiso de pantalla completa permanece como excepción explícita del
+flujo antifraude del examen. Su reemplazo depende de la revisión funcional ya planificada de
+fullscreen, pérdida de foco, recargas e incidentes; no corresponde modificarlo como saneamiento
+general de feedback.
 
 ---
 
 ## Fase 6 — Componentes reutilizables y consistencia visual
 
-**Estado: EN PROGRESO**
+**Estado: COMPLETADA — 2026-08-06**
 
 - [x] Crear la primera familia reutilizable de reportes: `ReportLayout`, `ReportFilterPanel`, `ReportKpiGrid`, `ReportTable` y `ChartCard`.
-- [ ] Validar esas APIs al implementar un segundo reporte.
-- [ ] Comparar patrones repetidos en alumnos, carreras, materias, docentes y usuarios.
-- [ ] Evaluar `ManagementPageHeader`.
-- [ ] Evaluar `DataTable` administrativo.
-- [ ] Evaluar `FilterPanel` y `Pagination` compartidos.
-- [ ] Evaluar `StatusBadge`.
-- [ ] Evaluar campos de formulario reutilizables.
-- [ ] Evaluar `EmptyState`, `LoadingSkeleton` y `ConfirmDialog`.
-- [ ] Evitar un componente de tabla excesivamente configurable.
+- [x] Validar esas APIs con el reporte de rendimiento por publicación de evaluación.
+- [x] Consumir KPIs y distribución global del nuevo reporte sin recalcular agregados desde la página visible.
+- [x] Comparar patrones repetidos en alumnos, carreras, materias, docentes y usuarios.
+- [x] Implementar `ManagementPageHeader` y validarlo en alumnos y materias.
+- [x] Evaluar `DataTable` administrativo: se difiere porque filas, acciones y estados todavía varían demasiado.
+- [x] Implementar `ManagementFilterPanel` estructural y `Pagination` compartida sin mezclar filtros locales con filtros URL de reportes.
+- [x] Implementar `StatusBadge`; cada dominio conserva la traducción de estado a etiqueta y tono.
+- [x] Evaluar campos de formulario reutilizables: se difieren a la fase 7 junto con schemas y errores por campo.
+- [x] Reutilizar `EmptyState`, `LoadingState` y un `ReportSkeleton` compartido. `ConfirmDialog` se difiere hasta corregir accesibilidad de `Modal`.
+- [x] Evitar un componente de tabla excesivamente configurable.
+- [!] Los gráficos del reporte anterior por alumno continúan describiendo únicamente la página visible porque su endpoint no entrega series globales. Sus KPIs sí son globales. Corregir esa diferencia requiere ampliar el contrato backend existente; el nuevo reporte no tiene esta limitación.
 
 ---
 
 ## Fase 7 — Formularios y validación
 
-**Estado: PENDIENTE**
+**Estado: COMPLETADA — 2026-08-06**
 
-- [ ] Crear schemas Zod para formularios complejos.
-- [ ] Reutilizar tipos inferidos cuando sea apropiado.
-- [ ] Crear campos accesibles y consistentes.
-- [ ] Separar transformación de formulario a payload.
-- [ ] Separar validación del renderizado.
-- [ ] Dividir la creación de examen en secciones mantenibles.
-- [ ] Evaluar React Hook Form solo si reduce complejidad real.
-- [ ] Mantener formularios CRUD simples sin dependencias innecesarias.
+- [x] Crear `examFormSchema` con Zod para información, publicación y estructura dinámica de preguntas.
+- [x] Reutilizar tipos inferidos del schema para el estado y las preguntas del examen.
+- [x] Crear `FormFieldError` y asociar errores mediante labels, `aria-invalid` y `aria-describedby`.
+- [x] Separar la transformación al `GuardarEvaluacionPayload` en `src/lib/exam-form.ts`.
+- [x] Separar validación del renderizado y reutilizar el mapeo de errores Zod por path.
+- [x] Dividir la creación de examen en información básica, editor de preguntas y configuración lateral.
+- [x] Inicializar apertura y cierre con fechas editables válidas, limitar el año a una ventana lógica y validar relaciones al perder foco y al enviar.
+- [x] Eliminar el título y descripción generados automáticamente; ahora son datos explícitos del formulario.
+- [x] Evaluar React Hook Form: no se incorpora porque Zod y estado controlado resolvieron el caso sin otra dependencia.
+- [x] Validar el patrón reducido en materias con schema pequeño, transformación numérica y errores por campo.
+- [x] Mantener formularios CRUD simples sin convertirlos en una abstracción universal.
 
 ---
 
 ## Fase 8 — Testing frontend
 
-**Estado: PENDIENTE**
+**Estado: EN PROGRESO — primera etapa implementada**
 
-- [ ] Aprobar e instalar infraestructura de testing.
-- [ ] Evaluar Vitest, React Testing Library y `user-event`.
-- [ ] Evaluar Mock Service Worker para contratos HTTP.
+- [x] Aprobar e instalar infraestructura de testing.
+- [x] Incorporar Vitest, jsdom, React Testing Library, `user-event` y `jest-dom`.
+- [x] Incorporar Mock Service Worker para contratos HTTP sin depender de la API activa.
 - [ ] Evaluar Playwright para flujos críticos.
-- [ ] Probar cliente HTTP y servicios.
-- [ ] Probar autenticación y manejo de errores.
+- [x] Probar cliente HTTP y servicios críticos: `apiFetch`, errores HTTP, timeout, cancelación, red, refresh/reintento y normalización del inicio de intento.
+- [~] Probar autenticación y manejo de errores: cubierta la clasificación de errores; falta el flujo integrado de autenticación.
 - [ ] Probar hooks principales.
-- [ ] Probar componentes reutilizables.
+- [~] Probar componentes reutilizables: cubiertos `Pagination` y `FormFieldError`; falta ampliar casos críticos.
 - [ ] Probar el reporte de rendimiento.
 - [ ] Agregar E2E de login por rol, rutas protegidas, examen, corrección y reportes.
+
+### Etapa 1 — Base unitaria y de componentes
+
+- [x] Configurar entorno `jsdom`, setup común, limpieza automática, alias `@/` y matchers de DOM.
+- [x] Agregar scripts para modo interactivo y ejecución única reproducible.
+- [x] Probar schemas de examen y materia, incluyendo fechas, tipos de pregunta y opciones correctas.
+- [x] Probar valores iniciales y transformación del formulario de examen al payload HTTP.
+- [x] Probar construcción centralizada de query strings.
+- [x] Probar categorización, mensajes seguros, reintentos y errores de validación.
+- [x] Probar la adaptación del contrato real de `POST /intentos/iniciar`.
+- [x] Probar interacción básica y estados deshabilitados de paginación, y el error accesible de campo.
+- [x] Incorporar MSW 2 en modo Node para interceptar el `fetch` real de tests, rechazar requests no declarados y simular exclusivamente el BFF same-origin y la sesión NextAuth.
+- [x] Cubrir éxito, cuerpo vacío, validación, JSON inválido, 403 funcional, 401 no renovable, refresh exitoso/fallido, límite de un reintento y single-flight concurrente.
+- [x] Cubrir timeout, `AbortSignal`, pérdida de red y rechazo de endpoints que podrían evitar el BFF.
+- [ ] Incorporar Playwright como etapa separada para los flujos críticos de navegador.
 
 ---
 
@@ -369,14 +397,13 @@ La protección de respuestas pendientes está implementada sin cambios de backen
 2. [x] Analizar y aprobar el alcance exacto de la fase 1.
 3. [x] Ejecutar fase 1 — Autenticación, refresh, logout y expiración validados manualmente.
 4. [x] Ejecutar fase 2 — Cliente API y configuración cerrados en frontend; inscripción registrada como dependencia backend.
-5. [ ] Ejecutar fase 3 — Tipado y contratos.
-6. [ ] Normalizar React Query y errores.
+5. [x] Ejecutar fase 3 — Contratos estrictos, sin `any` y separados por dominio.
+6. [x] Normalizar React Query y errores — Fases 4 y 5 completadas.
 7. [ ] Consolidar componentes, formularios y accesibilidad.
-8. [ ] Incorporar testing frontend.
+8. [~] Incorporar testing frontend — primera etapa unitaria y de componentes completada.
 9. [ ] Completar documentación, limpieza y rendimiento medido.
 
 ## Próximo paso
 
-Iniciar la Fase 3 con una auditoría focalizada de tipos y contratos. En paralelo,
-coordinar con backend el endpoint idempotente de inscripción de alumnos antes de
-reactivar esa operación en la interfaz.
+Continuar la Fase 8 con hooks de React Query y autenticación integrada.
+Evaluar y aprobar por separado Playwright y la preparación de datos para E2E.

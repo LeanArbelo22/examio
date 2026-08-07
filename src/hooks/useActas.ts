@@ -7,19 +7,20 @@ import {
   cargarDetalleActa,
 } from "@/services/api/actas.api";
 import type { CreateActaPayload, CargarDetalleActaPayload } from "@/types/index";
+import { actaKeys, isValidId } from "@/lib/query-keys";
 
 export const useGetActas = () => {
   return useQuery({
-    queryKey: ["actas"],
+    queryKey: actaKeys.all,
     queryFn: getActas,
   });
 };
 
 export const useGetActaPorId = (id: number | null) => {
   return useQuery({
-    queryKey: ["acta", id],
+    queryKey: actaKeys.detail(id!),
     queryFn: () => getActaPorId(id!),
-    enabled: !!id,
+    enabled: isValidId(id),
   });
 };
 
@@ -28,7 +29,7 @@ export const useCrearActaCierre = () => {
   return useMutation({
     mutationFn: (payload: CreateActaPayload) => crearActaCierre(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["actas"] });
+      queryClient.invalidateQueries({ queryKey: actaKeys.all });
     },
   });
 };
@@ -38,7 +39,7 @@ export const useCargarDetalleActa = () => {
   return useMutation({
     mutationFn: (payload: CargarDetalleActaPayload) => cargarDetalleActa(payload),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["acta", variables.IdActa] });
+      queryClient.invalidateQueries({ queryKey: actaKeys.detail(variables.IdActa) });
     },
   });
 };
@@ -48,7 +49,7 @@ export const useCerrarActa = () => {
   return useMutation({
     mutationFn: cerrarActa,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["actas"] });
+      queryClient.invalidateQueries({ queryKey: actaKeys.all });
     },
   });
 };
