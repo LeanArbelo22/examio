@@ -371,17 +371,24 @@ general de feedback.
 
 ## Fase 9 — Accesibilidad y UX
 
-**Estado: PENDIENTE**
+**Estado: COMPLETADA**
 
-- [ ] Agregar focus trap, Escape, restauración de foco y `aria-labelledby` a `Modal`.
-- [ ] Revisar navegación por teclado en tablas.
-- [ ] Agregar `aria-live` a estados asíncronos y errores.
-- [ ] Asociar errores de formulario con `aria-describedby`.
-- [ ] Revisar contraste y foco visible.
-- [ ] Evitar emojis como único indicador.
-- [ ] Revisar responsive de tablas y gráficos.
-- [ ] Limitar el bloqueo del menú contextual al entorno de examen.
-- [ ] Respetar `prefers-reduced-motion`.
+- [x] Agregar focus trap, Escape, restauración de foco y `aria-labelledby` a `Modal`.
+- [x] Revisar navegación por teclado en tablas interactivas y mantener foco visible.
+- [x] Agregar semántica `aria-live`, `status` o `alert` a estados asíncronos y errores compartidos.
+- [x] Asociar errores de login y creación de evaluación con `aria-invalid` y `aria-describedby`.
+- [x] Revisar contraste y foco visible. Los tonos heredados de texto y placeholder demasiado claros se elevan globalmente al contraste de `slate-500` mediante una política CSS prioritaria.
+- [x] Evitar emojis como único indicador en los flujos revisados; los símbolos conservados están ocultos semánticamente o acompañados por texto.
+- [x] Revisar responsive de tablas y gráficos: tablas con overflow horizontal y ancho mínimo; gráficos con contenedores adaptables y alternativa textual.
+- [x] Limitar el bloqueo del menú contextual al entorno fullscreen del examen y registrar allí el incidente.
+- [x] Respetar `prefers-reduced-motion` globalmente para animaciones, transiciones y scroll suave.
+
+### Implementación y verificación
+
+- [x] El modal bloquea el scroll de fondo mientras está abierto y devuelve el foco al disparador al cerrar.
+- [x] Los gráficos de reportes exponen listas o resúmenes equivalentes para lectores de pantalla sin duplicar el SVG de Recharts.
+- [x] El detalle de alumno anuncia su carga y el login anuncia errores funcionales sin depender del color.
+- [x] Se agregaron pruebas de nombre accesible, foco inicial, Escape, ciclo de Tab y alternativas textuales de gráficos.
 
 ---
 
@@ -429,10 +436,10 @@ general de feedback.
 4. [x] Ejecutar fase 2 — Cliente API y configuración cerrados en frontend; inscripción registrada como dependencia backend.
 5. [x] Ejecutar fase 3 — Contratos estrictos, sin `any` y separados por dominio.
 6. [x] Normalizar React Query y errores — Fases 4 y 5 completadas.
-7. [~] Componentes y formularios consolidados en las Fases 6 y 7; accesibilidad transversal pendiente en la Fase 9.
+7. [x] Componentes, formularios y accesibilidad transversal consolidados en las Fases 6, 7 y 9.
 8. [x] Incorporar testing frontend — cobertura unitaria, integración y E2E crítica completada.
 9. [ ] Completar documentación, limpieza y rendimiento medido.
 
 ## Próximo paso
 
-Comenzar la Fase 9 con la accesibilidad del `Modal`, foco y anuncios asíncronos.
+Continuar la Fase 10 con la separación de mocks productivos y la limpieza de textos mal codificados.

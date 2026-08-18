@@ -3,7 +3,6 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Providers } from "@/components/providers/Providers";
 import "./globals.css";
 import { Geist } from "next/font/google";
-import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,14 +26,6 @@ export default function RootLayout({
           <Navbar />
           <main className="flex-1 flex flex-col">{children}</main>
         </Providers>
-        {/* bloquea click derecho en toda la app */}
-        <Script id="block-context-menu" strategy="afterInteractive">
-          {`
-            document.addEventListener('contextmenu', function(e) {
-              e.preventDefault();
-            });
-          `}
-        </Script>
       </body>
     </html>
   );

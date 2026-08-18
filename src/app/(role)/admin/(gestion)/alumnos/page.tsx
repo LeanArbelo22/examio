@@ -176,8 +176,8 @@ export default function AlumnosPage() {
             <ErrorMessage message="Error al conectar con el microservicio transaccional de alumnos." />
           ) : (
             <div className="space-y-4">
-              <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm">
-                <table className="w-full text-left text-sm border-collapse">
+              <div className="overflow-x-auto bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+                <table className="w-full min-w-[720px] text-left text-sm border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 font-bold text-[11px] uppercase tracking-wider select-none">
                       <th className="p-4">Estudiante</th>

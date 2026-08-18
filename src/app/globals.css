@@ -12,6 +12,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Los tonos heredados slate-400/300 no alcanzan contraste suficiente en texto pequeño sobre blanco. */
+.text-slate-400 {
+  color: #64748b !important;
+}
+
+.placeholder\:text-slate-300::placeholder {
+  color: #64748b !important;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -51,4 +60,19 @@ html, body {
 html {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

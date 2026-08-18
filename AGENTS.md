@@ -280,11 +280,22 @@ Los tests del backend y su estrategia de mocks no constituyen tests del frontend
 
 Tailwind CSS 4 es el mecanismo principal; los estilos globales viven en `src/app/globals.css`.
 La identidad existente usa Geist, paleta slate/indigo, superficies claras, bordes suaves, radios amplios y sombras sutiles.
+Los textos heredados con `text-slate-400` y placeholders `slate-300` se elevan desde
+`globals.css` al contraste efectivo de `slate-500`; no retirar esa política sin
+volver a medir textos pequeños sobre superficies claras.
 Reutilizar componentes y combinaciones existentes antes de introducir una variante visual.
 Mantener loading, skeleton, empty state y error state en vistas de datos.
 Diseñar tablas y gráficos responsive, con alternativa legible en pantallas pequeñas.
 Preservar foco visible, labels, semántica, navegación por teclado y atributos ARIA básicos.
-El `Modal` actual no debe asumirse plenamente accesible; revisar su comportamiento antes de usarlo en un flujo crítico.
+El `Modal` compartido implementa nombre accesible, foco inicial, focus trap, Escape,
+restauración de foco y bloqueo de scroll. Los modales críticos del examen son flujos
+especializados y no deben sustituirse sin preservar sus restricciones funcionales.
+Los estados asíncronos deben distinguir `status`/`aria-live="polite"` de errores
+urgentes con `alert`; evitar anunciar cada transición intermedia de un autoguardado.
+Todo gráfico debe conservar una alternativa textual con los mismos datos relevantes.
+Las tablas anchas deben permitir scroll horizontal sin comprimir columnas hasta volverlas ilegibles.
+El bloqueo del menú contextual pertenece exclusivamente al entorno fullscreen del examen.
+Respetar `prefers-reduced-motion`; no depender de animación para comunicar estado.
 
 ## Riesgos y zonas delicadas
 
