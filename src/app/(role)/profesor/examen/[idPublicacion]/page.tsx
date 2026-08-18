@@ -102,7 +102,7 @@ export default function GestionExamenPage({ params }: { params: Promise<{ idPubl
 
         {alumnos.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   <th className="pb-3 pr-4">Matr&iacute;cula</th>

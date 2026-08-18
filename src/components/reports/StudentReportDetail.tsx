@@ -70,5 +70,5 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 function DetailSkeleton() {
-  return <div className="space-y-4" aria-label="Cargando detalle"><div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-xl bg-slate-100" />)}</div>{Array.from({ length: 3 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-xl bg-slate-100" />)}</div>;
+  return <div className="space-y-4" role="status" aria-live="polite" aria-label="Cargando detalle"><div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-xl bg-slate-100" />)}</div>{Array.from({ length: 3 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-xl bg-slate-100" />)}</div>;
 }

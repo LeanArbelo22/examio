@@ -38,7 +38,7 @@ export function EvaluationReportCharts({
             No hay intentos para graficar.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <><ul className="sr-only">{data.map((item) => <li key={item.categoria}>{item.categoria}: {item.cantidad}</li>)}</ul><div aria-hidden="true" className="h-full w-full"><ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={data}
@@ -60,7 +60,7 @@ export function EvaluationReportCharts({
               />
               <Legend verticalAlign="bottom" iconType="circle" />
             </PieChart>
-          </ResponsiveContainer>
+          </ResponsiveContainer></div></>
         )}
       </ChartCard>
       <ChartCard

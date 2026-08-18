@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Usuario, CreateUsuarioPayload, UpdateUsuarioPayload } from "@/types/index";
 import type { UserRole } from "@/types/index";
 import { Button } from "@/components/ui/Button";
@@ -18,6 +18,26 @@ const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: "alumno", label: "Alumno" },
 ];
 
+const EMPTY_FORM_DATA = {
+  Email: "",
+  PasswordHash: "",
+  Rol: "alumno" as UserRole,
+  IdDocente: "",
+  IdAlumno: "",
+  Activo: true,
+};
+
+function getFormDataForUser(usuario: Usuario) {
+  return {
+    Email: usuario.email || "",
+    PasswordHash: "",
+    Rol: usuario.rol,
+    IdDocente: usuario.idDocente?.toString() || "",
+    IdAlumno: usuario.idAlumno?.toString() || "",
+    Activo: usuario.activo,
+  };
+}
+
 export default function UsuariosPage() {
   const { usuarios, isLoading, isError } = useGetUsuarios();
   const { mutate: createUsuario, isPending: isCreating } = useCreateUsuario();
@@ -31,45 +51,18 @@ export default function UsuariosPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 30;
 
-  const [formData, setFormData] = useState({
-    Email: "",
-    PasswordHash: "",
-    Rol: "alumno" as UserRole,
-    IdDocente: "",
-    IdAlumno: "",
-    Activo: true,
-  });
+  const [formData, setFormData] = useState({ ...EMPTY_FORM_DATA });
 
   const isProcessing = isCreating || isUpdating;
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, filterRol]);
-
-  useEffect(() => {
-    if (usuarioEnEdicion) {
-      setFormData({
-        Email: usuarioEnEdicion.email || "",
-        PasswordHash: "",
-        Rol: usuarioEnEdicion.rol,
-        IdDocente: usuarioEnEdicion.idDocente?.toString() || "",
-        IdAlumno: usuarioEnEdicion.idAlumno?.toString() || "",
-        Activo: usuarioEnEdicion.activo,
-      });
-    } else {
-      setFormData({
-        Email: "",
-        PasswordHash: "",
-        Rol: "alumno",
-        IdDocente: "",
-        IdAlumno: "",
-        Activo: true,
-      });
-    }
-  }, [usuarioEnEdicion]);
+  const resetForm = () => {
+    setUsuarioEnEdicion(null);
+    setFormData({ ...EMPTY_FORM_DATA });
+  };
 
   const handleEditClick = (usuario: Usuario) => {
     setUsuarioEnEdicion(usuario);
+    setFormData(getFormDataForUser(usuario));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -115,7 +108,7 @@ export default function UsuariosPage() {
       }
       updateUsuario(
         { id: usuarioEnEdicion.id, data: payload },
-        { onSuccess: () => setUsuarioEnEdicion(null) },
+        { onSuccess: resetForm },
       );
     } else {
       const payload: CreateUsuarioPayload = {
@@ -127,15 +120,7 @@ export default function UsuariosPage() {
         Activo: formData.Activo,
       };
       createUsuario(payload, {
-        onSuccess: () =>
-          setFormData({
-            Email: "",
-            PasswordHash: "",
-            Rol: "alumno",
-            IdDocente: "",
-            IdAlumno: "",
-            Activo: true,
-          }),
+        onSuccess: resetForm,
       });
     }
   };
@@ -156,12 +141,18 @@ export default function UsuariosPage() {
           type="text"
           placeholder="🔍 Buscar por email o ID..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setCurrentPage(1);
+          }}
           className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 font-medium text-slate-700"
         />
         <select
           value={filterRol}
-          onChange={(e) => setFilterRol(e.target.value)}
+          onChange={(e) => {
+            setFilterRol(e.target.value);
+            setCurrentPage(1);
+          }}
           className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none font-medium text-slate-500"
         >
           <option value="todos">Todos los Roles</option>
@@ -186,8 +177,8 @@ export default function UsuariosPage() {
             <ErrorMessage message="Error al conectar con el microservicio de usuarios." />
           ) : (
             <div className="space-y-4">
-              <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm">
-                <table className="w-full text-left text-sm border-collapse">
+              <div className="overflow-x-auto bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+                <table className="w-full min-w-[720px] text-left text-sm border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 font-bold text-[11px] uppercase tracking-wider select-none">
                       <th className="p-4">ID</th>
@@ -440,7 +431,7 @@ export default function UsuariosPage() {
             {usuarioEnEdicion && (
               <button
                 type="button"
-                onClick={() => setUsuarioEnEdicion(null)}
+                onClick={resetForm}
                 className="w-full text-xs font-bold text-slate-400 hover:text-slate-600 mt-1.5 transition-colors"
               >
                 Volver a nuevo registro

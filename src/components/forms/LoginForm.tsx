@@ -66,7 +66,7 @@ export function LoginForm() {
       </div>
 
       {(globalError || state.errors?.email || state.errors?.password) && (
-        <div className="text-red-600 text-sm font-medium mb-4">
+        <div id="login-form-error" role="alert" aria-live="assertive" className="text-red-600 text-sm font-medium mb-4">
           {globalError || "Por favor, corregí los errores en el formulario."}
         </div>
       )}
@@ -88,6 +88,8 @@ export function LoginForm() {
                 : "border-slate-200 focus:ring-indigo-100 focus:border-indigo-600"
             }`}
             placeholder="ejemplo@institucion.edu.ar"
+            aria-invalid={Boolean(state.errors?.email || globalError)}
+            aria-describedby={state.errors?.email || globalError ? "login-form-error" : undefined}
           />
           {state.errors?.email && (
             <p className="mt-1.5 text-xs font-medium text-red-600">{state.errors.email}</p>
@@ -114,6 +116,8 @@ export function LoginForm() {
                 : "border-slate-200 focus:ring-indigo-100 focus:border-indigo-600"
             }`}
             placeholder="••••••••"
+            aria-invalid={Boolean(state.errors?.password || globalError)}
+            aria-describedby={state.errors?.password || globalError ? "login-form-error" : undefined}
           />
           {state.errors?.password && (
             <p className="mt-1.5 text-xs font-medium text-red-600">{state.errors.password}</p>
@@ -136,6 +140,7 @@ export function LoginForm() {
           <Button
             type="submit"
             disabled={isPending}
+            aria-busy={isPending}
             className="w-full flex justify-center py-3 px-4 bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 active:scale-[0.99] transition-all rounded-xl shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isPending ? "Iniciando sesión..." : "Ingresar"}

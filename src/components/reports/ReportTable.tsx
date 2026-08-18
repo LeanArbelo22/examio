@@ -87,7 +87,7 @@ export function ReportTable<T, TSort extends string>({
                       onRowClick(row);
                     }
                   }}
-                  className={`border-b border-slate-50 transition last:border-0 ${onRowClick ? "cursor-pointer hover:bg-indigo-50/40 focus:bg-indigo-50/40 focus:outline-none" : ""}`}
+                  className={`border-b border-slate-50 transition last:border-0 ${onRowClick ? "cursor-pointer hover:bg-indigo-50/40 focus:bg-indigo-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500" : ""}`}
                 >
                   {columns.map((column) => (
                     <td key={column.key} className={`px-4 py-3.5 text-slate-600 ${alignClasses[column.align ?? "left"]}`}>

@@ -130,6 +130,15 @@ export function FullscreenWrapper({
       });
     };
 
+    const blockContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+      enviarAlerta({
+        IdIntento: idIntento,
+        TipoIncidente: "context_menu_block",
+        Detalle: "Intento de abrir el menú contextual durante el examen.",
+      });
+    };
+
     const blockShortcuts = (e: KeyboardEvent) => {
       if (
         e.key === "F12" ||
@@ -151,12 +160,14 @@ export function FullscreenWrapper({
     document.addEventListener("copy", blockClipboard);
     document.addEventListener("cut", blockClipboard);
     document.addEventListener("paste", blockClipboard);
+    document.addEventListener("contextmenu", blockContextMenu);
     document.addEventListener("keydown", blockShortcuts);
 
     return () => {
       document.removeEventListener("copy", blockClipboard);
       document.removeEventListener("cut", blockClipboard);
       document.removeEventListener("paste", blockClipboard);
+      document.removeEventListener("contextmenu", blockContextMenu);
       document.removeEventListener("keydown", blockShortcuts);
     };
   }, [enviarAlerta, idIntento, isFullscreen]);

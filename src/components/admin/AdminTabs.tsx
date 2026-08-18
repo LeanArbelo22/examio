@@ -133,7 +133,7 @@ function IntentosTable({ intentos }: { intentos: AdminIntentoItem[] }) {
   }
 
   return (
-    <table className="w-full text-xs">
+    <table className="w-full min-w-[640px] text-xs">
       <thead>
         <tr className="border-b border-slate-100 bg-slate-50/50">
           <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider">Alumno</th>
@@ -192,7 +192,7 @@ function EvaluacionesTable({ evaluaciones }: { evaluaciones: AdminEvaluacionItem
   }
 
   return (
-    <table className="w-full text-xs">
+    <table className="w-full min-w-[640px] text-xs">
       <thead>
         <tr className="border-b border-slate-100 bg-slate-50/50">
           <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider">Docente</th>

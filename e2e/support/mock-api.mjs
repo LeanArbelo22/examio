@@ -110,6 +110,11 @@ const server = createServer(async (request, response) => {
     return send(response, 200, { success: true, data: null });
   }
 
+  if (request.method === "POST" && url.pathname === "/api/telemetria/alerta") {
+    await readJson(request);
+    return send(response, 200, { success: true, data: null });
+  }
+
   if (request.method === "GET" && url.pathname === "/api/intentos/73/completo") {
     return send(response, 200, {
       success: true,

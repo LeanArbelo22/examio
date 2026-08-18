@@ -41,7 +41,10 @@ test("credenciales inválidas permanecen en login con mensaje funcional", async 
   await page.getByRole("button", { name: "Ingresar" }).click();
 
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByText("El correo o la contraseña son incorrectos.")).toBeVisible();
+  const error = page.getByText("El correo o la contraseña son incorrectos.");
+  await expect(error).toBeVisible();
+  await expect(page.getByLabel("Correo electrónico")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByLabel("Contraseña")).toHaveAttribute("aria-describedby", "login-form-error");
 });
 
 test("el docente abre reportes mediante sesión y BFF reales", async ({ page }) => {
@@ -56,6 +59,11 @@ test("el docente abre reportes mediante sesión y BFF reales", async ({ page }) 
 test("el alumno responde dentro del examen sin exponer credenciales", async ({ page }) => {
   await login(page, "alumno@cervantes.edu.ar");
   await expect(page).toHaveURL(/\/alumno$/);
+  expect(await page.evaluate(() => {
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    document.dispatchEvent(event);
+    return event.defaultPrevented;
+  })).toBe(false);
   await page.evaluate(() => {
     sessionStorage.setItem("examio_deadline_73", String(Date.now() + 30 * 60_000));
   });
@@ -63,6 +71,13 @@ test("el alumno responde dentro del examen sin exponer credenciales", async ({ p
   await page.goto("/alumno/examen/73/actividad/1");
   await expect(page.getByRole("heading", { name: "Pregunta 1 de 1" })).toBeVisible();
   await page.getByRole("button", { name: "Confirmar e Ingresar" }).click();
+  await expect(page.getByRole("button", { name: "Confirmar e Ingresar" })).toBeHidden();
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => {
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    document.dispatchEvent(event);
+    return event.defaultPrevented;
+  })).toBe(true);
   await page.getByText("Opción persistida").click();
   await expect(page.getByText("Guardado", { exact: true })).toBeVisible();
 
