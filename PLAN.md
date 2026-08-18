@@ -143,7 +143,7 @@ Auditoría frontend realizada sobre el flujo concreto de inicio, guardado de res
 - [~] Si vence el tiempo con respuestas pendientes, registrar la solicitud de entrega, sincronizar primero y finalizar después. El cómputo académico del tiempo continúa bajo autoridad backend.
 - [~] La finalización espera la outbox, queda durablemente solicitada si no hay conexión y ofrece reintento o salida controlada; falta validación manual offline.
 - [x] Guardado de respuestas abiertas: borrador durable por pulsación, autoguardado HTTP tras 750 ms de inactividad, envío en `blur`/navegación, restauración tras recarga y conservación de la versión confirmada; verificado manualmente.
-- [~] Guardado de opciones: actualización optimista, outbox durable, restauración y reintento acotado.
+- [x] Guardado de opciones: actualización optimista, outbox durable, restauración, reintento acotado y persistencia visual al navegar; verificado manualmente.
 - [x] Precargar y conservar las opciones de todas las preguntas durante el intento para que una sesión degradada no vacíe preguntas ya preparadas.
 - [x] Suprimir la repetición del modal de sesión una vez aceptado el modo degradado para el intento completo.
 
@@ -183,9 +183,9 @@ La protección de respuestas pendientes está implementada sin cambios de backen
 - [ ] Renderizar preguntas de programación/SQL como desarrollo y no como opción múltiple; confirmar los valores efectivos de `Tipo` y reutilizar el guardado de texto/código.
 - [ ] Eliminar nombres y títulos de evaluaciones hardcodeados y mostrarlos desde publicación/actividad.
 - [!] Definir la semántica de múltiples intentos: un único examen visible con historial de intentos y una regla explícita para promedio, mejor intento, último intento o intento válido. Requiere decisión funcional y revisión de API/SQL.
-- [ ] Inicializar fecha de inicio y fin al crear una evaluación, como mínimo con la fecha actual y un rango válido.
-- [ ] Limitar años y rangos de fecha a valores académicamente razonables tanto en frontend como en validación backend.
-- [ ] Validar inputs de creación al perder foco, sin esperar el submit, conservando la revalidación final del backend.
+- [x] Inicializar fecha de inicio y fin al crear una evaluación con un rango editable válido. Resuelto posteriormente en la Fase 7.
+- [x] Limitar años y rangos de fecha a valores académicamente razonables en el frontend. La API conserva la validación autoritativa. Resuelto posteriormente en la Fase 7.
+- [x] Validar inputs de creación al perder foco y al enviar, conservando la revalidación final del backend. Resuelto posteriormente en la Fase 7.
 - [ ] Permitir a docente y alumno filtrar o agrupar actividades del dashboard por comisión y materia.
 - [!] Definir la política de revisión posterior a la entrega: habilitar una única consulta cuando todo sea autocorregible o después de la corrección docente si existen respuestas abiertas. Requiere persistir autorización/consumo de esa visualización en backend.
 - [!] Agregar una devolución general opcional del examen además de comentarios por pregunta. Requiere contrato y persistencia backend.
@@ -309,18 +309,18 @@ general de feedback.
 
 ## Fase 8 — Testing frontend
 
-**Estado: EN PROGRESO — primera etapa implementada**
+**Estado: COMPLETADA**
 
 - [x] Aprobar e instalar infraestructura de testing.
 - [x] Incorporar Vitest, jsdom, React Testing Library, `user-event` y `jest-dom`.
 - [x] Incorporar Mock Service Worker para contratos HTTP sin depender de la API activa.
-- [ ] Evaluar Playwright para flujos críticos.
+- [x] Evaluar e incorporar Playwright para flujos críticos.
 - [x] Probar cliente HTTP y servicios críticos: `apiFetch`, errores HTTP, timeout, cancelación, red, refresh/reintento y normalización del inicio de intento.
-- [~] Probar autenticación y manejo de errores: cubierta la clasificación de errores; falta el flujo integrado de autenticación.
-- [ ] Probar hooks principales.
-- [~] Probar componentes reutilizables: cubiertos `Pagination` y `FormFieldError`; falta ampliar casos críticos.
-- [ ] Probar el reporte de rendimiento.
-- [ ] Agregar E2E de login por rol, rutas protegidas, examen, corrección y reportes.
+- [x] Probar autenticación y manejo de errores: clasificación, caches, UX dentro/fuera del examen, callbacks JWT, login, rotación, single-flight y sesión pública sin credenciales.
+- [x] Probar hooks principales: alumnos, evaluaciones, reportes, outbox, sincronización offline/concurrente y finalización coordinada.
+- [x] Probar componentes reutilizables: `Pagination`, `FormFieldError`, filtros y tabla de reportes, providers de sesión y modal de expiración.
+- [x] Probar los reportes de rendimiento por alumno y evaluación.
+- [x] Agregar E2E aislados de login por rol, rutas protegidas, examen, corrección y reportes.
 
 ### Etapa 1 — Base unitaria y de componentes
 
@@ -335,7 +335,37 @@ general de feedback.
 - [x] Incorporar MSW 2 en modo Node para interceptar el `fetch` real de tests, rechazar requests no declarados y simular exclusivamente el BFF same-origin y la sesión NextAuth.
 - [x] Cubrir éxito, cuerpo vacío, validación, JSON inválido, 403 funcional, 401 no renovable, refresh exitoso/fallido, límite de un reintento y single-flight concurrente.
 - [x] Cubrir timeout, `AbortSignal`, pérdida de red y rechazo de endpoints que podrían evitar el BFF.
-- [ ] Incorporar Playwright como etapa separada para los flujos críticos de navegador.
+- [x] Incorporar Playwright como etapa separada para los flujos críticos de navegador.
+
+### Etapa 2 — Hooks de React Query
+
+- [x] Crear un `QueryClientProvider` aislado por test, sin reintentos y sin caché compartida entre casos.
+- [x] Verificar `enabled` y activación posterior con identificadores válidos en alumnos y opciones de examen.
+- [x] Verificar payload e invalidaciones relacionadas de la inscripción de alumnos.
+- [x] Verificar la invalidación del sorteo después de finalizar un intento.
+- [x] Verificar que filtros y paginación produzcan query keys diferentes en reportes.
+- [x] Verificar `placeholderData` durante un cambio de página del reporte por evaluación.
+- [x] Verificar que el detalle de alumno omita filtros exclusivos del listado.
+- [x] Probar la outbox con IndexedDB realista: reemplazo por versión, confirmación tardía, aislamiento por intento, solicitud de entrega, limpieza, suscripción y fallback no durable.
+- [x] Probar guardado optimista exitoso y confirmación de la misma versión desde el hook.
+- [x] Probar sincronización offline, conservación de la solicitud de entrega, recuperación manual, single-flight e invalidación de opciones confirmadas.
+- [x] Probar en el layout real el orden registrar → sincronizar → finalizar → limpiar.
+- [x] Probar que respuestas pendientes bloqueen la entrega sin borrar la outbox y mantengan una salida controlada.
+- [x] Probar la propagación integrada de errores terminales desde QueryCache y MutationCache.
+- [x] Verificar que 403, access inválido, red y validación no se conviertan en expiración de sesión.
+- [x] Probar el modal fuera del examen, continuación degradada sin repetición y recuperación transitoria dentro del examen.
+- [x] Probar callbacks JWT, login y refresh server-side de NextAuth sin exponer credenciales.
+
+### Etapa 3 — Componentes, autenticación y navegador
+
+- [x] Cubrir filtros con borrador, limpieza, orden, paginación, filas activables por teclado y estados vacíos de reportes.
+- [x] Verificar que el reporte por evaluación use KPIs y distribución globales del backend y que el reporte por alumno describa gráficos limitados a la página visible.
+- [x] Cubrir login válido e inválido, errores seguros, renovación anticipada, rotación, idempotencia, concurrencia y logout tolerante a fallas de infraestructura.
+- [x] Verificar que `Session.user` exponga identidad funcional pero no access token ni refresh token.
+- [x] Incorporar Playwright con Chromium, servidor Next.js y API efímera local sin SQL Server ni cuentas reales.
+- [x] Verificar en navegador login por `admin`, `docente` y `alumno`, cookie HttpOnly, redirección RBAC y bloqueo de rutas protegidas.
+- [x] Verificar en navegador reporte docente mediante BFF, respuesta de examen atravesando fullscreen/outbox/BFF y corrección de respuesta abierta.
+- [x] Verificar que el flujo E2E de examen no escriba credenciales en `localStorage` ni `sessionStorage`.
 
 ---
 
@@ -399,11 +429,10 @@ general de feedback.
 4. [x] Ejecutar fase 2 — Cliente API y configuración cerrados en frontend; inscripción registrada como dependencia backend.
 5. [x] Ejecutar fase 3 — Contratos estrictos, sin `any` y separados por dominio.
 6. [x] Normalizar React Query y errores — Fases 4 y 5 completadas.
-7. [ ] Consolidar componentes, formularios y accesibilidad.
-8. [~] Incorporar testing frontend — primera etapa unitaria y de componentes completada.
+7. [~] Componentes y formularios consolidados en las Fases 6 y 7; accesibilidad transversal pendiente en la Fase 9.
+8. [x] Incorporar testing frontend — cobertura unitaria, integración y E2E crítica completada.
 9. [ ] Completar documentación, limpieza y rendimiento medido.
 
 ## Próximo paso
 
-Continuar la Fase 8 con hooks de React Query y autenticación integrada.
-Evaluar y aprobar por separado Playwright y la preparación de datos para E2E.
+Comenzar la Fase 9 con la accesibilidad del `Modal`, foco y anuncios asíncronos.

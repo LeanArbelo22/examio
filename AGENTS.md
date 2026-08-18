@@ -245,21 +245,29 @@ esas respuestas a React Query como única fuente durable.
 
 ## Testing
 
-El testing usa Vitest 4, jsdom, React Testing Library, `user-event`, `jest-dom` y
-MSW 2. Los tests se ubican junto al módulo probado como `*.test.ts` o `*.test.tsx`;
+El testing usa Vitest 4, jsdom, React Testing Library, `user-event`, `jest-dom`,
+MSW 2 y Playwright. Los tests unitarios se ubican junto al módulo probado como `*.test.ts` o `*.test.tsx`;
 la configuración común vive en `vitest.config.ts` y `vitest.setup.ts`.
 `src/test/msw/server.ts` expone el servidor Node compartido para simular `fetch`.
 Declarar handlers por test, usar rutas BFF same-origin y mantener
 `onUnhandledRequest: "error"`; no crear mocks globales permisivos ni simular tokens.
-Playwright no está instalado y su incorporación requiere la etapa y aprobación
-registradas en `PLAN.md`.
+Los tests de hooks deben usar `src/test/query-client.tsx`, que crea un `QueryClient`
+aislado y sin reintentos. Mockear el servicio de dominio para probar keys,
+`enabled`, payloads e invalidaciones; usar MSW cuando el objeto de la prueba sea HTTP.
+La outbox IndexedDB se prueba con `fake-indexeddb`; crear una fábrica aislada y usar
+identificadores de intento únicos para evitar estado compartido entre casos. Probar
+siempre también el fallback sin IndexedDB y exigir que informe `durable: false`.
+Los E2E viven en `e2e/` y usan una API efímera local para atravesar NextAuth,
+middleware y BFF sin SQL Server, cuentas reales ni datos persistentes. Mantener sus
+contratos mínimos acotados a los flujos críticos; no convertir el stub en otra API.
 
 Hasta que exista esa infraestructura, validar de forma proporcional:
 
 ```bash
 pnpm eslint <archivos-modificados>
 pnpm test:run
-pnpm tsc --noEmit --incremental false
+pnpm test:e2e
+pnpm typecheck
 pnpm build
 ```
 

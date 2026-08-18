@@ -64,7 +64,9 @@ Otros comandos:
 
 ```bash
 pnpm lint
+pnpm typecheck
 pnpm test:run
+pnpm test:e2e
 pnpm build
 pnpm start
 ```
@@ -82,15 +84,31 @@ Las librerías de testing cumplen responsabilidades separadas:
 - **MSW:** intercepta `fetch` en los tests y responde mediante contratos HTTP declarativos.
   La configuración usa `setupServer` de Node; no genera un Service Worker productivo,
   no intercepta el navegador real y no requiere que la API Examio esté levantada.
+- **fake-indexeddb:** implementación en memoria de la API estándar IndexedDB para
+  verificar la outbox durable en Node/jsdom. Solo se usa en tests y no reemplaza ni
+  modifica el almacenamiento del navegador en producción.
+- **Playwright:** ejecuta flujos críticos en Chromium contra Next.js, NextAuth,
+  middleware y BFF reales. Una API efímera local aporta contratos deterministas sin
+  conectarse a SQL Server, usar cuentas reales ni persistir datos académicos.
 
 El servidor compartido vive en `src/test/msw/server.ts`; se inicia desde
 `vitest.setup.ts`, restaura handlers después de cada test y falla ante requests no
 declarados. Los tests de `apiFetch` simulan las rutas same-origin `/api/examio/*` y
 `/api/auth/session`, conservando la frontera BFF sin conocer tokens.
 
-La cobertura actual incluye schemas, transformadores, utilidades, componentes simples,
-el contrato de inicio de intento y el cliente HTTP con refresh/reintento. Los tests de
-hooks y Playwright permanecen como etapas posteriores en [PLAN.md](./PLAN.md).
+Los hooks de React Query se renderizan con un `QueryClient` nuevo por caso mediante
+`src/test/query-client.tsx`. El harness desactiva reintentos para que los estados sean
+deterministas y evita compartir caché entre tests. Los servicios se mockean cuando el
+objetivo es verificar `enabled`, query keys, payloads o invalidaciones; MSW se reserva
+para probar el límite HTTP real.
+
+La cobertura actual incluye schemas, transformadores, utilidades, componentes y
+reportes, el cliente HTTP con refresh/reintento, hooks de dominio, outbox, sesión y
+entrega coordinada. Los callbacks server-side de NextAuth cubren login, refresh,
+single-flight, logout y ausencia de credenciales en la sesión pública. Los E2E viven
+en `e2e/`; `playwright.config.ts` levanta el frontend en el puerto 3100 y el stub en
+el 55813, usa identidades ficticias `@cervantes.edu.ar` y nunca toca la base real.
+La primera ejecución requiere `pnpm exec playwright install chromium`.
 
 ## Variables de entorno
 
