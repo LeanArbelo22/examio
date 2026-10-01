@@ -77,3 +77,18 @@ export const reporteKeys = {
   evaluaciones: (filtros: object) =>
     [...reporteKeys.rendimientoEvaluaciones, "listado", filtros] as const,
 };
+
+export const bancoPreguntasKeys = {
+  all: ["banco-preguntas"] as const,
+  preguntas: () => [...bancoPreguntasKeys.all, "preguntas"] as const,
+  preguntasListado: (filtros: object) =>
+    [...bancoPreguntasKeys.preguntas(), "listado", filtros] as const,
+  pregunta: (id: number) =>
+    [...bancoPreguntasKeys.preguntas(), "detalle", id] as const,
+  grupos: () => [...bancoPreguntasKeys.all, "grupos"] as const,
+  gruposListado: (filtros: object) =>
+    [...bancoPreguntasKeys.grupos(), "listado", filtros] as const,
+  grupo: (id: number) =>
+    [...bancoPreguntasKeys.grupos(), "detalle", id] as const,
+  etiquetas: () => [...bancoPreguntasKeys.all, "etiquetas"] as const,
+};

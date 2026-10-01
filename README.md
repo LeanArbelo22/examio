@@ -122,7 +122,7 @@ Las variables locales se guardan en `.env.local`. Los archivos `.env*` están ig
 | `NEXTAUTH_SECRET` | Sí | Servidor | Secreto utilizado para firmar y cifrar información de NextAuth. No debe exponerse al cliente. |
 | `EXAMIO_API_URL` | Sí | Servidor | Base URL exclusiva de la API. En local: `http://localhost:55803/api`. No usar prefijo `NEXT_PUBLIC_`. |
 | `NODE_ENV` | Automática | Servidor y build | `development`, `production` o `test`. Next.js la establece según el comando ejecutado. |
-| `NEXT_PUBLIC_DEV_BYPASS_AUTH` | No | Cliente y servidor | Existe una comprobación que muestra una advertencia de desarrollo, pero actualmente **no implementa un bypass real**. No debe utilizarse como mecanismo de seguridad. |
+| `NEXT_PUBLIC_DEV_BYPASS_AUTH` | No | — | Variable legacy sin efecto. No implementa un bypass y no debe utilizarse como mecanismo de seguridad. |
 
 Ejemplo sin valores reales:
 
@@ -593,6 +593,6 @@ El inventario completo y el estado de cada iniciativa se mantienen en [PLAN.md](
 4. Normalizar React Query y manejo de errores.
 5. Incorporar testing frontend.
 6. Mejorar accesibilidad.
-7. Separar mocks de código productivo.
+7. Mantener mocks exclusivamente en tests y E2E; las dependencias backend faltantes se documentan en `PLAN.md`.
 
 Este README debe actualizarse cuando cambien arquitectura, variables, autenticación, scripts, rutas, servicios o convenciones.

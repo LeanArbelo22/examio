@@ -50,7 +50,8 @@ Examio API
 - `src/lib` concentra infraestructura: cliente HTTP, NextAuth, schemas, auxiliares y la outbox IndexedDB del examen.
 - `src/types` contiene entidades, DTOs, payloads y ampliaciones de NextAuth.
   `index.ts` es el barrel compatible; las definiciones viven en `shared`, `api`,
-  `auth`, `alumnos`, `academic`, `evaluaciones`, `administracion` y `reportes`.
+  `auth`, `alumnos`, `academic`, `evaluaciones`, `administracion`, `reportes` y
+  `banco-preguntas`.
 - `src/assets` contiene recursos importados por componentes.
 - Los estilos globales viven en `src/app/globals.css`.
 
@@ -70,6 +71,7 @@ El feedback común usa `FeedbackMessage`, `RequestErrorState`, `LoadingState` y 
 ├── docs/
 │   ├── API.md                # contratos sincronizados de la API
 │   ├── DATABASE.md           # modelo de datos sincronizado
+│   ├── PLAN_API.md           # estado y pendientes sincronizados de la API
 │   └── DEVELOPMENT.md        # entorno, puertos, health y diagnóstico
 ├── scripts/
 │   └── check-development-environment.mjs
@@ -142,7 +144,7 @@ credenciales y el BFF agrega el bearer del lado servidor. No almacenar tokens de
 
 El middleware protege navegación por rol, pero la API conserva la autoridad final.
 No existe un bypass de autenticación activo.
-`NEXT_PUBLIC_DEV_BYPASS_AUTH` solo puede producir una advertencia y no debe tratarse como control de seguridad.
+`NEXT_PUBLIC_DEV_BYPASS_AUTH` es una variable legacy sin efecto y no debe tratarse como control de seguridad.
 No modificar auth, sesión, middleware, logout o expiración como efecto colateral de otra feature.
 
 ## Comunicación con la API
@@ -170,6 +172,9 @@ types → service → hook → page/component
 - Tipar payload, filtros y respuesta antes de conectar la UI.
 - Incluir en la query key todo parámetro que altere el resultado.
 - Preservar el mensaje y los errores de validación útiles sin exponer detalles sensibles.
+- Para operaciones que exigen `Idempotency-Key`, crear un UUID por intención del usuario,
+  bloquear envíos simultáneos y conservar la misma clave y el mismo body ante reintentos inciertos.
+  Una clave nueva representa otra operación y nunca debe generarse automáticamente al recibir un 409.
 
 La base URL se configura mediante `EXAMIO_API_URL`, variable exclusiva del servidor. No introducir
 URLs hardcodeadas ni variables `NEXT_PUBLIC_` para este destino.
@@ -238,6 +243,8 @@ Se construyen con las fábricas de `src/lib/query-keys.ts`; queries e invalidaci
 deben usar la misma fábrica e incluir filtros, paginación y cualquier valor que
 cambie la respuesta. Los hooks exponen el objeto estándar de React Query; algunos
 mantienen aliases históricos de datos/estado solo por compatibilidad transitoria.
+El banco usa `bancoPreguntasKeys` y `src/hooks/useBancoPreguntas.ts`; las mutaciones
+invalidan su namespace completo y una importación invalida también evaluaciones.
 
 React Query gestiona estado remoto confirmado. El estado local controla interacción
 efímera y la outbox IndexedDB del examen conserva respuestas pendientes; no trasladar
@@ -261,7 +268,7 @@ Los E2E viven en `e2e/` y usan una API efímera local para atravesar NextAuth,
 middleware y BFF sin SQL Server, cuentas reales ni datos persistentes. Mantener sus
 contratos mínimos acotados a los flujos críticos; no convertir el stub en otra API.
 
-Hasta que exista esa infraestructura, validar de forma proporcional:
+Validar de forma proporcional:
 
 ```bash
 pnpm eslint <archivos-modificados>
@@ -316,15 +323,27 @@ Respetar `prefers-reduced-motion`; no depender de animación para comunicar esta
   el contrato efectivo antes de mover, reutilizar o eliminar tipos.
 - **Aliases históricos de React Query:** algunos hooks conservan aliases de retorno por compatibilidad.
   Las implementaciones nuevas deben usar el resultado estándar y las fábricas de query keys existentes.
+- **Banco y revisiones optimistas:** preguntas, grupos y borradores cambian mediante
+  `RevisionEsperada`; un 409 exige conservar la edición local y recargar/reconciliar de forma explícita.
+  No sobrescribir silenciosamente ni reintentar con una revisión inventada.
+- **Copias independientes:** importar desde el banco crea IDs nuevos y no establece sincronización.
+  No mezclar IDs del banco con IDs de evaluación ni presentar una copia adaptada como idéntica al origen.
+- **Reemplazos completos:** los `PUT` del banco reemplazan opciones, etiquetas y composición;
+  la edición completa de una evaluación elimina grupos omitidos. Construir siempre el payload desde
+  el estado completo confirmado, no desde un parche parcial.
+- **Publicación transaccional:** un borrador solo se publica mediante `publicar-completo`.
+  `GuardarTodoEnBanco` es explícito y desmarcado por defecto en UI; la misma intención conserva
+  `Idempotency-Key` para evitar duplicados y un fallo del banco debe impedir la publicación completa.
 - **Errores especializados del examen:** el flujo de evaluación maneja sesión, conectividad,
   respuestas pendientes y fullscreen localmente para no desmontar el intento. No sustituirlo por
   un error boundary genérico ni eliminar sus avisos sin revisar la política antifraude.
 - **Componentes y páginas monolíticas:** varias pantallas administrativas contienen UI y lógica repetida.
   No refactorizarlas incidentalmente al desarrollar otra feature.
-- **Mocks en código productivo:** algunos dashboards todavía dependen de datos auxiliares/mock.
-  Confirmar el origen de cada dato antes de conectar o retirar un mock.
+- **Datos simulados:** los mocks están limitados a tests y E2E. No incorporar datos simulados en
+  pantallas reales; si falta un contrato, registrar explícitamente la dependencia backend.
 - **Accesibilidad incompleta:** modal, tablas, mensajes asíncronos y bloqueo global del menú contextual requieren cuidado.
-- **Sin red de tests frontend:** minimizar alcance, hacer verificaciones focalizadas y evitar refactors mezclados.
+- **Tests focalizados primero:** existe infraestructura Vitest/MSW/Playwright; ejecutar primero
+  los tests del módulo y después ampliar a suite, E2E o build según el riesgo.
 - **Codificación de texto:** existen caracteres mal codificados; no propagar mojibake al editar contenido.
 
 Las acciones y prioridades para resolver estos riesgos están en `PLAN.md`.
@@ -343,6 +362,12 @@ La fase de estabilización del entorno está completada.
 El frontend dispone de `pnpm env:check`, `pnpm dev:checked` y documentación de diagnóstico.
 La API expone un health check público que identifica `examio-api` y diferencia disponibilidad HTTP de SQL Server.
 La documentación de frontend, API y base de datos ya está separada.
+
+El backend del Banco privado de preguntas está implementado y sus migraciones y pruebas
+fueron verificadas por el responsable del backend. `docs/API.md`, `docs/DATABASE.md` y
+`docs/PLAN_API.md` están sincronizados. En frontend ya existen tipos, servicios, query keys,
+hooks y pruebas focalizadas del banco; las rutas, editores e integración con borradores y
+publicación continúan pendientes en la Fase 12 de `PLAN.md`.
 
 Los reportes por alumno y por publicación de evaluación están integrados en
 `/profesor/reportes`. Comparten layout, filtros, KPIs, tabla, skeleton y tarjetas
@@ -406,6 +431,8 @@ Usar esta documentación como índice hacia el código.
 - El acceso HTTP debe pasar por servicio de dominio y `apiFetch`.
 - Los contratos compartidos se reutilizan desde `src/types`; no duplicar shapes localmente sin motivo.
 - Requests y responses pueden usar casing distinto; la transformación ocurre en los límites de integración.
+- El banco es privado por docente; admin solo consulta y alumnos no acceden. Reutilizar contenido
+  siempre crea una copia independiente y toda publicación desde borrador es transaccional e idempotente.
 - Los componentes se generalizan con evidencia de reutilización, no anticipadamente.
 - Los cambios estructurales requieren justificación, propuesta y aprobación.
 
@@ -435,6 +462,11 @@ Referencia sincronizada de endpoints, contratos HTTP, autenticación, RBAC y com
 
 Referencia sincronizada de entidades, relaciones, restricciones y decisiones de persistencia.
 
+### `docs/PLAN_API.md`
+
+Estado técnico y pendientes sincronizados de la API. Consultarlo para distinguir capacidades
+backend ya entregadas de validaciones o evoluciones todavía pendientes.
+
 ## Mantenimiento de la documentación
 
 Actualizar `AGENTS.md` cuando cambien arquitectura, estructura importante, convenciones, patrones,
@@ -443,8 +475,9 @@ riesgos persistentes, testing, integración con la API o decisiones técnicas re
 Actualizar `PLAN.md` cuando cambien tareas pendientes, prioridades, recomendaciones, problemas detectados
 o refactors planificados; marcar allí cada punto completado y verificado.
 
-`docs/API.md` y `docs/DATABASE.md` se sincronizan desde la API y son documentación externa de referencia
-para el frontend. No editar sus contratos para adaptar unilateralmente una implementación cliente.
+`docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` se sincronizan desde la API y son documentación
+externa de referencia para el frontend. No editar sus contratos ni su estado para adaptar
+unilateralmente una implementación cliente.
 
 No convertir `AGENTS.md` en changelog, backlog, lista de tickets, copia de `PLAN.md`,
 catálogo de endpoints ni réplica del modelo de datos.
