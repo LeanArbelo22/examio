@@ -399,17 +399,33 @@ general de feedback.
 - [x] Crear documentación operativa del entorno frontend.
 - [x] Crear README específico del frontend.
 - [x] Separar claramente documentación frontend, API y base de datos.
-- [ ] Separar mocks de código productivo.
-- [ ] Eliminar mocks usados por pantallas reales cuando exista integración.
+- [x] Separar mocks de código productivo; MSW y datos simulados permanecen exclusivamente en tests y E2E.
+- [x] Eliminar mocks usados por pantallas reales cuando existe integración y retirar de la UI las simulaciones sin contrato real.
 - [x] Documentar variables de entorno y aclarar cuáles tienen efecto actual.
 - [x] Documentar arquitectura, routing, layouts y providers.
 - [x] Documentar autenticación, sesión y roles.
 - [x] Documentar cliente HTTP y servicios por dominio.
 - [x] Documentar hooks y convenciones de TanStack Query.
 - [x] Documentar el inventario y las reglas actuales de query keys.
-- [ ] Corregir caracteres mal codificados.
-- [ ] Eliminar comentarios temporales.
+- [x] Corregir caracteres mal codificados. La auditoría de fuentes y documentación no encontró secuencias mojibake residuales; los archivos revisados permanecen en UTF-8.
+- [x] Eliminar comentarios temporales del dashboard, creación de evaluaciones y provider global.
 - [ ] Resolver o retirar Teams, Moodle, recuperación de contraseña y “Recordar sesión”.
+
+### Limpieza de mocks productivos
+
+- [x] Eliminar `src/lib/db-mock.ts` y confirmar que no quedan imports productivos.
+- [x] Retirar cifras institucionales simuladas del dashboard administrativo; los accesos de gestión ya no presentan conteos ficticios.
+- [x] Retirar el banco de preguntas simulado de la creación de evaluaciones.
+- [x] Retirar el selector decorativo de formato: el tipo efectivo continúa definiéndose por pregunta y se persiste mediante el contrato existente.
+- [x] Reemplazar los controles de seguridad simulados por el campo real `RecursosPermitidos`, aclarando que es información para el alumno y no una política antifraude.
+
+### Dependencias backend diferenciadas
+
+- [!] Si se requieren conteos reales de carreras, alumnos activos, docentes y comisiones en `/admin`, ampliar un contrato de resumen institucional. `GET /api/admin/dashboard/analitica` entrega métricas de intentos y evaluaciones, pero no esos conteos estructurales.
+- [x] El backend del Banco de preguntas ya implementa persistencia, búsqueda/filtros, RBAC, borradores, revisiones, copias independientes, idempotencia y publicación transaccional. Las migraciones, verificaciones SQL y pruebas fueron ejecutadas correctamente por el responsable del backend. La integración frontend continúa en la Fase 12.
+- [!] Para configurar fullscreen, portapapeles, orden o variantes por evaluación, definir persistencia y aplicación efectiva de políticas antifraude en backend. `RecursosPermitidos` es texto informativo y no debe reutilizarse como configuración de seguridad.
+
+Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deliberadamente fuera de esta iteración y continúan pendientes.
 
 ---
 
@@ -428,6 +444,59 @@ general de feedback.
 
 ---
 
+## Fase 12 — Banco privado de preguntas y borradores de evaluación
+
+**Estado: EN PROGRESO — 2026-09-30**
+
+### Contrato y base de integración
+
+- [x] Sincronizar `docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` desde la documentación del backend.
+- [x] Verificar que el backend soporte preguntas, grupos, etiquetas, filtros, revisiones optimistas, copias desde/hacia evaluaciones, borradores reales y publicación completa transaccional.
+- [x] Crear tipos estrictos del banco para listados, detalles, filtros, payloads, importaciones, mappings e idempotencia.
+- [x] Crear servicios de dominio sobre `apiFetch`, sin URLs externas ni `fetch` directo.
+- [x] Verificar que el BFF existente reenvía `Idempotency-Key` hacia la API sin exponer el bearer al navegador.
+- [x] Crear la fábrica `bancoPreguntasKeys` y hooks React Query para consultas, CRUD, estados, etiquetas, copias e importación.
+- [x] Cubrir la capa de servicio y hooks con pruebas focalizadas de contratos, query keys, `enabled`, invalidaciones e `Idempotency-Key`.
+
+### Rutas y vistas del banco
+
+- [ ] Agregar el acceso desde la navegación docente existente, sin crear un layout o sidebar global nuevo.
+- [ ] Crear `/profesor/banco-preguntas` como workspace responsive con pestañas accesibles para Preguntas y Grupos, filtros sincronizables con URL, paginación server-side, loading, error y empty states.
+- [ ] Crear `/profesor/banco-preguntas/preguntas/nueva` y `/profesor/banco-preguntas/preguntas/[id]/editar` reutilizando un editor de pregunta compartido con la creación de evaluaciones.
+- [ ] Crear `/profesor/banco-preguntas/grupos/nuevo` y `/profesor/banco-preguntas/grupos/[id]/editar` reutilizando el editor de grupo y permitiendo combinar preguntas existentes y nuevas.
+- [ ] Incorporar gestión accesible de etiquetas sin desviar al docente del editor; soportar creación, renombrado, eliminación y conflictos 409.
+- [ ] Mostrar estado, revisión y procedencia con texto además de color; confirmar archivado/restauración y comunicar los grupos afectados por cambios de una variante.
+- [ ] Tratar un 409 de revisión como conflicto visible: conservar la edición local, ofrecer recarga explícita y no sobrescribir silenciosamente.
+
+### Creación y edición de evaluaciones
+
+- [ ] Extender `src/lib/schemas/examSchema.ts`, tipos y `src/lib/exam-form.ts` para representar `Estado`, `RevisionEsperada`, `ImportacionesBanco`, referencias opcionales y resultados de mappings sin mezclar shapes de UI con payloads HTTP.
+- [ ] Implementar “Guardar borrador” en `/profesor/crear-examen`: persistir estructura incompleta y configuraciones ingresadas; para valores todavía vacíos, mostrar y enviar los defaults documentados del backend (1 intento, 90 minutos, apertura actual + 5 minutos y cierre + 24 horas) de forma explícita y editable.
+- [ ] Adaptar `/profesor/examen/[idPublicacion]` para editar únicamente borradores, conservar IDs anidados y revisión, y evitar que un reemplazo completo elimine grupos omitidos accidentalmente.
+- [ ] Agregar un selector de banco accesible dentro del editor, con búsqueda, filtros, selección múltiple, resumen previo e importación como copia independiente; nunca usar IDs del banco como IDs de evaluación.
+- [ ] Permitir “Guardar en mi banco” sobre una pregunta o grupo específico durante creación o edición, sin exigir guardar ni publicar antes la evaluación completa. Para grupos mixtos usar la unión discriminada del endpoint compuesto.
+- [ ] Mantener la edición local después de guardar en el banco y reflejar la referencia resultante sin prometer sincronización futura.
+- [ ] Mover “+ Añadir Pregunta Estructural” debajo del último grupo/pregunta, manteniendo una acción visible y alcanzable por teclado al final de la estructura.
+
+### Publicación transaccional
+
+- [ ] Sustituir la publicación legacy por `POST /api/evaluaciones/:idActividad/publicar-completo`.
+- [ ] Mostrar “Guardar todas las preguntas en mi banco” desmarcado por defecto y explicar que solo afecta contenido que todavía no fue guardado individualmente.
+- [ ] Enviar contenido final, publicación, revisión, importaciones y `GuardarTodoEnBanco` en una única operación; un fallo del banco debe dejar la evaluación sin publicar.
+- [ ] Generar una `Idempotency-Key` UUID por intención del usuario, bloquear doble clic y conservar exactamente la misma clave y body ante reintentos de resultado incierto.
+- [ ] No reintentar automáticamente con clave nueva ante 409; distinguir revisión del borrador, revisión del banco y reutilización inválida de clave.
+- [ ] Tras éxito, reconciliar IDs/revisiones/mappings devueltos, invalidar evaluaciones y banco, y navegar únicamente cuando la publicación haya sido confirmada.
+
+### Calidad y verificación
+
+- [ ] Probar editores de pregunta/grupo, filtros, paginación, selección por teclado, estados y conflictos de revisión.
+- [ ] Probar borrador incompleto, conservación de configuración, importación, guardado individual y publicación con la opción desmarcada/marcada.
+- [ ] Probar idempotencia de doble clic y reintento, rollback visible y que una copia modificada no altere su origen.
+- [ ] Agregar E2E del flujo crítico docente: crear banco directo → guardar borrador → importar/guardar individual → publicar transaccional.
+- [ ] Validar ESLint focalizado, suite Vitest, typecheck, E2E relacionado y build.
+
+---
+
 ## Orden de ejecución acordado
 
 1. [x] Fase 0 — Entorno de desarrollo.
@@ -438,8 +507,9 @@ general de feedback.
 6. [x] Normalizar React Query y errores — Fases 4 y 5 completadas.
 7. [x] Componentes, formularios y accesibilidad transversal consolidados en las Fases 6, 7 y 9.
 8. [x] Incorporar testing frontend — cobertura unitaria, integración y E2E crítica completada.
-9. [ ] Completar documentación, limpieza y rendimiento medido.
+9. [ ] Completar Fase 12 — Banco privado de preguntas y borradores de evaluación.
+10. [ ] Completar documentación, limpieza y rendimiento medido.
 
 ## Próximo paso
 
-Continuar la Fase 10 con la separación de mocks productivos y la limpieza de textos mal codificados.
+Implementar las rutas y los editores reutilizables del banco, comenzando por el workspace docente y la creación directa de preguntas y grupos. Después integrar esos mismos editores con el borrador de evaluación.

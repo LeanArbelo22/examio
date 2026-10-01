@@ -34,11 +34,6 @@ function notifySessionProblem(error: unknown) {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  // TODO: Remover en producción - Bypass para desarrollo local
-  if (process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true") {
-    console.warn("DEV BYPASS AUTH ACTIVE: No requiere sesión real.");
-  }
-
   const [queryClient] = useState(() => new QueryClient({
     queryCache: new QueryCache({
       onError: notifySessionProblem,

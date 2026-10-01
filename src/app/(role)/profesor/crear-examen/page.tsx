@@ -4,11 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/Button";
-import { FeedbackMessage } from "@/components/ui/FeedbackMessage";
 import { FormFieldError } from "@/components/forms/FormFieldError";
 import { ExamBasicInfoFields } from "@/components/forms/ExamBasicInfoFields";
 import { ExamSettingsSidebar } from "@/components/forms/ExamSettingsSidebar";
-import { examCategoriesMock, bancoPreguntasMock } from "@/lib/db-mock";
 import { TipoPregunta } from "@/types/index";
 import { guardarEvaluacionCompleta } from "@/services/api/evaluaciones.api";
 import { useGetComisionesDocente } from "@/hooks/useDocentes";
@@ -42,7 +40,6 @@ function TrashIcon() {
 
 export default function CrearExamenPage() {
   const router = useRouter();
-  const { types, securityMeasures } = examCategoriesMock;
   const [initialSchedule] = useState(defaultExamSchedule);
   const ahoraLocal = new Date(
     new Date().getTime() - new Date().getTimezoneOffset() * 60000,
@@ -53,12 +50,8 @@ export default function CrearExamenPage() {
 
   const { data: session } = useSession();
   const [isPending, setIsPending] = useState(false);
-  const [erroresValidacion, setErroresValidacion] = useState<string[]>([]); // 👈 Estado para el panel de errores
+  const [erroresValidacion, setErroresValidacion] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [feedback, setFeedback] = useState<{
-    variant: "error" | "success" | "info";
-    message: string;
-  } | null>(null);
 
   const legajoDocente = session?.user?.identificadorInstitucional
     ? Number(session.user.identificadorInstitucional)
@@ -74,13 +67,7 @@ export default function CrearExamenPage() {
   const [fechaInicio, setFechaInicio] = useState(initialSchedule.fechaInicio);
   const [fechaFin, setFechaFin] = useState(initialSchedule.fechaFin);
 
-  const [selectedFormat, setSelectedFormat] = useState("mixed");
-  const [securityConfig, setSecurityConfig] = useState<Record<string, boolean>>(
-    securityMeasures.reduce(
-      (acc, curr) => ({ ...acc, [curr.id]: curr.default }),
-      {},
-    ),
-  );
+  const [recursosPermitidos, setRecursosPermitidos] = useState("");
 
   const [preguntas, setPreguntas] = useState<ExamQuestionGroup[]>([
     {
@@ -96,10 +83,6 @@ export default function CrearExamenPage() {
       ],
     },
   ]);
-
-  const handleToggleSecurity = (id: string) => {
-    setSecurityConfig((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
 
   const handleAgregarPreguntaBase = () => {
     setPreguntas((prev) => [
@@ -288,37 +271,6 @@ export default function CrearExamenPage() {
     );
   };
 
-  const handleImportarDelBanco = (
-    preguntaId: number,
-    consignaTexto: string,
-    tipo: string,
-  ) => {
-    const tipoMapeado =
-      tipo === "choice" ? "mc" : tipo === "text" ? "abierta" : "code";
-    setPreguntas((prev) =>
-      prev.map((p) =>
-        p.id === preguntaId
-          ? {
-              ...p,
-              variantes: [
-                ...p.variantes,
-                {
-                  id: `v-${Date.now()}`,
-                  enunciado: consignaTexto,
-                  tipo: tipoMapeado,
-                  opciones: tipoMapeado === "mc" ? [] : undefined,
-                },
-              ],
-            }
-          : p,
-      ),
-    );
-    setFeedback({
-      variant: "success",
-      message: "Consigna reutilizada e importada desde el Banco de EXAMIO.",
-    });
-  };
-
   const currentForm = (): ExamFormValues => ({
     titulo,
     descripcion,
@@ -342,25 +294,19 @@ export default function CrearExamenPage() {
   };
 
   const handleGuardarExamenCompleto = async () => {
-    setErroresValidacion([]); // Limpiamos errores previos
+    setErroresValidacion([]);
     const validation = examFormSchema.safeParse(currentForm());
     if (!validation.success) {
       const errors = validationErrorsFromZod(validation.error.issues);
       setFieldErrors(errors);
       setErroresValidacion([...new Set(validation.error.issues.map((issue) => issue.message))]);
-      // Hacemos un scroll suave arriba de todo para que el usuario note el banner inmediatamente
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
-    const recursosPermitidos = Object.keys(securityConfig)
-        .filter((key) => securityConfig[key])
-        .map((key) => securityMeasures.find((m) => m.id === key)?.label)
-        .filter((label): label is string => Boolean(label))
-        .join(", ");
     const payload = toGuardarEvaluacionPayload(
       validation.data,
-      recursosPermitidos,
+      recursosPermitidos.trim(),
     );
 
     try {
@@ -405,13 +351,6 @@ export default function CrearExamenPage() {
         </div>
       </div>
 
-      {feedback && (
-        <FeedbackMessage
-          variant={feedback.variant}
-          message={feedback.message}
-        />
-      )}
-
       {/* 🚨 PANEL DE ERRORES ESTILIZADO CON TAILWIND 🚨 */}
       {erroresValidacion.length > 0 && (
         <div className="bg-red-50 border-l-4 border-red-500 rounded-xl p-4 shadow-sm animate-fade-in">
@@ -447,34 +386,6 @@ export default function CrearExamenPage() {
             onDescriptionChange={setDescripcion}
             onBlur={validateField}
           />
-
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2.5 mb-4">
-              🎛️ Formato del examen
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {types.map((type) => {
-                const isSelected = selectedFormat === type.id;
-                return (
-                  <div
-                    key={type.id}
-                    onClick={() => setSelectedFormat(type.id)}
-                    className={`p-4 rounded-xl border text-left cursor-pointer transition-all duration-200 flex gap-3 ${isSelected ? "border-indigo-600 bg-indigo-50/40 shadow-sm" : "border-slate-200 bg-white hover:bg-slate-50/50"}`}
-                  >
-                    <span className="text-xl select-none">{type.icon}</span>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-800">
-                        {type.title}
-                      </h4>
-                      <p className="text-[11px] text-slate-400 leading-normal mt-0.5">
-                        {type.desc}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -678,29 +589,7 @@ export default function CrearExamenPage() {
                   />
                 </div>
 
-                <div className="flex items-center gap-2 pt-2 justify-between border-t border-slate-100 mt-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-slate-400 font-medium">
-                      Reutilizar:
-                    </span>
-                    {bancoPreguntasMock.map((bancoItem) => (
-                      <button
-                        key={bancoItem.id}
-                        type="button"
-                        onClick={() =>
-                          handleImportarDelBanco(
-                            p.id,
-                            bancoItem.text,
-                            bancoItem.type,
-                          )
-                        }
-                        className="text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded transition-colors"
-                        title={bancoItem.text}
-                      >
-                        📥 {bancoItem.topic}
-                      </button>
-                    ))}
-                  </div>
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 mt-2">
                   <button
                     type="button"
                     onClick={() => handleAgregarVariante(p.id)}
@@ -725,14 +614,13 @@ export default function CrearExamenPage() {
           minDate={ahoraLocal}
           maxDate={maxDate}
           errors={fieldErrors}
-          securityMeasures={securityMeasures}
-          securityConfig={securityConfig}
+          allowedResources={recursosPermitidos}
           onDurationChange={setDuracionMinutos}
           onAttemptsChange={setCantidadIntentos}
           onStartDateChange={setFechaInicio}
           onEndDateChange={setFechaFin}
           onCommissionChange={setIdMateriaDivision}
-          onToggleSecurity={handleToggleSecurity}
+          onAllowedResourcesChange={setRecursosPermitidos}
           onBlur={validateField}
         />
       </div>
