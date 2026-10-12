@@ -1,4 +1,9 @@
-import type { TipoPregunta } from "./shared";
+import type {
+  EstrategiaCorreccion,
+  ModoJustificacion,
+  TipoPregunta,
+  TratamientoJustificacion,
+} from "./shared";
 
 export type EstadoBanco = "borrador" | "disponible" | "archivado";
 
@@ -65,6 +70,10 @@ export interface BancoGrupoAfectado {
 export interface BancoPreguntaDetalle
   extends Omit<BancoPreguntaListado, "resumen"> {
   enunciado: string;
+  modoJustificacion?: ModoJustificacion;
+  estrategiaCorreccion?: EstrategiaCorreccion;
+  tratamientoJustificacion?: TratamientoJustificacion;
+  contenidoHash?: string | null;
   opciones: BancoOpcion[];
   etiquetas: BancoEtiqueta[];
   gruposAfectados?: BancoGrupoAfectado[];
@@ -94,6 +103,9 @@ export interface BancoPreguntaPayload {
   Titulo: string;
   Enunciado?: string;
   Tipo: TipoPregunta;
+  ModoJustificacion?: ModoJustificacion;
+  EstrategiaCorreccion?: EstrategiaCorreccion;
+  TratamientoJustificacion?: TratamientoJustificacion;
   Estado?: EstadoBanco;
   Opciones?: BancoOpcionPayload[];
   Etiquetas?: number[];
@@ -156,6 +168,11 @@ export interface BancoGrupoDesdeContenidoResultado {
 
 export interface BancoReferenciaPreguntaPayload {
   IdPregunta: number;
+  RevisionEsperada: number;
+}
+
+export interface BancoReferenciaGrupoPayload {
+  IdGrupo: number;
   RevisionEsperada: number;
 }
 

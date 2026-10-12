@@ -1,5 +1,10 @@
 import {
   GuardarEvaluacionPayload,
+  GuardarEvaluacionResultado,
+  ModificarBorradorPayload,
+  ModificarBorradorResultado,
+  PublicarEvaluacionPayload,
+  PublicarEvaluacionResultado,
   PreguntaSorteada,
   OpcionSorteada,
   IniciarIntentoPayload,
@@ -15,8 +20,19 @@ import {
   IntentoDetallado,
   HistorialCorregidoItem,
   AlertaAntifraude,
+  CorreccionPreguntaIntentoPayload,
+  ResultadoCalificacionIntento,
+  ResultadoCorreccionPregunta,
+  IntentoAlumnoPublicacion,
+  MisIntentosFiltros,
+  MisIntentosResultado,
+  SeleccionIntentoValidoResultado,
+  IncidenteFoco,
+  IncidenteFocoPayload,
+  ResumenIncidentesFoco,
 } from "@/types/index";
 import { ApiError, apiFetch } from "@/lib/api";
+import { buildQueryString } from "@/lib/query-string";
 
 interface IniciarIntentoApiResult {
   idIntento: number;
@@ -24,11 +40,41 @@ interface IniciarIntentoApiResult {
 }
 
 // EVALUACIONES
-export const guardarEvaluacionCompleta = (payload: GuardarEvaluacionPayload): Promise<{ idActividad: number }> =>
-  apiFetch<{ idActividad: number }>("/evaluaciones/guardar-completo", {
+export const guardarEvaluacionCompleta = (
+  payload: GuardarEvaluacionPayload,
+  idempotencyKey: string,
+): Promise<GuardarEvaluacionResultado> =>
+  apiFetch<GuardarEvaluacionResultado>("/evaluaciones/guardar-completo", {
     method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
     body: JSON.stringify(payload),
   });
+
+export const modificarBorradorCompleto = (
+  idActividad: number,
+  payload: ModificarBorradorPayload,
+): Promise<ModificarBorradorResultado> =>
+  apiFetch<ModificarBorradorResultado>(
+    `/evaluaciones/${idActividad}/modificar-completo`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+  );
+
+export const publicarEvaluacionCompleta = (
+  idActividad: number,
+  payload: PublicarEvaluacionPayload,
+  idempotencyKey: string,
+): Promise<PublicarEvaluacionResultado> =>
+  apiFetch<PublicarEvaluacionResultado>(
+    `/evaluaciones/${idActividad}/publicar-completo`,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(payload),
+    },
+  );
 
 export const actualizarEstadoEvaluacion = (id: number, estado: string): Promise<void> =>
   apiFetch<void>(`/evaluaciones/${id}/estado`, {
@@ -54,11 +100,48 @@ export const obtenerIntentosDetallados = (idAlumno: number): Promise<IntentoDeta
 export const obtenerHistorialCorregido = (idAlumno: number): Promise<HistorialCorregidoItem[]> =>
   apiFetch<HistorialCorregidoItem[]>(`/intentos/alumno/${idAlumno}/historial-corregido`);
 
+export const obtenerMisIntentos = (
+  filtros: MisIntentosFiltros,
+): Promise<MisIntentosResultado> =>
+  apiFetch<MisIntentosResultado>(
+    `/intentos/mios${buildQueryString(filtros)}`,
+  );
+
 export const obtenerEvaluacionesDocente = (legajo: number): Promise<EvaluacionDocente[]> =>
   apiFetch<EvaluacionDocente[]>(`/docentes/${legajo}/evaluaciones`);
 
 export const obtenerAlumnosInscriptos = (idPublicacion: number): Promise<AlumnoIntento[]> =>
   apiFetch<AlumnoIntento[]>(`/evaluaciones/${idPublicacion}/alumnos`);
+
+export const obtenerIntentosAlumnoPublicacion = (
+  idPublicacion: number,
+  matricula: number,
+): Promise<IntentoAlumnoPublicacion[]> =>
+  apiFetch<IntentoAlumnoPublicacion[]>(
+    `/evaluaciones/publicaciones/${idPublicacion}/alumnos/${matricula}/intentos`,
+  );
+
+export const seleccionarIntentoValido = (
+  idPublicacion: number,
+  matricula: number,
+  idIntento: number,
+): Promise<SeleccionIntentoValidoResultado> =>
+  apiFetch<SeleccionIntentoValidoResultado>(
+    `/evaluaciones/publicaciones/${idPublicacion}/alumnos/${matricula}/intento-valido`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ IdIntento: idIntento }),
+    },
+  );
+
+export const restaurarSeleccionAutomaticaIntento = (
+  idPublicacion: number,
+  matricula: number,
+): Promise<SeleccionIntentoValidoResultado> =>
+  apiFetch<SeleccionIntentoValidoResultado>(
+    `/evaluaciones/publicaciones/${idPublicacion}/alumnos/${matricula}/intento-valido`,
+    { method: "DELETE" },
+  );
 
 export const obtenerDetalleEvaluacion = (id: number): Promise<EvaluacionDetalle> =>
   apiFetch<EvaluacionDetalle>(`/evaluaciones/${id}/detalle`);
@@ -102,21 +185,27 @@ export const finalizarExamenOficial = (idIntento: number): Promise<{ notaFinal: 
 export const obtenerIntentoCompleto = (idIntento: number): Promise<IntentoCompleto> =>
   apiFetch<IntentoCompleto>(`/intentos/${idIntento}/completo`);
 
-export const calificarIntento = (idIntento: number, notaFinal: number): Promise<void> =>
-  apiFetch<void>(`/intentos/${idIntento}/calificar`, {
+export const calificarIntento = (
+  idIntento: number,
+  notaFinal: number,
+): Promise<ResultadoCalificacionIntento> =>
+  apiFetch<ResultadoCalificacionIntento>(`/intentos/${idIntento}/calificar`, {
     method: "PUT",
     body: JSON.stringify({ notaFinal }),
   });
-    
-export const corregirRespuestaAbierta = (
+
+export const corregirPreguntaIntento = (
   idIntento: number,
   idPregunta: number,
-  payload: { esCorrecta: boolean | null; comentariosDocente: string | null }
-): Promise<void> =>
-  apiFetch<void>(`/intentos/${idIntento}/preguntas/${idPregunta}/corregir`, {
+  payload: CorreccionPreguntaIntentoPayload,
+): Promise<ResultadoCorreccionPregunta> =>
+  apiFetch<ResultadoCorreccionPregunta>(
+    `/intentos/${idIntento}/preguntas/${idPregunta}/corregir`,
+    {
     method: "PUT",
     body: JSON.stringify(payload),
-  });
+    },
+  );
 
 // TELEMETRÍA
 export const registrarAlertaAntifraude = (payload: AlertaPayload): Promise<void> =>
@@ -133,3 +222,30 @@ export const registrarMetricasNavegacion = (payload: NavegacionPayload): Promise
     method: "POST",
     body: JSON.stringify(payload),
   });
+
+export const guardarIncidenteFoco = (
+  idIntento: number,
+  eventoId: string,
+  payload: IncidenteFocoPayload,
+): Promise<IncidenteFoco> =>
+  apiFetch<IncidenteFoco>(
+    `/telemetria/intentos/${idIntento}/incidentes/${eventoId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+  );
+
+export const obtenerResumenIncidentesFoco = (
+  idIntento: number,
+): Promise<ResumenIncidentesFoco> =>
+  apiFetch<ResumenIncidentesFoco>(
+    `/telemetria/intentos/${idIntento}/resumen`,
+  );
+
+export const obtenerIncidentesFoco = (
+  idIntento: number,
+): Promise<IncidenteFoco[]> =>
+  apiFetch<IncidenteFoco[]>(
+    `/telemetria/intentos/${idIntento}/incidentes`,
+  );

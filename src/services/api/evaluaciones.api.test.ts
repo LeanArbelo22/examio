@@ -1,6 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, apiFetch } from "@/lib/api";
-import { iniciarIntentoExamen } from "./evaluaciones.api";
+import {
+  guardarEvaluacionCompleta,
+  iniciarIntentoExamen,
+  modificarBorradorCompleto,
+  publicarEvaluacionCompleta,
+  calificarIntento,
+  corregirPreguntaIntento,
+  obtenerIntentosAlumnoPublicacion,
+  obtenerMisIntentos,
+  restaurarSeleccionAutomaticaIntento,
+  seleccionarIntentoValido,
+  guardarIncidenteFoco,
+  obtenerIncidentesFoco,
+  obtenerResumenIncidentesFoco,
+} from "./evaluaciones.api";
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
@@ -34,5 +48,231 @@ describe("iniciarIntentoExamen", () => {
       statusCode: 502,
       code: "INVALID_UPSTREAM_RESPONSE",
     } satisfies Partial<ApiError>);
+  });
+
+  it("crea un borrador con la clave idempotente", async () => {
+    apiFetchMock.mockResolvedValue({
+      idActividad: 4,
+      idPublicacion: 8,
+      estado: "borrador",
+      revision: 1,
+      importaciones: [],
+      banco: [],
+    });
+    const payload = {
+      Titulo: "Parcial",
+      Tipo: "evaluacion" as const,
+      CantidadIntentosMaximos: 1,
+      DuracionMinutos: 90,
+      IdMateriaDivision: 12,
+      FechaInicio: "2026-08-07T13:00:00.000Z",
+      FechaFin: "2026-08-07T15:00:00.000Z",
+      Estado: "borrador" as const,
+      GruposPreguntas: [],
+    };
+
+    await guardarEvaluacionCompleta(
+      payload,
+      "4e096ceb-51fd-49a1-8f80-c3760edaf021",
+    );
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      "/evaluaciones/guardar-completo",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "Idempotency-Key": "4e096ceb-51fd-49a1-8f80-c3760edaf021",
+        },
+        body: JSON.stringify(payload),
+      }),
+    );
+  });
+
+  it("modifica el borrador completo por actividad", async () => {
+    apiFetchMock.mockResolvedValue({ revision: 3 });
+    const payload = {
+      Titulo: "Parcial",
+      Tipo: "evaluacion" as const,
+      CantidadIntentosMaximos: 1,
+      DuracionMinutos: 90,
+      IdMateriaDivision: 12,
+      FechaInicio: "2026-08-07T13:00:00.000Z",
+      FechaFin: "2026-08-07T15:00:00.000Z",
+      GruposPreguntas: [],
+      IdPublicacion: 8,
+      RevisionEsperada: 2,
+    };
+
+    await modificarBorradorCompleto(4, payload);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      "/evaluaciones/4/modificar-completo",
+      { method: "PUT", body: JSON.stringify(payload) },
+    );
+  });
+
+  it("publica el borrador completo con una clave idempotente", async () => {
+    apiFetchMock.mockResolvedValue({
+      idActividad: 4,
+      idPublicacion: 8,
+      estado: "publicada",
+      revision: 3,
+      importaciones: [],
+      banco: [],
+    });
+    const payload = {
+      Titulo: "Parcial",
+      Tipo: "evaluacion" as const,
+      CantidadIntentosMaximos: 1,
+      DuracionMinutos: 90,
+      IdMateriaDivision: 12,
+      FechaInicio: "2026-10-07T13:00:00.000Z",
+      FechaFin: "2026-10-07T15:00:00.000Z",
+      GruposPreguntas: [],
+      IdPublicacion: 8,
+      RevisionEsperada: 2,
+      GuardarTodoEnBanco: false,
+    };
+    const key = "4e096ceb-51fd-49a1-8f80-c3760edaf021";
+
+    await publicarEvaluacionCompleta(4, payload, key);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      "/evaluaciones/4/publicar-completo",
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": key },
+        body: JSON.stringify(payload),
+      },
+    );
+  });
+
+  it("envía la corrección canónica por puntaje y comentario", async () => {
+    apiFetchMock.mockResolvedValue({
+      idIntento: 73,
+      idPregunta: 502,
+      puntajeMaximoSnapshot: 2,
+      puntajeObtenido: 1.5,
+      origenCorreccion: "manual",
+      comentariosDocente: "Parcialmente correcta",
+      notaAutomatica: null,
+      notaFinalCalculada: 8.5,
+      notaFinalManual: null,
+      notaFinal: 8.5,
+      escalaCalificacion: 10,
+      notaAprobacion: 4,
+    });
+
+    await corregirPreguntaIntento(73, 502, {
+      puntajeObtenido: 1.5,
+      comentariosDocente: "Parcialmente correcta",
+    });
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      "/intentos/73/preguntas/502/corregir",
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          puntajeObtenido: 1.5,
+          comentariosDocente: "Parcialmente correcta",
+        }),
+      },
+    );
+  });
+
+  it("envía el override de nota con el body legacy compatible", async () => {
+    apiFetchMock.mockResolvedValue({
+      idIntento: 73,
+      notaAutomatica: 4,
+      notaFinalCalculada: 8.5,
+      notaFinalManual: 9,
+      notaFinal: 9,
+      escalaCalificacion: 10,
+      notaAprobacion: 4,
+    });
+
+    await calificarIntento(73, 9);
+
+    expect(apiFetchMock).toHaveBeenCalledWith("/intentos/73/calificar", {
+      method: "PUT",
+      body: JSON.stringify({ notaFinal: 9 }),
+    });
+  });
+
+  it("consulta y modifica el intento académico válido por alumno", async () => {
+    apiFetchMock.mockResolvedValue([]);
+
+    await obtenerIntentosAlumnoPublicacion(41, 30500);
+    await seleccionarIntentoValido(41, 30500, 73);
+    await restaurarSeleccionAutomaticaIntento(41, 30500);
+
+    const basePath = "/evaluaciones/publicaciones/41/alumnos/30500";
+    expect(apiFetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${basePath}/intentos`,
+    );
+    expect(apiFetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${basePath}/intento-valido`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ IdIntento: 73 }),
+      },
+    );
+    expect(apiFetchMock).toHaveBeenNthCalledWith(
+      3,
+      `${basePath}/intento-valido`,
+      { method: "DELETE" },
+    );
+  });
+
+  it("serializa todos los filtros del historial propio", async () => {
+    apiFetchMock.mockResolvedValue({ items: [], resumen: {}, paginacion: {} });
+
+    await obtenerMisIntentos({
+      idMateria: 4,
+      idMateriaDivision: 9,
+      fechaDesde: "2026-10-01",
+      fechaHasta: "2026-10-31",
+      estado: "entregado",
+      resultado: "aprobado",
+      pagina: 2,
+      limite: 10,
+      ordenarPor: "nota",
+      ordenDireccion: "desc",
+    });
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      "/intentos/mios?idMateria=4&idMateriaDivision=9&fechaDesde=2026-10-01&fechaHasta=2026-10-31&estado=entregado&resultado=aprobado&pagina=2&limite=10&ordenarPor=nota&ordenDireccion=desc",
+    );
+  });
+
+  it("usa el UUID como recurso idempotente de telemetría", async () => {
+    apiFetchMock.mockResolvedValue({});
+    const eventoId = "4e096ceb-51fd-49a1-8f80-c3760edaf021";
+    const payload = {
+      Tipo: "focus_lost" as const,
+      FechaInicioCliente: "2026-10-12T10:15:00.000Z",
+      FechaFinCliente: "2026-10-12T10:15:23.500Z",
+      DuracionMilisegundos: 23500,
+    };
+
+    await guardarIncidenteFoco(73, eventoId, payload);
+    await obtenerResumenIncidentesFoco(73);
+    await obtenerIncidentesFoco(73);
+
+    expect(apiFetchMock).toHaveBeenNthCalledWith(
+      1,
+      `/telemetria/intentos/73/incidentes/${eventoId}`,
+      { method: "PUT", body: JSON.stringify(payload) },
+    );
+    expect(apiFetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/telemetria/intentos/73/resumen",
+    );
+    expect(apiFetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/telemetria/intentos/73/incidentes",
+    );
   });
 });

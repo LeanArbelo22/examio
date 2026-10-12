@@ -32,13 +32,24 @@ import type {
   BancoPreguntaFiltros,
   BancoPreguntaPayload,
   BancoPreguntaUpdatePayload,
+  BancoGrupoListado,
+  BancoPreguntaListado,
 } from "@/types";
 
-export const usePreguntasBanco = (filtros: BancoPreguntaFiltros) =>
+export interface ResolverSeleccionBancoInput {
+  preguntas: BancoPreguntaListado[];
+  grupos: BancoGrupoListado[];
+}
+
+export const usePreguntasBanco = (
+  filtros: BancoPreguntaFiltros,
+  enabled = true,
+) =>
   useQuery({
     queryKey: bancoPreguntasKeys.preguntasListado(filtros),
     queryFn: () => listarPreguntasBanco(filtros),
     placeholderData: (previousData) => previousData,
+    enabled,
   });
 
 export const usePreguntaBanco = (id: number | null) =>
@@ -48,11 +59,12 @@ export const usePreguntaBanco = (id: number | null) =>
     enabled: isValidId(id),
   });
 
-export const useGruposBanco = (filtros: BancoGrupoFiltros) =>
+export const useGruposBanco = (filtros: BancoGrupoFiltros, enabled = true) =>
   useQuery({
     queryKey: bancoPreguntasKeys.gruposListado(filtros),
     queryFn: () => listarGruposBanco(filtros),
     placeholderData: (previousData) => previousData,
+    enabled,
   });
 
 export const useGrupoBanco = (id: number | null) =>
@@ -66,6 +78,16 @@ export const useEtiquetasBanco = () =>
   useQuery({
     queryKey: bancoPreguntasKeys.etiquetas(),
     queryFn: listarEtiquetasBanco,
+  });
+
+export const useResolverSeleccionBanco = () =>
+  useMutation({
+    mutationFn: async ({ preguntas, grupos }: ResolverSeleccionBancoInput) => ({
+      preguntas,
+      grupos: await Promise.all(
+        grupos.map((group) => obtenerGrupoBanco(group.id)),
+      ),
+    }),
   });
 
 function useInvalidarBanco() {

@@ -2,7 +2,7 @@
 
 import { use } from "react";
 import { useGetDetalleEvaluacion } from "@/hooks/useEvaluaciones";
-import type { EvaluacionDetalle, GrupoPreguntaDetalle, PreguntaDetalle, OpcionDetalle } from "@/types/index";
+import type { GrupoPreguntaDetalle, PreguntaDetalle, OpcionDetalle } from "@/types/index";
 
 const TIPO_BADGE: Record<string, { label: string; className: string }> = {
   mc: { label: "Múltiple", className: "bg-cyan-50 text-cyan-700 border border-cyan-200" },
@@ -52,9 +52,30 @@ export default function DetallePlantillaPage({ params }: { params: Promise<{ idP
         </p>
       </div>
 
+      <section
+        className="grid gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4"
+        aria-label="Configuración de calificación"
+      >
+        <ScoringSummary label="Escala" value={`0 a ${detalle.escalaCalificacion}`} />
+        <ScoringSummary label="Aprobación" value={String(detalle.notaAprobacion)} />
+        <ScoringSummary
+          label="Puntajes"
+          value={detalle.modoPuntaje === "iguales" ? "Iguales" : "Personalizados"}
+        />
+        <ScoringSummary
+          label="Vista del alumno"
+          value={detalle.mostrarPuntajePorPregunta ? "Puntaje visible" : "Puntaje oculto"}
+        />
+      </section>
+
       {detalle.grupos.map((grupo: GrupoPreguntaDetalle) => (
         <div key={grupo.idGrupo} className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
-          <h3 className="text-base font-bold text-slate-900 mb-4">{grupo.tituloReferencia}</h3>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-base font-bold text-slate-900">{grupo.tituloReferencia}</h3>
+            <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
+              {grupo.puntajeMaximo ?? 0} / {detalle.escalaCalificacion} puntos
+            </span>
+          </div>
 
           {grupo.preguntas.length === 0 && (
             <p className="text-xs text-slate-400 italic">Sin preguntas en este grupo.</p>
@@ -96,6 +117,17 @@ export default function DetallePlantillaPage({ params }: { params: Promise<{ idP
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function ScoringSummary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-2">
+      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        {label}
+      </span>
+      <span className="mt-0.5 block text-sm font-black text-slate-800">{value}</span>
     </div>
   );
 }

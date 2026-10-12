@@ -1,11 +1,31 @@
 import type {
   EstadoActividad,
   EstadoIntento,
+  EstrategiaCorreccion,
+  ModoJustificacion,
   TipoActividad,
   TipoPregunta,
+  TratamientoJustificacion,
 } from "./shared";
+import type {
+  BancoImportacionPayload,
+  BancoImportarEnEvaluacionResultado,
+  BancoReferenciaGrupoPayload,
+  BancoReferenciaPreguntaPayload,
+} from "./banco-preguntas";
 
-export interface Actividad {
+export type EscalaCalificacion = 10 | 100;
+export type ModoPuntaje = "iguales" | "personalizados";
+
+export interface ConfiguracionCalificacion {
+  escalaCalificacion: EscalaCalificacion;
+  notaAprobacion: number;
+  modoPuntaje: ModoPuntaje;
+  mostrarPuntajePorPregunta: boolean;
+  correccionAutomaticaCerradas: boolean;
+}
+
+export interface Actividad extends ConfiguracionCalificacion {
   id: number;
   titulo: string;
   descripcion?: string;
@@ -104,6 +124,7 @@ export interface PreguntaSorteada {
   enunciado: string;
   tipo: TipoPregunta;
   grupoConceptualmente?: string;
+  puntajeMaximo?: number;
 }
 
 export interface OpcionSorteada {
@@ -142,7 +163,7 @@ export interface EvaluacionDocente {
   division: string;
   fechaInicio: string;
   fechaFin: string;
-  duracionMinutos: number;
+  duracionMinutos: number | null;
   cantidadIntentosMaximos: number;
   recursosPermitidos: string | null;
   estado: EstadoActividad;
@@ -160,25 +181,38 @@ export interface PreguntaDetalle {
   idPregunta: number;
   enunciado: string;
   tipo: TipoPregunta;
+  modoJustificacion?: ModoJustificacion;
+  estrategiaCorreccion?: EstrategiaCorreccion;
+  tratamientoJustificacion?: TratamientoJustificacion;
+  contenidoHash?: string | null;
+  idBancoPreguntaOrigen?: number | null;
+  revisionBancoOrigen?: number | null;
+  fechaIncorporacionBanco?: string | null;
   opciones: OpcionDetalle[];
 }
 
 export interface GrupoPreguntaDetalle {
   idGrupo: number;
   tituloReferencia: string;
+  puntajeMaximo: number | null;
+  idBancoGrupoOrigen?: number | null;
+  revisionBancoOrigen?: number | null;
+  fechaIncorporacionBanco?: string | null;
   preguntas: PreguntaDetalle[];
 }
 
-export interface EvaluacionDetalle {
+export interface EvaluacionDetalle extends ConfiguracionCalificacion {
   idActividad: number;
   titulo: string;
   descripcion?: string;
   tipo: TipoActividad;
-  duracionMinutos: number;
+  duracionMinutos: number | null;
   cantidadIntentosMaximos: number;
   estado: EstadoActividad;
+  revision: number;
   recursosPermitidos: string | null;
   idPublicacion: number;
+  idMateriaDivision?: number;
   fechaInicio: string;
   fechaFin: string;
   materia: string;
@@ -201,12 +235,20 @@ export interface RespuestaIntento {
   comentariosDocente?: string | null;
 }
 
+export type OrigenCorreccion = "automatica" | "manual" | null;
+
 export interface PreguntaIntento {
   idPregunta: number;
   enunciado: string;
   tipo: TipoPregunta;
   grupoConceptualmente: string;
-  respuesta: RespuestaIntento;
+  puntajeMaximo: number | null;
+  puntajeObtenido: number | null;
+  origenCorreccion: OrigenCorreccion;
+  comentariosDocente: string | null;
+  corregidoPor: number | null;
+  fechaCorreccion: string | null;
+  respuesta: RespuestaIntento | null;
   opciones: OpcionIntento[];
 }
 
@@ -217,6 +259,10 @@ export interface IntentoCompleto {
   estado: EstadoIntento;
   notaFinal: number | null;
   notaAutomatica: number | null;
+  notaFinalCalculada: number | null;
+  notaFinalManual: number | null;
+  escalaCalificacion: EscalaCalificacion;
+  notaAprobacion: number;
   fechaInicio: string;
   fechaFin: string | null;
   numeroIntento: number;
@@ -227,6 +273,32 @@ export interface IntentoCompleto {
   tipoEvaluacion: string;
   duracionMinutos: number;
   preguntas: PreguntaIntento[];
+}
+
+export interface CorreccionPreguntaIntentoPayload {
+  puntajeObtenido: number | null;
+  comentariosDocente: string | null;
+}
+
+export interface ResultadoCalificacionIntento {
+  idIntento: number;
+  notaAutomatica: number | null;
+  notaFinalCalculada: number | null;
+  notaFinalManual: number | null;
+  notaFinal: number | null;
+  escalaCalificacion: EscalaCalificacion;
+  notaAprobacion: number;
+}
+
+export interface ResultadoCorreccionPregunta
+  extends ResultadoCalificacionIntento {
+  idPregunta: number;
+  puntajeMaximoSnapshot: number;
+  puntajeObtenido: number | null;
+  origenCorreccion: OrigenCorreccion;
+  comentariosDocente: string | null;
+  corregidoPor?: number | null;
+  fechaCorreccion?: string | null;
 }
 
 export interface AlumnoIntento {
@@ -243,6 +315,37 @@ export interface AlumnoIntento {
   numeroIntento: number | null;
   cantidadIntentosMaximos: number;
   intentosAgotados: boolean;
+}
+
+export type SeleccionIntentoValido = "automatica" | "manual" | null;
+
+export interface IntentoAlumnoPublicacion {
+  idIntento: number;
+  idPublicacion: number;
+  idAlumno: number;
+  numeroIntento: number;
+  estado: EstadoIntento;
+  fechaInicio: string;
+  fechaFin: string | null;
+  notaAutomatica: number | null;
+  notaFinalCalculada: number | null;
+  notaFinalManual: number | null;
+  notaFinal: number | null;
+  escalaCalificacion: EscalaCalificacion;
+  notaAprobacion: number;
+  estadoCorreccion: "pendiente" | "completa" | null;
+  preguntasPendientesCorreccion: number;
+  esIntentoValido: boolean;
+  seleccionIntentoValido: SeleccionIntentoValido;
+}
+
+export interface SeleccionIntentoValidoResultado {
+  idPublicacion: number;
+  idAlumno: number;
+  idIntento: number | null;
+  esIntentoValido: boolean;
+  seleccionIntentoValido: SeleccionIntentoValido;
+  fechaSeleccion?: string;
 }
 
 export interface EstadisticasAlumno {
@@ -279,6 +382,67 @@ export interface HistorialCorregidoItem {
   numeroIntento: number;
 }
 
+export type ResultadoIntentoAlumno = "aprobado" | "desaprobado" | "pendiente";
+export type OrdenIntentosAlumno = "fecha" | "materia" | "evaluacion" | "nota";
+export type DireccionOrdenIntentosAlumno = "asc" | "desc";
+
+export interface MisIntentosFiltros {
+  idMateria?: number;
+  idMateriaDivision?: number;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  estado?: EstadoIntento;
+  resultado?: ResultadoIntentoAlumno;
+  pagina?: number;
+  limite?: number;
+  ordenarPor?: OrdenIntentosAlumno;
+  ordenDireccion?: DireccionOrdenIntentosAlumno;
+}
+
+export interface IntentoHistorialAlumno {
+  idIntento: number;
+  idActividad: number;
+  idPublicacion: number;
+  titulo: string;
+  tipo: TipoActividad;
+  idMateria: number;
+  materia: string;
+  idMateriaDivision: number;
+  division: string;
+  numeroIntento: number;
+  cantidadIntentosMaximos: number;
+  estado: EstadoIntento;
+  fechaInicio: string;
+  fechaFin: string | null;
+  notaAutomatica: number | null;
+  notaFinal: number | null;
+  escalaCalificacion: EscalaCalificacion;
+  notaAprobacion: number;
+  resultado: ResultadoIntentoAlumno;
+  estadoCorreccion: "pendiente" | "completa" | null;
+  esIntentoValido: boolean;
+  seleccionIntentoValido: SeleccionIntentoValido;
+}
+
+export interface ResumenIntentosAlumno {
+  totalIntentos: number;
+  totalEvaluaciones: number;
+  evaluacionesAprobadas: number;
+  evaluacionesDesaprobadas: number;
+  evaluacionesPendientes: number;
+}
+
+export interface MisIntentosResultado {
+  items: IntentoHistorialAlumno[];
+  resumen: ResumenIntentosAlumno;
+  paginacion: {
+    pagina: number;
+    limite: number;
+    total: number;
+    totalPaginas: number;
+  };
+}
+
 export interface EvaluacionPendiente {
   idPublicacion: number;
   titulo: string;
@@ -298,19 +462,28 @@ export interface EvaluacionPendiente {
 }
 
 export interface OpcionPayload {
+  Id?: number;
   Texto: string;
   EsCorrecta: boolean;
 }
 
 export interface PreguntaPayload {
+  Id?: number;
   Enunciado: string;
   Tipo: TipoPregunta;
+  ModoJustificacion?: ModoJustificacion;
+  EstrategiaCorreccion?: EstrategiaCorreccion;
+  TratamientoJustificacion?: TratamientoJustificacion;
   Opciones?: OpcionPayload[];
+  ReferenciaBanco?: BancoReferenciaPreguntaPayload;
 }
 
 export interface GrupoPreguntaPayload {
+  Id?: number;
   TituloReferencia: string;
+  PuntajeMaximo?: number | null;
   Variantes: PreguntaPayload[];
+  ReferenciaBanco?: BancoReferenciaGrupoPayload;
 }
 
 export interface GuardarEvaluacionPayload {
@@ -323,7 +496,57 @@ export interface GuardarEvaluacionPayload {
   IdMateriaDivision: number;
   FechaInicio: string;
   FechaFin: string;
+  Estado?: "borrador" | "publicada";
+  EscalaCalificacion?: EscalaCalificacion;
+  NotaAprobacion?: number;
+  ModoPuntaje?: ModoPuntaje;
+  MostrarPuntajePorPregunta?: boolean;
+  CorreccionAutomaticaCerradas?: boolean;
   GruposPreguntas: GrupoPreguntaPayload[];
+  ImportacionesBanco?: BancoImportacionPayload[];
+}
+
+export interface GuardarEvaluacionResultado {
+  idActividad: number;
+  idPublicacion: number;
+  estado: "borrador" | "publicada";
+  revision: number;
+  escalaCalificacion: EscalaCalificacion;
+  notaAprobacion: number;
+  modoPuntaje: ModoPuntaje;
+  mostrarPuntajePorPregunta: boolean;
+  correccionAutomaticaCerradas: boolean;
+  importaciones: unknown[];
+  banco: unknown[];
+}
+
+export interface ModificarBorradorPayload
+  extends Omit<GuardarEvaluacionPayload, "Estado"> {
+  IdPublicacion: number;
+  RevisionEsperada: number;
+}
+
+export interface ModificarBorradorResultado {
+  revision: number;
+  importaciones?: BancoImportarEnEvaluacionResultado["importaciones"];
+}
+
+export interface PublicarEvaluacionPayload extends ModificarBorradorPayload {
+  GuardarTodoEnBanco: boolean;
+}
+
+export interface PublicarEvaluacionResultado {
+  idActividad: number;
+  idPublicacion: number;
+  estado: "publicada";
+  revision: number;
+  importaciones: BancoImportarEnEvaluacionResultado["importaciones"];
+  banco: unknown[];
+}
+
+export interface EvaluacionOperacionIdempotente<TPayload> {
+  payload: TPayload;
+  idempotencyKey: string;
 }
 
 export interface IniciarIntentoPayload {

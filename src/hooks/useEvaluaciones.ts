@@ -7,6 +7,8 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import {
   guardarEvaluacionCompleta,
+  modificarBorradorCompleto,
+  publicarEvaluacionCompleta,
   actualizarEstadoEvaluacion,
   iniciarIntentoExamen,
   obtenerExamenSorteado,
@@ -25,7 +27,11 @@ import {
   registrarAlertaAntifraude,
   getAlertasByIntento,
   registrarMetricasNavegacion,
-  corregirRespuestaAbierta,
+  corregirPreguntaIntento,
+  obtenerIntentosAlumnoPublicacion,
+  seleccionarIntentoValido,
+  restaurarSeleccionAutomaticaIntento,
+  obtenerMisIntentos,
 } from "@/services/api/evaluaciones.api";
 import { ApiError } from "@/lib/api";
 import {
@@ -43,15 +49,22 @@ import {
 } from "@/lib/exam-answer-outbox";
 import type {
   GuardarEvaluacionPayload,
+  EvaluacionOperacionIdempotente,
+  ModificarBorradorPayload,
+  PublicarEvaluacionPayload,
   IniciarIntentoPayload,
   GuardarRespuestaPayload,
   AlertaPayload,
   NavegacionPayload,
   OpcionSorteada,
   PreguntaSorteada,
+  CorreccionPreguntaIntentoPayload,
+  MisIntentosFiltros,
+  MisIntentosResultado,
 } from "@/types/index";
 import {
   alumnoKeys,
+  bancoPreguntasKeys,
   docenteKeys,
   evaluacionKeys,
   intentoKeys,
@@ -153,9 +166,69 @@ async function synchronizePendingAnswers(
 
 // --- HOOKS DEL PROFESOR ---
 
-export const useCreateEvaluacion = () => {
+export const useCreateEvaluacion = (legajo?: number) => {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: GuardarEvaluacionPayload) => guardarEvaluacionCompleta(payload),
+    mutationFn: ({
+      payload,
+      idempotencyKey,
+    }: EvaluacionOperacionIdempotente<GuardarEvaluacionPayload>) =>
+      guardarEvaluacionCompleta(payload, idempotencyKey),
+    onSuccess: () => {
+      if (isValidId(legajo)) {
+        queryClient.invalidateQueries({
+          queryKey: docenteKeys.evaluaciones(legajo),
+        });
+      }
+    },
+  });
+};
+
+export const useModificarBorrador = (
+  idActividad: number,
+  idPublicacion: number,
+  legajo?: number,
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ModificarBorradorPayload) =>
+      modificarBorradorCompleto(idActividad, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: evaluacionKeys.detail(idPublicacion),
+      });
+      if (isValidId(legajo)) {
+        queryClient.invalidateQueries({
+          queryKey: docenteKeys.evaluaciones(legajo),
+        });
+      }
+    },
+  });
+};
+
+export const usePublicarEvaluacion = (
+  idActividad: number,
+  idPublicacion: number,
+  legajo?: number,
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      payload,
+      idempotencyKey,
+    }: EvaluacionOperacionIdempotente<PublicarEvaluacionPayload>) =>
+      publicarEvaluacionCompleta(idActividad, payload, idempotencyKey),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: evaluacionKeys.detail(idPublicacion),
+      });
+      queryClient.invalidateQueries({ queryKey: bancoPreguntasKeys.all });
+      if (isValidId(legajo)) {
+        queryClient.invalidateQueries({
+          queryKey: docenteKeys.evaluaciones(legajo),
+        });
+      }
+    },
   });
 };
 
@@ -179,6 +252,54 @@ export const useGetAlumnosInscriptos = (idPublicacion: number) => {
     queryKey: evaluacionKeys.alumnos(idPublicacion),
     queryFn: () => obtenerAlumnosInscriptos(idPublicacion),
     enabled: isValidId(idPublicacion),
+  });
+};
+
+export const useGetIntentosAlumnoPublicacion = (
+  idPublicacion: number,
+  matricula: number | null,
+) =>
+  useQuery({
+    queryKey: evaluacionKeys.intentosAlumno(idPublicacion, matricula!),
+    queryFn: () => obtenerIntentosAlumnoPublicacion(idPublicacion, matricula!),
+    enabled: isValidId(idPublicacion) && isValidId(matricula),
+  });
+
+export const useSeleccionarIntentoValido = (
+  idPublicacion: number,
+  matricula: number,
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (idIntento: number) =>
+      seleccionarIntentoValido(idPublicacion, matricula, idIntento),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: evaluacionKeys.intentosAlumno(idPublicacion, matricula),
+      });
+      queryClient.invalidateQueries({
+        queryKey: evaluacionKeys.alumnos(idPublicacion),
+      });
+    },
+  });
+};
+
+export const useRestaurarSeleccionAutomaticaIntento = (
+  idPublicacion: number,
+  matricula: number,
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      restaurarSeleccionAutomaticaIntento(idPublicacion, matricula),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: evaluacionKeys.intentosAlumno(idPublicacion, matricula),
+      });
+      queryClient.invalidateQueries({
+        queryKey: evaluacionKeys.alumnos(idPublicacion),
+      });
+    },
   });
 };
 
@@ -497,6 +618,13 @@ export const useGetHistorialCorregido = (idAlumno: number) => {
   });
 };
 
+export const useMisIntentos = (filtros: MisIntentosFiltros) =>
+  useQuery({
+    queryKey: intentoKeys.mios(filtros),
+    queryFn: () => obtenerMisIntentos(filtros),
+    placeholderData: (previousData: MisIntentosResultado | undefined) => previousData,
+  });
+
 export const useGetDetalleEvaluacion = (id: number) => {
   return useQuery({
     queryKey: evaluacionKeys.detail(id),
@@ -505,22 +633,17 @@ export const useGetDetalleEvaluacion = (id: number) => {
   });
 };
   
-export const useCorregirRespuestaAbierta = (idIntento: number) => {
+export const useCorregirPreguntaIntento = (idIntento: number) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       idPregunta,
-      esCorrecta,
-      comentariosDocente,
+      payload,
     }: {
       idPregunta: number;
-      esCorrecta: boolean | null;
-      comentariosDocente: string | null;
+      payload: CorreccionPreguntaIntentoPayload;
     }) =>
-      corregirRespuestaAbierta(idIntento, idPregunta, {
-        esCorrecta,
-        comentariosDocente,
-      }),
+      corregirPreguntaIntento(idIntento, idPregunta, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: intentoKeys.detail(idIntento) });
     },

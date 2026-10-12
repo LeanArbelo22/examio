@@ -36,6 +36,10 @@ export default defineConfig({
     {
       command: `pnpm dev --hostname 127.0.0.1 --port ${frontendPort}`,
       port: frontendPort,
+      env: {
+        ...process.env,
+        EXAMIO_NEXT_DIST_DIR: ".next-e2e",
+      },
       reuseExistingServer: false,
       timeout: 120_000,
       stdout: "pipe",

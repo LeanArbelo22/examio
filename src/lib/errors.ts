@@ -25,6 +25,16 @@ const SAFE_CODE_MESSAGES: Record<string, string> = {
   BFF_UPSTREAM_UNAVAILABLE: "Examio no está disponible temporalmente.",
   VALIDATION_ERROR: "Revisá los datos ingresados.",
   REQUEST_INVALID: "Revisá los datos ingresados.",
+  QUESTION_SCORE_OUT_OF_RANGE:
+    "El puntaje debe respetar el máximo de la pregunta y usar hasta dos decimales.",
+  FINAL_GRADE_OUT_OF_RANGE:
+    "La nota final debe respetar la escala de la evaluación y usar hasta dos decimales.",
+  ATTEMPT_NOT_DELIVERED:
+    "El intento todavía no fue entregado y no puede corregirse.",
+  ATTEMPT_SCOPE_FORBIDDEN:
+    "No tenés permisos para corregir este intento.",
+  QUESTION_RUNTIME_NOT_AVAILABLE:
+    "La evaluación usa selección múltiple o justificación. Podés guardarla como borrador, pero todavía no está disponible para ser respondida por alumnos.",
 };
 
 export function getErrorCategory(error: unknown): ErrorCategory {

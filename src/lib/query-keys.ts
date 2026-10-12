@@ -52,6 +52,8 @@ export const evaluacionKeys = {
   all: ["evaluaciones"] as const,
   detail: (id: number) => [...evaluacionKeys.all, id, "detalle"] as const,
   alumnos: (idPublicacion: number) => [...evaluacionKeys.all, idPublicacion, "alumnos"] as const,
+  intentosAlumno: (idPublicacion: number, matricula: number) =>
+    [...evaluacionKeys.all, idPublicacion, "alumnos", matricula, "intentos"] as const,
   sorteo: (idIntento: number) => [...evaluacionKeys.all, "intentos", idIntento, "sorteo"] as const,
   opciones: (idIntento: number, idPregunta: number) =>
     [...evaluacionKeys.all, "intentos", idIntento, "preguntas", idPregunta, "opciones"] as const,
@@ -61,6 +63,9 @@ export const intentoKeys = {
   all: ["intentos"] as const,
   detail: (id: number) => [...intentoKeys.all, id, "completo"] as const,
   alertas: (id: number) => [...intentoKeys.all, id, "alertas"] as const,
+  incidentesFoco: (id: number) => [...intentoKeys.all, id, "incidentes-foco"] as const,
+  resumenFoco: (id: number) => [...intentoKeys.incidentesFoco(id), "resumen"] as const,
+  mios: (filtros: object) => [...intentoKeys.all, "mios", filtros] as const,
 };
 
 export const adminKeys = {

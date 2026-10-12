@@ -30,6 +30,11 @@ const evaluacionesMock = vi.mocked(obtenerReporteRendimientoEvaluaciones);
 
 function reporteEvaluaciones(pagina: number): ReporteEvaluacionesListado {
   return {
+    criterios: {
+      alcanceIntentos: "todos",
+      escalaPromedio: 10,
+      conPendientesCorreccion: null,
+    },
     kpis: {
       totalEvaluaciones: 2,
       totalAlumnosAlcanzados: 30,
@@ -39,9 +44,11 @@ function reporteEvaluaciones(pagina: number): ReporteEvaluacionesListado {
       totalEnProgreso: 2,
       totalVencidos: 1,
       totalAnulados: 2,
+      totalIntentosAlcanceAcademico: 20,
       totalIntentosCalificados: 18,
       intentosPendientesCorreccion: 2,
       promedioIntentosCalificados: 7.5,
+      promedioIntentosCalificadosBase10: 7.5,
       tasaAprobacionIntentos: 80,
     },
     graficos: { distribucionResultados: [] },
@@ -93,8 +100,11 @@ describe("hooks de reportes", () => {
       alumno: { matricula: 30123, nombre: "Ada", apellido: "Lovelace" },
       kpis: {
         totalIntentos: 1,
+        intentosAlcanceAcademico: 1,
         totalCorregidos: 1,
         promedioGeneral: 9,
+        escalaPromedio: 10,
+        alcanceIntentos: "todos",
         aprobados: 1,
         desaprobados: 0,
         porcentajeAprobacion: 100,

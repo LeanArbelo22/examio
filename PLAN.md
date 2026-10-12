@@ -164,22 +164,22 @@ La protección de respuestas pendientes está implementada sin cambios de backen
 
 ### Auditoría y política configurable de continuidad y supervisión
 
-- [!] Definir y persistir un registro auditable de incidentes durante el intento: pérdida y recuperación de conectividad, expiración o recuperación de sesión, recarga, errores de sincronización o entrega, salida de pantalla completa, minimización, cambio de pestaña o pérdida de foco. Requiere contrato backend, persistencia y criterios de privacidad.
-- [!] Registrar para cada incidente tipo, instante de inicio, instante de recuperación, duración, resultado y contexto mínimo del intento, sin incluir respuestas, tokens ni datos sensibles. La autoridad temporal y el formato definitivo deben acordarse con backend.
+- [~] La pérdida de foco ya se persiste con inicio, fin, duración, UUID idempotente y timestamps del servidor. Continúan pendientes conectividad, sesión, recarga, errores de sincronización/entrega y salida de pantalla completa como incidentes estructurados.
+- [x] Registrar la pérdida de foco sin respuestas, tokens ni contenido del examen, usando timestamps cliente validados y recepción del servidor.
 - [!] Definir una configuración por evaluación elegida por el docente para cada clase de incidente: solo registrar, advertir y solicitar retorno, permitir una cantidad acotada o aplicar una consecuencia. Requiere modelo de datos, API, validación server-side y una política funcional explícita.
 - [!] Definir límites independientes y acumulativos cuando corresponda —por ejemplo, una salida de pantalla completa permitida y entrega ante una reincidencia— evitando que el cliente sea la única autoridad para contabilizarlos.
 - [ ] Reemplazar en una etapa posterior el tratamiento actual de salida de pantalla completa como fraude inmediato por una máquina de estados no destructiva: advertir, conservar contenido, respuestas y temporizador, y solicitar volver a pantalla completa. La restricción permanece habilitada hasta abordar ese rediseño.
 - [!] Definir qué consecuencias pueden ejecutarse automáticamente. Una entrega, anulación o penalización por incidentes de navegador no debe implementarse sin reglas backend autoritativas, tolerancia a falsos positivos y aprobación funcional.
 - [ ] Detectar recargas y reanudaciones como incidentes diferenciados. La recuperación durable actual preserva el intento, pero una recarga también puede utilizarse para abandonar pantalla completa sin generar la señal de salida esperada.
 - [ ] Al reanudar después de una recarga, volver a solicitar pantalla completa cuando la evaluación lo requiera y mantener visible la advertencia hasta que el alumno retome, sin descartar respuestas ni reiniciar el temporizador.
-- [!] Diseñar una entrega confiable de telemetría con cola durable, deduplicación e idempotencia. Los eventos ocurridos sin conexión deben sincronizarse al recuperarla y no pueden depender de un único `fetch` durante `beforeunload`.
+- [~] La pérdida de foco usa una outbox IndexedDB independiente, UUID idempotente, control de versión y sincronización al recuperar conectividad. Extender el mismo patrón a otras clases de incidente cuando exista contrato.
 - [ ] Informar al alumno de manera clara qué incidente se detectó, qué acción debe realizar, cuántas tolerancias quedan si aplica y si el evento está pendiente de sincronización.
-- [!] Proveer al docente una vista o reporte cronológico de incidentes del intento, diferenciando señales técnicas de una determinación de fraude; requiere endpoint y autorización RBAC docente.
+- [x] Mostrar al docente resumen y detalle cronológico de pérdidas de foco dentro de la corrección, aclarando que son señales informativas sin consecuencia académica automática.
 - [ ] Diseñar pruebas manuales específicas para recarga, salida de fullscreen, cambio de pestaña, minimización, pérdida de foco, desconexión, sesión vencida y combinaciones concurrentes, incluyendo el tiempo hasta retomar.
 
 ### Backlog funcional de evaluaciones detectado en validación
 
-- [!] Permitir al docente corregir y comentar una pregunta abierta sin respuesta. Requiere definir si se crea una respuesta vacía o si la corrección/comentario pertenece a la relación intento-pregunta sin `Respuesta` existente.
+- [x] Permitir al docente corregir y comentar una pregunta sin respuesta mediante `IntentoPregunta`, sin crear una `Respuesta` artificial. Resuelto en la Fase 13, etapa 2.
 - [ ] Renderizar preguntas de programación/SQL como desarrollo y no como opción múltiple; confirmar los valores efectivos de `Tipo` y reutilizar el guardado de texto/código.
 - [ ] Eliminar nombres y títulos de evaluaciones hardcodeados y mostrarlos desde publicación/actividad.
 - [!] Definir la semántica de múltiples intentos: un único examen visible con historial de intentos y una regla explícita para promedio, mejor intento, último intento o intento válido. Requiere decisión funcional y revisión de API/SQL.
@@ -460,40 +460,138 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 
 ### Rutas y vistas del banco
 
-- [ ] Agregar el acceso desde la navegación docente existente, sin crear un layout o sidebar global nuevo.
-- [ ] Crear `/profesor/banco-preguntas` como workspace responsive con pestañas accesibles para Preguntas y Grupos, filtros sincronizables con URL, paginación server-side, loading, error y empty states.
-- [ ] Crear `/profesor/banco-preguntas/preguntas/nueva` y `/profesor/banco-preguntas/preguntas/[id]/editar` reutilizando un editor de pregunta compartido con la creación de evaluaciones.
-- [ ] Crear `/profesor/banco-preguntas/grupos/nuevo` y `/profesor/banco-preguntas/grupos/[id]/editar` reutilizando el editor de grupo y permitiendo combinar preguntas existentes y nuevas.
+- [x] Agregar el acceso desde la navegación docente existente, sin crear un layout o sidebar global nuevo.
+- [x] Crear `/profesor/banco-preguntas` como workspace responsive con pestañas accesibles para Preguntas y Grupos, filtros sincronizables con URL, paginación server-side, loading, error y empty states.
+- [x] Crear `/profesor/banco-preguntas/preguntas/nueva` y `/profesor/banco-preguntas/preguntas/[id]/editar` reutilizando `QuestionContentEditor` con la creación de evaluaciones.
+- [x] Crear `/profesor/banco-preguntas/grupos/nuevo` y `/profesor/banco-preguntas/grupos/[id]/editar`; la creación permite combinar preguntas existentes y nuevas de forma transaccional y la edición reemplaza la composición con preguntas existentes.
 - [ ] Incorporar gestión accesible de etiquetas sin desviar al docente del editor; soportar creación, renombrado, eliminación y conflictos 409.
 - [ ] Mostrar estado, revisión y procedencia con texto además de color; confirmar archivado/restauración y comunicar los grupos afectados por cambios de una variante.
 - [ ] Tratar un 409 de revisión como conflicto visible: conservar la edición local, ofrecer recarga explícita y no sobrescribir silenciosamente.
 
 ### Creación y edición de evaluaciones
 
-- [ ] Extender `src/lib/schemas/examSchema.ts`, tipos y `src/lib/exam-form.ts` para representar `Estado`, `RevisionEsperada`, `ImportacionesBanco`, referencias opcionales y resultados de mappings sin mezclar shapes de UI con payloads HTTP.
-- [ ] Implementar “Guardar borrador” en `/profesor/crear-examen`: persistir estructura incompleta y configuraciones ingresadas; para valores todavía vacíos, mostrar y enviar los defaults documentados del backend (1 intento, 90 minutos, apertura actual + 5 minutos y cierre + 24 horas) de forma explícita y editable.
-- [ ] Adaptar `/profesor/examen/[idPublicacion]` para editar únicamente borradores, conservar IDs anidados y revisión, y evitar que un reemplazo completo elimine grupos omitidos accidentalmente.
-- [ ] Agregar un selector de banco accesible dentro del editor, con búsqueda, filtros, selección múltiple, resumen previo e importación como copia independiente; nunca usar IDs del banco como IDs de evaluación.
-- [ ] Permitir “Guardar en mi banco” sobre una pregunta o grupo específico durante creación o edición, sin exigir guardar ni publicar antes la evaluación completa. Para grupos mixtos usar la unión discriminada del endpoint compuesto.
-- [ ] Mantener la edición local después de guardar en el banco y reflejar la referencia resultante sin prometer sincronización futura.
-- [ ] Mover “+ Añadir Pregunta Estructural” debajo del último grupo/pregunta, manteniendo una acción visible y alcanzable por teclado al final de la estructura.
+- [x] Extender tipos, schemas y transformadores con `RevisionEsperada`, IDs anidados, `ImportacionesBanco`, referencias de procedencia y publicación completa sin mezclar shapes de UI con payloads HTTP.
+- [x] Implementar “Guardar borrador” en `/profesor/crear-examen`: persiste estructura incompleta y configuraciones ingresadas, con defaults visibles de un intento, 90 minutos, apertura +5 minutos y cierre +24 horas.
+- [x] Crear `/profesor/examen/[idPublicacion]/editar` para editar únicamente borradores, conservar IDs anidados y revisión, y reemplazar la estructura completa desde el estado cargado.
+- [!] Limitación backend detectada: `GET /api/evaluaciones/:id/detalle` no devuelve `idMateriaDivision` y usa `INNER JOIN` para grupos/preguntas. El frontend resuelve la comisión solo si materia/división tiene una coincidencia única y mantiene al menos una variante por grupo, pero el contrato debería devolver el ID y representar grupos vacíos para garantizar round-trip fiel de cualquier borrador.
+- [x] Agregar un selector de banco accesible dentro del editor, con búsqueda, filtros, selección múltiple, resumen previo e importación como copia independiente; los IDs del banco solo viajan en referencias/importaciones.
+- [x] Permitir “Guardar en mi banco” sobre una pregunta o grupo específico durante creación o edición, sin exigir guardar ni publicar antes la evaluación completa. Los grupos usan la unión discriminada del endpoint compuesto.
+- [x] Mantener la edición local después de guardar en el banco y reflejar la referencia de procedencia sin prometer sincronización futura.
+- [x] Mover “+ Añadir Pregunta Estructural” debajo del último grupo/pregunta, manteniendo una acción visible y alcanzable por teclado al final de la estructura.
 
 ### Publicación transaccional
 
-- [ ] Sustituir la publicación legacy por `POST /api/evaluaciones/:idActividad/publicar-completo`.
-- [ ] Mostrar “Guardar todas las preguntas en mi banco” desmarcado por defecto y explicar que solo afecta contenido que todavía no fue guardado individualmente.
-- [ ] Enviar contenido final, publicación, revisión, importaciones y `GuardarTodoEnBanco` en una única operación; un fallo del banco debe dejar la evaluación sin publicar.
-- [ ] Generar una `Idempotency-Key` UUID por intención del usuario, bloquear doble clic y conservar exactamente la misma clave y body ante reintentos de resultado incierto.
+- [x] Sustituir la publicación legacy por `POST /api/evaluaciones/:idActividad/publicar-completo`; una evaluación nueva se guarda primero como borrador.
+- [x] Mostrar “Guardar todas las preguntas en mi banco” desmarcado por defecto y explicar que lo guardado individualmente se conserva aunque no se active.
+- [x] Enviar contenido final, publicación, revisión, importaciones y `GuardarTodoEnBanco` en una única operación transaccional.
+- [x] Generar una `Idempotency-Key` UUID por intención del usuario, bloquear doble clic y conservar exactamente la misma clave y body ante reintentos de resultado incierto.
 - [ ] No reintentar automáticamente con clave nueva ante 409; distinguir revisión del borrador, revisión del banco y reutilización inválida de clave.
-- [ ] Tras éxito, reconciliar IDs/revisiones/mappings devueltos, invalidar evaluaciones y banco, y navegar únicamente cuando la publicación haya sido confirmada.
+- [x] Tras éxito, invalidar detalle, evaluaciones docentes y banco, y navegar únicamente cuando la publicación haya sido confirmada. Los mappings se recuperan desde el detalle de la evaluación de destino.
 
 ### Calidad y verificación
 
+- [x] Agregar pruebas focalizadas de schemas de banco/borrador, transformadores con IDs, servicios, hooks, idempotencia y editor compartido de contenido.
 - [ ] Probar editores de pregunta/grupo, filtros, paginación, selección por teclado, estados y conflictos de revisión.
-- [ ] Probar borrador incompleto, conservación de configuración, importación, guardado individual y publicación con la opción desmarcada/marcada.
-- [ ] Probar idempotencia de doble clic y reintento, rollback visible y que una copia modificada no altere su origen.
-- [ ] Agregar E2E del flujo crítico docente: crear banco directo → guardar borrador → importar/guardar individual → publicar transaccional.
-- [ ] Validar ESLint focalizado, suite Vitest, typecheck, E2E relacionado y build.
+- [x] Probar borrador incompleto, conservación de configuración, importación, guardado individual y publicación con la opción desmarcada/marcada mediante schemas, transformadores, hooks, componentes y E2E.
+- [!] Idempotencia estable, bloqueo de doble clic y rollback funcional quedan cubiertos por hooks/UI y el contrato backend; resta una prueba frontend específica de respuesta 409 con recarga explícita.
+- [x] Agregar E2E del flujo crítico docente: guardar contenido individual → seleccionar/importar → guardar borrador → publicar transaccionalmente con opción de banco explícita.
+- [x] Validar ESLint focalizado, 111 tests Vitest, typecheck, 9 E2E y build de producción aislado.
+
+---
+
+## Fase 13 — Calificación configurable e intentos válidos
+
+**Estado: EN PROGRESO — 2026-10-12**
+
+### Etapa 1 — Configuración y persistencia fundacional
+
+- [x] Backend: incorporar escalas 10/100, nota de aprobación, puntajes iguales o personalizados por grupo, visibilidad para el alumno y corrección automática configurable, sin recalificar intentos históricos.
+- [x] Backend: ampliar snapshots y persistencia de corrección, preparar auditorías, override de intento válido e incidentes de foco para etapas posteriores, y actualizar los SP existentes de inicio/render/finalización.
+- [x] Sincronizar `docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` después de la entrega backend.
+- [x] Extender tipos, schemas y transformadores del formulario con la configuración de calificación y `PuntajeMaximo` por grupo.
+- [x] Incorporar el editor accesible de escala, umbral, distribución, visibilidad y corrección automática en creación y edición de borradores.
+- [x] Permitir puntajes personalizados incompletos al guardar borrador y exigir suma exacta en centavos al publicar.
+- [x] Ajustar proporcionalmente la nota de aprobación y los puntajes cargados al cambiar entre escala 10 y 100, notificando el cambio al docente.
+- [x] En modo personalizado, exigir guardar primero las importaciones pendientes del banco para poder asignarles puntaje antes de publicar.
+- [x] Mostrar la configuración y puntajes en el detalle docente y el puntaje máximo en el examen del alumno únicamente cuando el backend lo incluye.
+- [x] Agregar pruebas focalizadas para distribución decimal, cambio proporcional, validación, transformación de payloads, editor y render del alumno.
+- [x] Validar la etapa: ESLint focalizado sin errores, 120 tests Vitest, los 9 escenarios E2E y build de producción con TypeScript completado.
+
+### Etapa 2 — Corrección por pregunta y override final
+
+- [x] Backend: corregir por `puntajeObtenido` sobre `IntentoPregunta`, admitir omisiones y reemplazo de autocorrecciones, recalcular notas y auditar cada modificación.
+- [x] Backend: convertir `calificar` en un override final auditado que conserva separadas nota calculada, manual y efectiva.
+- [x] Sincronizar `docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` después de la entrega backend.
+- [x] Extender tipos, servicio y hook con el contrato canónico camelCase y las respuestas de calificación.
+- [x] Rehacer la pantalla docente para corregir todas las preguntas con puntaje parcial y comentario, incluyendo cerradas automáticas y preguntas omitidas.
+- [x] Mostrar desglose de nota automática, calculada, manual y efectiva usando escala y umbral reales.
+- [x] Incorporar confirmación explícita para el override final y bloquearlo mientras no exista nota calculada completa.
+- [x] Actualizar la revisión del alumno para usar escala, umbral y comentario canónico, sin ampliar todavía la política de acceso a revisiones.
+- [x] Agregar pruebas unitarias de validación, servicios, hooks y componentes, y adaptar el E2E de corrección al contrato por puntaje.
+- [x] Validar la etapa: ESLint focalizado sin errores, 131 tests Vitest, 9 escenarios E2E y build de producción con TypeScript completado.
+- [!] El contrato efectivo de `GET /intentos/:idIntento/completo` no expone todavía `idIntentoPregunta` ni `estadoCorreccion` aunque fueron mencionados en el resumen de entrega. La UI opera por `idPregunta` y deriva el estado desde `puntajeObtenido`; solicitar esos campos sólo si un flujo futuro los necesita de forma explícita.
+- [ ] Validar manualmente contra SQL Server real: puntaje parcial, pregunta omitida, reemplazo de autocorrección, escala 100 y override final. Ejecutar nuevamente el verificador SQL ampliado.
+
+### Etapa 3 — Intento académicamente válido
+
+- [x] Backend: entregar listado resumido por alumno/publicación, selección manual auditada y reversión a la regla automática del último intento entregado.
+- [x] Sincronizar `docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` después de las etapas 3 y 4.
+- [x] Incorporar tipos, servicios, query keys y hooks para consultar, seleccionar y restaurar el intento válido.
+- [x] Agrupar la gestión docente por alumno y ofrecer un modal accesible que conserva todos los intentos, sólo permite seleccionar entregados y confirma cambios académicos explícitamente.
+- [x] Invalidar tanto el detalle de intentos como el listado de alumnos después de cada cambio.
+- [x] Validar la integración con pruebas de servicio, hook, componente y E2E.
+- [!] Backend pendiente de validación manual contra SQL Server real para selección/reemplazo/eliminación y una carrera concurrente; el frontend no depende de esa validación para compilar.
+
+### Etapa 4 — Historial filtrable del alumno
+
+- [x] Backend: entregar `GET /api/intentos/mios` paginado, filtrable, ordenable, identificado por JWT y basado en el intento válido.
+- [x] Incorporar tipos, servicio, query key y hook del historial propio sin enviar matrícula desde el navegador.
+- [x] Rehacer `/alumno/resultados` con resumen académico, filtros combinables sincronizados con URL, ordenamiento, paginación, loading, error y empty state.
+- [x] Mostrar escala, umbral, estado, resultado e intento académico sin volver a calcular aprobación en cliente.
+- [x] Reutilizar `ReportFilterPanel`, `ReportKpiGrid`, `Pagination`, estados comunes y catálogos actuales de materias/comisiones.
+- [x] Validar la etapa: ESLint focalizado sin errores, 144 tests Vitest, 11 escenarios E2E y build de producción con TypeScript completado.
+- [!] Backend pendiente de validación manual de filtros combinados y plan de ejecución con volumen representativo.
+
+### Etapa 5 — Reportes operativos y escalas mixtas
+
+- [x] Backend: incorporar `alcanceIntentos=todos|validos`, filtro de pendientes, umbrales configurables y normalización base 10 entre escalas.
+- [x] Sincronizar la documentación backend y ampliar contratos TypeScript sin recalcular métricas en cliente.
+- [x] Agregar a ambos reportes el selector de alcance académico sincronizado con URL y el filtro de publicaciones con/sin correcciones pendientes.
+- [x] Presentar agregados globales normalizados sobre 10 y promedios de cada publicación en su escala original.
+- [x] Mantener contadores operativos de todos los intentos y explicar cuántos participan en el cálculo académico.
+- [!] Backend pendiente de comprobación manual con escalas mixtas, overrides y volumen representativo.
+
+### Etapa 6 — Incidentes de pérdida de foco
+
+- [x] Backend: entregar escritura idempotente y lecturas docentes de resumen/listado sin consecuencias académicas automáticas.
+- [x] Incorporar tipos, servicios, query keys y hooks de lectura/escritura.
+- [x] Registrar `blur/focus` y cambios de visibilidad sin duplicar el evento, con UUID estable y cierre sobre el mismo recurso.
+- [x] Incorporar una outbox IndexedDB independiente para sincronización offline, replay seguro y protección frente a confirmaciones tardías.
+- [x] Mostrar resumen y cronología informativa en la pantalla docente de corrección.
+- [x] Agregar pruebas focalizadas de contrato, outbox, listeners, filtros y flujo E2E.
+- [x] Validar la integración: ESLint focalizado, TypeScript, 149 tests Vitest, 3 E2E afectados y build de producción.
+- [!] El controlador backend efectivo responde `200` también en la primera creación, aunque el resumen de entrega indicó `201`; el frontend admite ambos estados y no depende de esa diferencia.
+- [!] El listado efectivo de incidentes devuelve un array completo sin paginación, pese a que el diseño inicial la mencionaba. La UI lo consume así; paginar requiere una evolución coordinada del contrato.
+- [!] Backend pendiente de validación contra SQL Server real para concurrencia, sincronización tardía y volumen. La ventana efectiva documentada es de siete días.
+
+---
+
+## Fase 14 — Respuestas múltiples, justificación y revisión
+
+**Estado: EN PROGRESO — 2026-10-13**
+
+### Etapa 1 — Edición y persistencia fundacional
+
+- [x] Backend: incorporar `multiple`, modos de justificación, estrategias de corrección, tratamiento manual/informativo y hash de contenido, preservando defaults legacy.
+- [x] Sincronizar `docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` después de la entrega backend.
+- [x] Ampliar tipos, schemas y transformadores de evaluación y banco sin crear endpoints ni query keys nuevos.
+- [x] Reutilizar `QuestionContentEditor` para selección única/múltiple, varias respuestas correctas y configuración accesible de justificación y corrección. La justificación se ofrece después de las opciones únicamente en `mc`, `multiple` y `vf`; desarrollo y programación fuerzan `sin_justificacion`.
+- [x] Conservar la configuración en preguntas independientes, grupos compuestos, borradores y copias entre banco y evaluación; `contenidoHash` permanece de solo lectura y no se calcula en cliente.
+- [x] Permitir guardar contenido nuevo en borradores/banco y bloquear su publicación con un mensaje funcional mientras el runtime de alumno no esté disponible.
+- [x] Proteger el runtime actual del alumno para que `multiple` no se interprete como selección única ni como respuesta abierta.
+- [x] Agregar pruebas focalizadas de UI, schemas, defaults, transformadores, copias, bloqueo temporal y mensaje `QUESTION_RUNTIME_NOT_AVAILABLE`.
+- [!] Requisito de despliegue: aplicar dos veces `20261013_respuestas_multiples_justificacion.sql`, después de `20261011_calificacion_intentos_telemetria.sql`, y ejecutar `verificar-respuestas-multiples-justificacion.sql` contra SQL Server real.
+- [ ] Etapa 2 backend/frontend: habilitar renderizado, persistencia de selecciones múltiples y justificación durante el intento; hasta entonces el contenido nuevo no puede publicarse.
 
 ---
 
@@ -508,8 +606,10 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 7. [x] Componentes, formularios y accesibilidad transversal consolidados en las Fases 6, 7 y 9.
 8. [x] Incorporar testing frontend — cobertura unitaria, integración y E2E crítica completada.
 9. [ ] Completar Fase 12 — Banco privado de preguntas y borradores de evaluación.
-10. [ ] Completar documentación, limpieza y rendimiento medido.
+10. [ ] Completar Fase 13 — Calificación configurable, corrección e intentos válidos por etapas coordinadas con backend.
+11. [ ] Completar Fase 14 — Respuestas múltiples, justificación y revisión por etapas coordinadas con backend.
+12. [ ] Completar documentación, limpieza y rendimiento medido.
 
 ## Próximo paso
 
-Implementar las rutas y los editores reutilizables del banco, comenzando por el workspace docente y la creación directa de preguntas y grupos. Después integrar esos mismos editores con el borrador de evaluación.
+Completar la gestión de etiquetas/estados y el tratamiento explícito de conflictos 409 del banco y de borradores, sin ampliar incidentalmente el alcance de los editores ya integrados.

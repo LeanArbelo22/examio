@@ -3,7 +3,8 @@
 import { use } from "react";
 import Link from "next/link";
 import { useGetIntentoCompleto } from "@/hooks/useEvaluaciones";
-import type { IntentoCompleto, PreguntaIntento, OpcionIntento } from "@/types/index";
+import type { PreguntaIntento, OpcionIntento } from "@/types/index";
+import { formatGrade } from "@/lib/attempt-grading";
 
 const TIPO_BADGE: Record<string, { label: string; className: string }> = {
   mc: { label: "Múltiple", className: "bg-cyan-50 text-cyan-700 border border-cyan-200" },
@@ -46,10 +47,11 @@ export default function RevisionAlumnoPage({ params }: { params: Promise<{ idInt
 
   const tieneNotaFinal = data.notaFinal !== null;
   const nota = tieneNotaFinal ? data.notaFinal : data.notaAutomatica;
+  const notaAprobacion = data.notaAprobacion;
 
   function notaColor(): string {
     if (!tieneNotaFinal) return "text-slate-700";
-    return nota !== null && nota >= 6 ? "text-emerald-600" : "text-red-500";
+    return nota !== null && nota >= notaAprobacion ? "text-emerald-600" : "text-red-500";
   }
 
   return (
@@ -69,7 +71,7 @@ export default function RevisionAlumnoPage({ params }: { params: Promise<{ idInt
             <div className="text-right">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Nota</p>
               <p className={`text-2xl font-black ${nota !== null ? notaColor() : "text-slate-300"}`}>
-                {nota !== null ? nota.toFixed(1) : "—"}
+                {formatGrade(nota, data.escalaCalificacion)}
               </p>
             </div>
             <Link
@@ -182,10 +184,10 @@ export default function RevisionAlumnoPage({ params }: { params: Promise<{ idInt
                 </div>
 
                 {/* Comentarios del docente */}
-                {p.respuesta?.comentariosDocente && (
+                {(p.comentariosDocente ?? p.respuesta?.comentariosDocente) && (
                     <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-150 text-sm text-slate-600 italic shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)]">
                         <p className="font-bold mb-1">💬 Devolución del docente:</p>
-                        <p className="whitespace-pre-wrap">{p.respuesta.comentariosDocente}</p>
+                        <p className="whitespace-pre-wrap">{p.comentariosDocente ?? p.respuesta?.comentariosDocente}</p>
                     </div>
                 )}
               </div>

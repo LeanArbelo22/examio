@@ -12,7 +12,48 @@ const routeLabels: Record<string, string> = {
   configuracion: "Configuración",
   historial: "Historial",
   reportes: "Reportes",
+  "crear-examen": "Crear actividad",
+  examen: "Evaluaciones",
+  intento: "Intentos",
+  detalle: "Detalle",
+  actividad: "Actividad",
+  "banco-preguntas": "Banco de preguntas",
+  preguntas: "Preguntas",
+  grupos: "Grupos",
+  nueva: "Nueva",
+  nuevo: "Nuevo",
+  editar: "Editar",
 };
+
+const nonNavigablePaths = new Set([
+  "/profesor/examen",
+  "/profesor/intento",
+  "/alumno/intento",
+  "/profesor/banco-preguntas/preguntas",
+  "/profesor/banco-preguntas/grupos",
+]);
+
+function getSegmentLabel(segment: string, previousSegment?: string): string {
+  if (/^\d+$/.test(segment)) {
+    if (previousSegment === "examen") return `Evaluación #${segment}`;
+    if (previousSegment === "intento") return `Intento #${segment}`;
+    if (previousSegment === "preguntas") return `Pregunta #${segment}`;
+    if (previousSegment === "grupos") return `Grupo #${segment}`;
+  }
+
+  if (routeLabels[segment]) return routeLabels[segment];
+
+  return decodeURIComponent(segment)
+    .split("-")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function isNavigablePath(href: string): boolean {
+  if (nonNavigablePaths.has(href)) return false;
+  return !/^\/profesor\/banco-preguntas\/(preguntas|grupos)\/\d+$/.test(href);
+}
 
 export function Breadcrumbs() {
   const pathname = usePathname();
@@ -43,18 +84,17 @@ export function Breadcrumbs() {
       {segments.map((segment, index) => {
         const isLast = index === segments.length - 1;
         const href = `/${segments.slice(0, index + 1).join("/")}`;
-        const label =
-          routeLabels[segment] ||
-          segment.charAt(0).toUpperCase() + segment.slice(1);
+        const label = getSegmentLabel(segment, segments[index - 1]);
+        const isLink = !isLast && isNavigablePath(href);
 
         return (
           <div key={href} className="flex items-center space-x-2">
             <span className="text-slate-300 select-none font-normal">/</span>
 
-            {isLast ? (
+            {!isLink ? (
               <span
-                className="text-slate-800 font-semibold tracking-tight"
-                aria-current="page"
+                className={isLast ? "text-slate-800 font-semibold tracking-tight" : "text-slate-500"}
+                aria-current={isLast ? "page" : undefined}
               >
                 {label}
               </span>

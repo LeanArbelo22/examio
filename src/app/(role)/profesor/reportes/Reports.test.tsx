@@ -79,6 +79,11 @@ vi.mock("@/components/reports/StudentReportDetail", () => ({
 }));
 
 const evaluationReport: ReporteEvaluacionesListado = {
+  criterios: {
+    alcanceIntentos: "todos",
+    escalaPromedio: 10,
+    conPendientesCorreccion: null,
+  },
   kpis: {
     totalEvaluaciones: 2,
     totalAlumnosAlcanzados: 35,
@@ -88,9 +93,11 @@ const evaluationReport: ReporteEvaluacionesListado = {
     totalEnProgreso: 2,
     totalVencidos: 1,
     totalAnulados: 1,
+    totalIntentosAlcanceAcademico: 24,
     totalIntentosCalificados: 20,
     intentosPendientesCorreccion: 4,
     promedioIntentosCalificados: 7.25,
+    promedioIntentosCalificadosBase10: 7.25,
     tasaAprobacionIntentos: 75,
   },
   graficos: {
@@ -111,6 +118,8 @@ const evaluationReport: ReporteEvaluacionesListado = {
       fechaInicio: "2026-08-01T12:00:00.000Z",
       fechaFin: "2026-08-01T14:00:00.000Z",
       estado: "publicada",
+      escalaCalificacion: 10,
+      notaAprobacion: 6,
       alumnosAlcanzados: 20,
       alumnosQueIniciaron: 18,
       sinIniciar: 2,
@@ -119,9 +128,11 @@ const evaluationReport: ReporteEvaluacionesListado = {
       enProgreso: 1,
       vencidos: 1,
       anulados: 0,
+      intentosAlcanceAcademico: 14,
       intentosCalificados: 14,
       intentosPendientesCorreccion: 2,
       promedioIntentosCalificados: 7.5,
+      promedioIntentosCalificadosBase10: 7.5,
       intentosAprobados: 11,
       intentosDesaprobados: 3,
       porcentajeAprobacionIntentos: 78.57,
@@ -135,7 +146,10 @@ const studentReport: ReporteRendimientoListado = {
     totalAlumnos: 30,
     conIntentos: 25,
     totalIntentos: 40,
+    intentosAlcanceAcademico: 32,
     promedioGeneral: 7.4,
+    escalaPromedio: 10,
+    alcanceIntentos: "todos",
     tasaAprobacion: 72.5,
   },
   alumnos: [
@@ -144,8 +158,11 @@ const studentReport: ReporteRendimientoListado = {
       nombre: "Ada",
       apellido: "Lovelace",
       totalIntentos: 2,
+      intentosAlcanceAcademico: 2,
       totalCorregidos: 2,
       promedio: 9,
+      escalaPromedio: 10,
+      alcanceIntentos: "todos",
       aprobados: 2,
       desaprobados: 0,
       porcentajeAprobacion: 100,
@@ -209,6 +226,24 @@ describe("reportes docentes", () => {
       screen.getByText("La fecha desde no puede ser posterior a la fecha hasta."),
     ).toBeVisible();
     expect(reportMocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("sincroniza alcance académico y pendientes con la URL", async () => {
+    const user = userEvent.setup();
+    render(<EvaluacionesReport />);
+
+    await user.selectOptions(screen.getByLabelText("Resultados académicos"), "validos");
+    await user.selectOptions(screen.getByLabelText("Correcciones pendientes"), "true");
+    await user.click(screen.getByRole("button", { name: "Buscar" }));
+
+    expect(reportMocks.replace).toHaveBeenCalledWith(
+      expect.stringContaining("alcanceIntentos=validos"),
+      { scroll: false },
+    );
+    expect(reportMocks.replace).toHaveBeenCalledWith(
+      expect.stringContaining("conPendientesCorreccion=true"),
+      { scroll: false },
+    );
   });
 
   it("presenta KPIs globales pero gráficos y tabla de la página del reporte por alumno", async () => {

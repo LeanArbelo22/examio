@@ -24,9 +24,18 @@ interface ReportFilterPanelProps {
   definitions: ReportFilterDefinition[];
   onSearch: (filters: Record<string, string>) => void;
   onClear: () => void;
+  title?: string;
+  description?: string;
 }
 
-export function ReportFilterPanel({ filters, definitions, onSearch, onClear }: ReportFilterPanelProps) {
+export function ReportFilterPanel({
+  filters,
+  definitions,
+  onSearch,
+  onClear,
+  title = "Filtros del reporte",
+  description = "Combiná criterios para acotar los resultados.",
+}: ReportFilterPanelProps) {
   const [draft, setDraft] = useState(filters);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -38,8 +47,8 @@ export function ReportFilterPanel({ filters, definitions, onSearch, onClear }: R
     <form onSubmit={submit} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-sm font-bold text-slate-800">Filtros del reporte</h2>
-          <p className="mt-0.5 text-xs text-slate-400">Combiná criterios para acotar los resultados.</p>
+          <h2 className="text-sm font-bold text-slate-800">{title}</h2>
+          <p className="mt-0.5 text-xs text-slate-400">{description}</p>
         </div>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

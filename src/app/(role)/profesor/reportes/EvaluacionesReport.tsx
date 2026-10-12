@@ -37,6 +37,8 @@ const FILTER_KEYS = [
   "estado",
   "fechaDesde",
   "fechaHasta",
+  "alcanceIntentos",
+  "conPendientesCorreccion",
 ] as const;
 
 function uniqueOptions<T>(
@@ -78,6 +80,13 @@ export function EvaluacionesReport() {
         FILTER_KEYS.map((key) => [key, searchParams.get(key) ?? ""]),
       ),
       estado: (searchParams.get("estado") ?? "") as ReporteEvaluacionesFiltros["estado"],
+      alcanceIntentos:
+        (searchParams.get("alcanceIntentos") as ReporteEvaluacionesFiltros["alcanceIntentos"]) ||
+        undefined,
+      conPendientesCorreccion:
+        searchParams.get("conPendientesCorreccion") === null
+          ? ""
+          : searchParams.get("conPendientesCorreccion") === "true",
       ordenarPor:
         (searchParams.get("ordenarPor") as ReporteEvaluacionesOrden) ||
         "fecha",
@@ -165,6 +174,21 @@ export function EvaluacionesReport() {
       },
       { key: "fechaDesde", label: "Fecha desde", type: "date" },
       { key: "fechaHasta", label: "Fecha hasta", type: "date" },
+      {
+        key: "alcanceIntentos",
+        label: "Resultados académicos",
+        type: "select",
+        options: [{ value: "validos", label: "Sólo intento válido" }],
+      },
+      {
+        key: "conPendientesCorreccion",
+        label: "Correcciones pendientes",
+        type: "select",
+        options: [
+          { value: "true", label: "Con pendientes" },
+          { value: "false", label: "Sin pendientes" },
+        ],
+      },
     ],
     [materias, comisiones, evaluaciones],
   );
@@ -250,7 +274,7 @@ export function EvaluacionesReport() {
         sortKey: "promedio",
         render: (row) => (
           <span className="font-black text-slate-800">
-            {formatNullable(row.promedioIntentosCalificados)}
+            {formatNullable(row.promedioIntentosCalificados)} / {row.escalaCalificacion}
           </span>
         ),
       },
@@ -322,15 +346,15 @@ export function EvaluacionesReport() {
               {
                 id: "promedio",
                 label: "Promedio por intento",
-                value: formatNullable(data.kpis.promedioIntentosCalificados),
-                helper: `${data.kpis.totalIntentosCalificados.toLocaleString("es-AR")} calificados`,
+                value: formatNullable(data.kpis.promedioIntentosCalificadosBase10),
+                helper: `Sobre 10 · ${data.kpis.totalIntentosCalificados.toLocaleString("es-AR")} calificados`,
                 tone: "amber",
               },
               {
                 id: "aprobacion",
                 label: "Aprobación por intento",
                 value: formatNullable(data.kpis.tasaAprobacionIntentos, "%"),
-                helper: `${data.kpis.intentosPendientesCorreccion.toLocaleString("es-AR")} pendientes`,
+                helper: `${data.kpis.intentosPendientesCorreccion.toLocaleString("es-AR")} pendientes · ${data.criterios.alcanceIntentos === "validos" ? "intentos válidos" : "todos los intentos"}`,
                 tone: "emerald",
               },
             ]}

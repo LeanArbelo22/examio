@@ -6,7 +6,14 @@ async function login(page: Page, email: string) {
   await page.goto("/login");
   await page.getByLabel("Correo electrónico").fill(email);
   await page.getByLabel("Contraseña").fill(password);
+  const callback = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/auth/callback/credentials") &&
+      response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Ingresar" }).click();
+  expect((await callback).status()).toBe(200);
+  await page.goto("/");
 }
 
 test("una ruta protegida redirige al login", async ({ page }) => {
@@ -81,6 +88,23 @@ test("el alumno responde dentro del examen sin exponer credenciales", async ({ p
   await page.getByText("Opción persistida").click();
   await expect(page.getByText("Guardado", { exact: true })).toBeVisible();
 
+  const completedFocusEvent = page.waitForRequest(
+    (request) =>
+      /\/api\/examio\/telemetria\/intentos\/73\/incidentes\/[0-9a-f-]+$/i.test(request.url()) &&
+      request.method() === "PUT" &&
+      Boolean(request.postDataJSON().FechaFinCliente),
+  );
+  let finalizedByFocusLoss = false;
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/examio/intentos/73/finalizar")) {
+      finalizedByFocusLoss = true;
+    }
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await completedFocusEvent;
+  expect(finalizedByFocusLoss).toBe(false);
+
   const storage = await page.evaluate(() => ({
     local: Object.keys(localStorage),
     session: Object.keys(sessionStorage),
@@ -95,12 +119,124 @@ test("el docente abre un intento y corrige una respuesta abierta", async ({ page
   await page.goto("/profesor/intento/73");
 
   await expect(page.getByRole("heading", { name: "E2E, Alumno" })).toBeVisible();
-  await expect(page.getByText("Respuesta del alumno")).toBeVisible();
+  await expect(page.getByText("Respuesta del alumno").last()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Actividad fuera del examen" })).toBeVisible();
   const correction = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/examio/intentos/73/preguntas/502/corregir") &&
       response.request().method() === "PUT",
   );
-  await page.getByRole("button", { name: /Correcta$/ }).click();
+  await page.getByLabel("Puntaje obtenido").fill("1.5");
+  await page.getByLabel(/Devolución del docente/).fill("Respuesta parcial");
+  await page.getByRole("button", { name: "Guardar corrección" }).click();
   expect((await correction).status()).toBe(200);
+  await expect(page.getByText(/La nota del intento fue recalculada/)).toBeVisible();
+});
+
+test("el docente elige el intento que cuenta como resultado académico", async ({ page }) => {
+  await login(page, "docente@cervantes.edu.ar");
+  await page.goto("/profesor/examen/47");
+
+  await page.getByRole("button", { name: "Gestionar intentos" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Intentos de E2E, Alumno" }),
+  ).toBeVisible();
+
+  const changeRequest = page.waitForRequest(
+    (request) =>
+      request.url().endsWith(
+        "/api/examio/evaluaciones/publicaciones/47/alumnos/30001/intento-valido",
+      ) && request.method() === "PUT",
+  );
+  await page.getByRole("button", { name: "Elegir como resultado" }).click();
+  await page.getByRole("button", { name: "Confirmar selección" }).click();
+
+  expect((await changeRequest).postDataJSON()).toEqual({ IdIntento: 72 });
+  await expect(
+    page.getByText("El intento elegido se usará como resultado académico."),
+  ).toBeVisible();
+});
+
+test("el alumno consulta su historial filtrable con el intento académico visible", async ({ page }) => {
+  await login(page, "alumno@cervantes.edu.ar");
+  await page.goto("/alumno/resultados?resultado=aprobado");
+
+  await expect(
+    page.getByRole("heading", { name: "Mi historial de actividades" }),
+  ).toBeVisible();
+  await expect(page.getByText("Evaluación E2E")).toBeVisible();
+  await expect(page.getByText("8.00 / 10")).toBeVisible();
+  await expect(page.getByText("Resultado académico")).toBeVisible();
+  await expect(page.getByText("2 intentos encontrados")).toBeVisible();
+});
+
+test("el docente guarda contenido individual, importa del banco y publica transaccionalmente", async ({ page }) => {
+  await login(page, "docente@cervantes.edu.ar");
+  await expect(page).toHaveURL(/\/profesor$/);
+  await page.goto("/profesor/crear-examen");
+
+  await page.getByLabel("Título", { exact: true }).fill("Evaluación banco E2E");
+  await page.getByLabel("Asignar a comisión").selectOption("12");
+  await page.getByPlaceholder("Título del grupo 1").fill("Protocolos");
+  await page.getByLabel("Tipo de variante 1").selectOption("abierta");
+  await page.getByLabel("Enunciado de variante 1").fill("Explicá TCP");
+
+  const saveQuestion = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/examio/banco-preguntas/preguntas") &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Guardar en banco" }).click();
+  expect((await saveQuestion).status()).toBe(201);
+  await expect(page.getByText("En banco", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Agregar desde mi banco" }).click();
+  await page.getByRole("checkbox", { name: /Pregunta disponible E2E/ }).check();
+  await page.getByRole("button", { name: "Agregar selección" }).click();
+  await expect(page.getByText("Pregunta disponible E2E", { exact: true })).toBeVisible();
+
+  const saveDraft = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/api/examio/evaluaciones/guardar-completo") &&
+      request.method() === "POST",
+  );
+  await page.getByRole("button", { name: "Guardar borrador" }).click();
+  const draftRequest = await saveDraft;
+  const draftBody = draftRequest.postDataJSON();
+  expect(draftBody.Estado).toBe("borrador");
+  expect(draftBody).toMatchObject({
+    EscalaCalificacion: 10,
+    NotaAprobacion: 4,
+    ModoPuntaje: "iguales",
+    MostrarPuntajePorPregunta: false,
+    CorreccionAutomaticaCerradas: true,
+  });
+  expect(draftBody.ImportacionesBanco).toEqual([
+    {
+      Tipo: "pregunta",
+      IdPregunta: 601,
+      RevisionEsperada: 2,
+      TituloReferencia: "Pregunta disponible E2E",
+    },
+  ]);
+  expect(draftRequest.headers()["idempotency-key"]).toBeTruthy();
+
+  await expect(page).toHaveURL(/\/profesor\/examen\/77\/editar$/);
+  await page.getByRole("button", { name: "Publicar evaluación" }).click();
+  const saveAll = page.getByRole("checkbox", {
+    name: /Guardar todas las preguntas en mi banco/,
+  });
+  await expect(saveAll).not.toBeChecked();
+  await saveAll.check();
+
+  const publishRequestPromise = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/api/examio/evaluaciones/70/publicar-completo") &&
+      request.method() === "POST",
+  );
+  await page.getByRole("button", { name: "Confirmar publicación" }).click();
+  const publishRequest = await publishRequestPromise;
+  expect(publishRequest.postDataJSON().GuardarTodoEnBanco).toBe(true);
+  expect(publishRequest.headers()["idempotency-key"]).toBeTruthy();
+  await expect(page).toHaveURL(/\/profesor\/examen\/77\/detalle$/);
 });

@@ -48,6 +48,10 @@ vi.mock("@/hooks/useEvaluaciones", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useTelemetria", () => ({
+  useFocusIncidentTracking: vi.fn(),
+}));
+
 async function renderActivityLayout() {
   await act(async () => {
     render(
