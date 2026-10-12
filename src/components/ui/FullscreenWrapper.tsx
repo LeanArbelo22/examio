@@ -80,38 +80,10 @@ export function FullscreenWrapper({
       }
     };
 
-    // Listener de pérdida de foco (Cambiar de pestaña o abrir otra app)
-    const handleWindowBlur = () => {
-      const doc = document as ExamDocument;
-      if (doc.isExitingLegitimately) return; // ESCUDO ACTIVO
-
-      triggerFraudePenalty(
-        "focus_lost",
-        "El alumno cambió de pestaña o minimizó el navegador protegido.",
-      );
-    };
-
-    // Listener de cambio de visibilidad
-    const handleVisibilityChange = () => {
-      const doc = document as ExamDocument;
-      if (doc.isExitingLegitimately) return; // ESCUDO ACTIVO
-
-      if (document.visibilityState === "hidden") {
-        triggerFraudePenalty(
-          "focus_lost",
-          "El alumno ocultó la ventana del examen.",
-        );
-      }
-    };
-
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    window.addEventListener("blur", handleWindowBlur);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      window.removeEventListener("blur", handleWindowBlur);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [isFullscreen, triggerFraudePenalty]);
 

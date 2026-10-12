@@ -19,7 +19,7 @@ import { useGetEvaluacionesDocente } from "@/hooks/useEvaluaciones";
 import { useReporteRendimiento } from "@/hooks/useReportes";
 import type { OrdenDireccion, ReporteRendimientoAlumno, ReporteRendimientoFiltros, ReporteRendimientoOrden } from "@/types/index";
 
-const FILTER_KEYS = ["matricula", "idMateria", "idMateriaDivision", "idActividad", "estado", "fechaDesde", "fechaHasta", "promedioMin", "promedioMax"] as const;
+const FILTER_KEYS = ["matricula", "idMateria", "idMateriaDivision", "idActividad", "estado", "fechaDesde", "fechaHasta", "promedioMin", "promedioMax", "alcanceIntentos"] as const;
 
 function uniqueFilterOptions<T>(
   items: T[],
@@ -51,6 +51,7 @@ export function RendimientoReport() {
   const filters = useMemo<ReporteRendimientoFiltros>(() => ({
     ...Object.fromEntries(FILTER_KEYS.map((key) => [key, searchParams.get(key) ?? ""])),
     estado: (searchParams.get("estado") ?? "") as ReporteRendimientoFiltros["estado"],
+    alcanceIntentos: (searchParams.get("alcanceIntentos") as ReporteRendimientoFiltros["alcanceIntentos"]) || undefined,
     ordenarPor: (searchParams.get("ordenarPor") as ReporteRendimientoOrden) || "alumno",
     ordenDireccion: (searchParams.get("ordenDireccion") as OrdenDireccion) || "asc",
     pagina: Math.max(1, Number(searchParams.get("pagina")) || 1),
@@ -102,9 +103,10 @@ export function RendimientoReport() {
         (item) => item.titulo,
       ),
     },
-    { key: "estado", label: "Estado", type: "select", options: [{ value: "entregado", label: "Entregado" }, { value: "en_progreso", label: "En progreso" }, { value: "vencido", label: "Vencido" }] },
+    { key: "estado", label: "Estado", type: "select", options: [{ value: "entregado", label: "Entregado" }, { value: "en_progreso", label: "En progreso" }, { value: "vencido", label: "Vencido" }, { value: "anulado", label: "Anulado" }] },
     { key: "fechaDesde", label: "Fecha desde", type: "date" }, { key: "fechaHasta", label: "Fecha hasta", type: "date" },
     { key: "promedioMin", label: "Promedio mínimo", type: "number", min: 0, max: 10, step: 0.01 }, { key: "promedioMax", label: "Promedio máximo", type: "number", min: 0, max: 10, step: 0.01 },
+    { key: "alcanceIntentos", label: "Resultados académicos", type: "select", options: [{ value: "validos", label: "Sólo intento válido" }] },
   ], [materias, comisiones, evaluaciones]);
   const visibleFilters = Object.fromEntries(FILTER_KEYS.map((key) => [key, String(filters[key] ?? "")]));
   const search = (values: Record<string, string>) => {
@@ -145,7 +147,7 @@ export function RendimientoReport() {
       />
     )}
     {data && <div className={`space-y-6 transition-opacity ${isFetching ? "opacity-60" : "opacity-100"}`} aria-busy={isFetching}>
-      <ReportKpiGrid items={[{ label: "Promedio general", value: data.kpis.promedioGeneral.toFixed(2), helper: "Sobre 10", tone: "indigo" }, { label: "Total de alumnos", value: data.kpis.totalAlumnos.toLocaleString("es-AR"), helper: `${data.kpis.conIntentos} con intentos`, tone: "blue" }, { label: "Total de intentos", value: data.kpis.totalIntentos.toLocaleString("es-AR"), tone: "amber" }, { label: "Tasa de aprobación", value: `${data.kpis.tasaAprobacion.toFixed(1)}%`, tone: "emerald" }]} />
+      <ReportKpiGrid items={[{ label: "Promedio general", value: data.kpis.promedioGeneral.toFixed(2), helper: `Sobre 10 · ${data.kpis.alcanceIntentos === "validos" ? "intentos válidos" : "todos los intentos"}`, tone: "indigo" }, { label: "Total de alumnos", value: data.kpis.totalAlumnos.toLocaleString("es-AR"), helper: `${data.kpis.conIntentos} con intentos`, tone: "blue" }, { label: "Total de intentos", value: data.kpis.totalIntentos.toLocaleString("es-AR"), helper: `${data.kpis.intentosAlcanceAcademico} en el cálculo académico`, tone: "amber" }, { label: "Tasa de aprobación", value: `${data.kpis.tasaAprobacion.toFixed(1)}%`, tone: "emerald" }]} />
       {data.alumnos.length > 0 && <ReportCharts alumnos={data.alumnos} />}
       <ReportTable columns={columns} rows={data.alumnos} rowKey={(row) => row.matricula} sortBy={filters.ordenarPor ?? "alumno"} sortDirection={filters.ordenDireccion ?? "asc"} onSort={(ordenarPor, ordenDireccion) => updateUrl({ ordenarPor, ordenDireccion, pagina: 1 })} onRowClick={(row) => setSelectedStudent(row.matricula)} page={data.paginacion.pagina} totalPages={data.paginacion.totalPaginas} total={data.paginacion.total} itemLabel="alumnos" onPageChange={(pagina) => updateUrl({ pagina })} />
     </div>}

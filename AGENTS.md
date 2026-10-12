@@ -24,7 +24,7 @@ Nunca debe asumirse que ocultar una acción o proteger una ruta en el cliente re
 - `fetch` encapsulado principalmente por el cliente HTTP propio.
 - ESLint 9 con reglas de Next.js.
 - pnpm como gestor de paquetes.
-- No hay formatter ni infraestructura de tests frontend configurados actualmente.
+- No hay formatter dedicado. El testing frontend usa Vitest/RTL/MSW y Playwright.
 - No se usa una librería UI externa, Redux, Zustand, Sass, CSS Modules ni Styled Components.
 
 ## Arquitectura actual
@@ -45,6 +45,8 @@ Examio API
 
 - `src/app` contiene rutas, layouts, páginas, route handlers y Server Actions.
 - `src/components` contiene UI compartida, layouts, formularios, providers y componentes de reportes.
+  Los editores del banco viven en `src/components/question-bank`; `src/components/evaluaciones`
+  compone el editor de borradores y comparte campos de preguntas desde `src/components/forms`.
 - `src/hooks` contiene queries y mutaciones de dominio.
 - `src/services/api` traduce operaciones de dominio a contratos HTTP.
 - `src/lib` concentra infraestructura: cliente HTTP, NextAuth, schemas, auxiliares y la outbox IndexedDB del examen.
@@ -314,6 +316,9 @@ Respetar `prefers-reduced-motion`; no depender de animación para comunicar esta
 - **Outbox de respuestas:** una confirmación solo puede confirmar la misma versión
   enviada; no eliminar ni sobrescribir una respuesta más nueva por una respuesta
   tardía. La pérdida de red no debe confundirse con expiración de sesión.
+- **Outbox de foco:** la telemetría de `blur/focus` usa una base IndexedDB independiente.
+  Inicio y cierre conservan el mismo UUID; una confirmación tardía del inicio no puede borrar
+  el cierre más nuevo. Sus fallas nunca deben bloquear, finalizar o penalizar el intento.
 - **Credenciales solo server-side:** nunca exponer access/refresh tokens mediante `Session.user`,
   respuestas del BFF, logs, variables públicas o almacenamiento del navegador.
 - **URLs y fetch fuera de la capa:** persisten URL hardcodeada y al menos una llamada directa legacy.
@@ -331,9 +336,43 @@ Respetar `prefers-reduced-motion`; no depender de animación para comunicar esta
 - **Reemplazos completos:** los `PUT` del banco reemplazan opciones, etiquetas y composición;
   la edición completa de una evaluación elimina grupos omitidos. Construir siempre el payload desde
   el estado completo confirmado, no desde un parche parcial.
+- **Detalle incompleto de borradores:** el detalle de evaluación todavía no devuelve
+  `idMateriaDivision` y omite grupos sin variantes por sus joins. El editor exige una
+  selección inequívoca de comisión y conserva al menos una variante por grupo; no relajar
+  esa protección hasta que el backend represente todo el borrador sin pérdida.
 - **Publicación transaccional:** un borrador solo se publica mediante `publicar-completo`.
   `GuardarTodoEnBanco` es explícito y desmarcado por defecto en UI; la misma intención conserva
   `Idempotency-Key` para evitar duplicados y un fallo del banco debe impedir la publicación completa.
+- **Calificación por grupo:** el puntaje pertenece a `GrupoPregunta` porque cada intento sortea una
+  variante. En modo personalizado, el borrador puede estar incompleto, pero la publicación exige
+  valores con hasta dos decimales cuya suma exacta coincida con la escala 10/100. No asignar puntajes
+  diferentes a variantes del mismo grupo ni sustituir la validación autoritativa del backend.
+- **Cambio de escala:** el editor convierte proporcionalmente la nota de aprobación y todos los
+  puntajes personalizados ya cargados, y notifica al docente. Nunca cambiar la escala enviando el
+  umbral anterior ni convertir valores silenciosamente fuera del editor.
+- **Importaciones y puntajes personalizados:** el contenido pendiente del banco todavía no tiene un
+  grupo editable al que asignar puntaje. Debe guardarse primero como borrador, recargar el detalle y
+  recién entonces publicarse.
+- **Selección múltiple y justificación — etapa fundacional:** `mc` sigue siendo selección única y
+  `multiple` permite varias correctas. La UI sólo ofrece justificación en `mc`, `multiple` y `vf`;
+  `abierta` y `code` fuerzan `sin_justificacion`. Banco y borradores ya persisten modo de justificación,
+  estrategia y tratamiento; `contenidoHash` lo calcula exclusivamente el backend. Hasta completar
+  el runtime de respuestas, cualquier evaluación con `multiple` o justificación debe conservarse
+  como borrador y la publicación responde `QUESTION_RUNTIME_NOT_AVAILABLE`. No degradar ni eliminar
+  esa configuración para publicar, ni implementar respuestas múltiples sobre el payload legacy.
+- **Compatibilidad histórica de notas:** no se recalifican intentos anteriores. Los nuevos intentos
+  conservan snapshot del puntaje y la corrección canónica opera sobre `IntentoPregunta`. El detalle
+  efectivo no expone `idIntentoPregunta` ni un `estadoCorreccion` literal: la UI escribe por
+  `idPregunta` y deriva pendiente/corregida desde `puntajeObtenido`.
+- **Override de nota final:** la nota manual es una excepción auditada que prevalece sobre la
+  calculada sin borrarla. No habilitar el override en UI hasta que todas las preguntas posean
+  puntaje definitivo; validar siempre contra la escala 10/100 real.
+- **Intento académicamente válido:** la selección automática considera sólo el último intento
+  `entregado`; un override manual persiste hasta que el docente lo elimine. No ocultar intentos
+  anteriores, no permitir elegir estados no entregados y no recalcular esta selección en cliente.
+- **Resumen del historial propio:** `GET /intentos/mios` resuelve el intento válido antes de aplicar
+  filtros. Los contadores académicos pueden no sumar `totalEvaluaciones`; mostrar el resumen del
+  backend sin inferir categorías ni aplicar umbrales globales 4/6.
 - **Errores especializados del examen:** el flujo de evaluación maneja sesión, conectividad,
   respuestas pendientes y fullscreen localmente para no desmontar el intento. No sustituirlo por
   un error boundary genérico ni eliminar sus avisos sin revisar la política antifraude.
@@ -366,15 +405,55 @@ La documentación de frontend, API y base de datos ya está separada.
 El backend del Banco privado de preguntas está implementado y sus migraciones y pruebas
 fueron verificadas por el responsable del backend. `docs/API.md`, `docs/DATABASE.md` y
 `docs/PLAN_API.md` están sincronizados. En frontend ya existen tipos, servicios, query keys,
-hooks y pruebas focalizadas del banco; las rutas, editores e integración con borradores y
-publicación continúan pendientes en la Fase 12 de `PLAN.md`.
+hooks y pruebas focalizadas del banco. Las rutas y editores independientes, borradores,
+selector, guardado individual y publicación transaccional están integrados. La gestión
+completa de estados/etiquetas y los conflictos 409 continúan en la Fase 12 de `PLAN.md`.
 
 Los reportes por alumno y por publicación de evaluación están integrados en
 `/profesor/reportes`. Comparten layout, filtros, KPIs, tabla, skeleton y tarjetas
 de gráficos; cada reporte conserva sus gráficos y reglas de dominio. Las series
 del reporte por evaluación son agregaciones globales del backend. Las del reporte
 por alumno todavía representan sólo la página visible y deben describirse como tales.
+Los filtros permiten alternar métricas académicas entre todos los intentos y el intento
+válido; los contadores operativos siempre incluyen todos. Los promedios globales entre
+escalas 10/100 se interpretan sobre 10, mientras cada publicación conserva escala y umbral.
 No se reemplazó la navegación completa del docente ni se creó un sidebar global.
+
+El Banco privado está disponible en `/profesor/banco-preguntas`, con workspace de
+preguntas/grupos y rutas independientes de creación/edición. `QuestionContentEditor`
+es el límite reutilizable entre banco y evaluación. La creación de grupos puede mezclar
+preguntas existentes y nuevas mediante la operación compuesta transaccional.
+
+La creación de evaluación permite guardar borrador y `/profesor/examen/[idPublicacion]/editar`
+edita borradores con revisión optimista e IDs anidados. El selector mantiene importaciones
+versionadas pendientes hasta guardar/publicar; los botones individuales crean contenido
+del banco sin exigir persistir antes la evaluación. Publicar usa exclusivamente
+`publicar-completo`, con `GuardarTodoEnBanco` desmarcado por defecto y una clave idempotente
+estable. `useIdempotencyKey` conserva la misma clave para el mismo payload tras un resultado incierto.
+
+Las primeras seis etapas de calificación, intentos, reportes y telemetría están integradas en el frontend. El editor permite
+escala 10/100, nota de aprobación, reparto igual o personalizado por grupo, visibilidad del puntaje
+y activación de corrección automática de cerradas. Cambiar la escala convierte proporcionalmente
+los valores existentes y lo comunica al docente. El detalle docente siempre presenta la configuración;
+el examen del alumno muestra `puntajeMaximo` solo si el backend lo incluyó. La pantalla de corrección
+docente asigna puntaje y comentario sobre `IntentoPregunta`, admite omisiones y reemplazo de
+autocorrecciones, muestra el desglose de notas y confirma el override final auditado. Desde la gestión
+de una evaluación, el docente puede consultar todos los intentos de cada alumno, elegir uno entregado
+como resultado académico y restaurar la selección automática. `/alumno/resultados` consume el historial
+propio server-side, con resumen, filtros, orden y paginación sincronizados con la URL.
+Durante el examen se registran pérdidas de foco mediante una outbox IndexedDB separada:
+el mismo UUID conserva inicio/cierre, se sincroniza al recuperar conectividad y nunca altera
+estado, nota o validez. La corrección docente muestra resumen y cronología como información,
+no como determinación automática de fraude.
+
+La etapa fundacional de selección múltiple y justificación está integrada en los editores de banco
+y borradores. `QuestionContentEditor` diferencia selección única (`mc`) de selección múltiple
+(`multiple`), conserva justificación/estrategia/tratamiento en copias y nunca calcula el hash de
+contenido. La resolución por alumnos pertenece a la siguiente etapa: mientras no esté disponible,
+la UI permite guardar el contenido pero bloquea su publicación sin transformarlo.
+
+Playwright usa `.next-e2e` mediante `EXAMIO_NEXT_DIST_DIR`, por lo que los E2E y builds
+de validación pueden ejecutarse sin finalizar un `next dev` activo sobre `.next`.
 
 Las fases de autenticación, cliente API, tipado, React Query, errores, testing y accesibilidad siguen gobernadas por `PLAN.md`.
 No hay bypass de login activo.

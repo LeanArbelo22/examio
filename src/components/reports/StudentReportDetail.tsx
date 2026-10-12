@@ -27,9 +27,9 @@ export function StudentReportDetail({ matricula, filters, onClose }: StudentRepo
       {data && (
         <div className="space-y-5">
           <ReportKpiGrid items={[
-            { label: "Promedio", value: data.kpis.promedioGeneral.toFixed(2), tone: "indigo" },
-            { label: "Intentos", value: String(data.kpis.totalIntentos), tone: "blue" },
-            { label: "Mejor resultado", value: data.actividades.length ? Math.max(...data.actividades.map((item) => item.notaMaxima)).toFixed(2) : "—", tone: "amber" },
+            { label: "Promedio", value: data.kpis.promedioGeneral.toFixed(2), helper: "Normalizado sobre 10", tone: "indigo" },
+            { label: "Intentos", value: String(data.kpis.totalIntentos), helper: `${data.kpis.intentosAlcanceAcademico} en el cálculo académico`, tone: "blue" },
+            { label: "Actividades", value: String(data.actividades.length), tone: "amber" },
             { label: "Aprobación", value: `${data.kpis.porcentajeAprobacion.toFixed(1)}%`, tone: "emerald" },
           ]} />
           <div>
@@ -50,10 +50,10 @@ export function StudentReportDetail({ matricula, filters, onClose }: StudentRepo
                     <span className="self-start rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">{actividad.intentos} intentos</span>
                   </div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <Metric label="Nota promedio" value={actividad.notaPromedio.toFixed(2)} />
-                    <Metric label="Nota máxima" value={actividad.notaMaxima.toFixed(2)} />
+                    <Metric label="Nota promedio" value={`${actividad.notaPromedio.toFixed(2)} / ${actividad.escalaCalificacion}`} />
+                    <Metric label="Nota máxima" value={`${actividad.notaMaxima.toFixed(2)} / ${actividad.escalaCalificacion}`} />
                     <Metric label="Mejor intento" value={actividad.mejorIntento ? `#${actividad.mejorIntento.numeroIntento}` : "—"} />
-                    <Metric label="Nota obtenida" value={actividad.mejorIntento?.notaFinal?.toFixed(2) ?? "—"} />
+                    <Metric label="Nota obtenida" value={actividad.mejorIntento ? `${actividad.mejorIntento.notaFinal.toFixed(2)} / ${actividad.escalaCalificacion}` : "—"} />
                   </dl>
                 </article>
               ))}

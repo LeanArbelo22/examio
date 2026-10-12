@@ -7,6 +7,8 @@ import {
   useGuardarRespuesta,
   usePendingAnswer,
 } from "@/hooks/useEvaluaciones";
+import type { OpcionSorteada } from "@/types";
+import { FeedbackMessage } from "@/components/ui/FeedbackMessage";
 
 export default function ActivityPage({ params }: { params: Promise<{ id: string; actividadId: string }> }) {
   const { id, actividadId } = use(params);
@@ -151,9 +153,18 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string;
     );
   }
 
+  if (currentQuestion.tipo === "multiple") {
+    return (
+      <FeedbackMessage
+        variant="warning"
+        message="Esta pregunta todavía no está disponible para ser respondida. Avisale al docente antes de continuar."
+      />
+    );
+  }
+
   const selectedOptionId =
     pendingAnswer?.payload.IdOpcionNueva ??
-    opciones?.find((option) => option.fueSeleccionada)?.idOpcion;
+    opciones?.find((option: OpcionSorteada) => option.fueSeleccionada)?.idOpcion;
   const hasAnswer =
     selectedOptionId !== undefined || openText.trim().length > 0;
   const answerStatus = isSaving || isPersistingDraft
@@ -179,6 +190,12 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string;
           </h2>
         </div>
         <div className="flex items-center gap-2">
+          {currentQuestion.puntajeMaximo !== undefined && (
+            <span className="rounded-md bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
+              {currentQuestion.puntajeMaximo} punto
+              {currentQuestion.puntajeMaximo === 1 ? "" : "s"}
+            </span>
+          )}
           {answerStatus && (
             <span
               role="status"
@@ -202,7 +219,7 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string;
           Seleccioná una opción:
         </p>
         
-        {opciones?.map((option) => {
+        {opciones?.map((option: OpcionSorteada) => {
           const idOpcion = option.idOpcion;
           const texto = option.texto;
           const isSelected = selectedOptionId === idOpcion;

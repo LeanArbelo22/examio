@@ -54,23 +54,30 @@ export default function ProfesorPage() {
           <h2 className="text-lg font-bold text-slate-800 tracking-tight">Centro de Gestión Docente</h2>
           <p className="text-xs text-slate-400 mt-0.5">Diseñá entornos seguros y monitoreá rendimientos.</p>
         </div>
-        <Button
-          onClick={() => router.push("/profesor/crear-examen")}
-          className="bg-indigo-600 text-white text-xs font-bold py-3 px-5 rounded-xl hover:bg-indigo-700 active:scale-[0.99] transition-all shadow-sm shrink-0 flex items-center justify-center gap-2"
-        >
-          <span>🆕</span> Crear Nuevo Examen
-        </Button>
-        <Link href="/profesor/reportes">
-          <Button className="w-full bg-white text-indigo-700 text-xs font-bold py-3 px-5 rounded-xl border border-indigo-200 hover:bg-indigo-50 transition-all shadow-sm sm:w-auto">
-            Reportes
+        <div className="flex w-full flex-col gap-3 sm:ml-auto sm:w-auto sm:flex-row sm:items-center">
+          <Button
+            onClick={() => router.push("/profesor/crear-examen")}
+            className="flex shrink-0 items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-xs font-bold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-[0.99]"
+          >
+            Crear actividad
           </Button>
-        </Link>
+          <Link href="/profesor/banco-preguntas">
+            <Button className="w-full rounded-xl border border-indigo-200 bg-white px-5 py-3 text-xs font-bold text-indigo-700 shadow-sm transition-all hover:bg-indigo-50 sm:w-auto">
+              Banco de preguntas
+            </Button>
+          </Link>
+          <Link href="/profesor/reportes">
+            <Button className="w-full rounded-xl border border-indigo-200 bg-white px-5 py-3 text-xs font-bold text-indigo-700 shadow-sm transition-all hover:bg-indigo-50 sm:w-auto">
+              Reportes
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-slate-900 tracking-tight">Mis Evaluaciones</h2>
         <span className="px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-full">
-          {isLoading ? "..." : `${evaluaciones.length} publicadas`}
+          {isLoading ? "..." : `${evaluaciones.length} evaluaciones`}
         </span>
       </div>
 
@@ -127,9 +134,18 @@ export default function ProfesorPage() {
               </div>
 
               <div className="mt-4 pt-2">
-                <Link href={`/profesor/examen/${exam.idPublicacion}`} className="block w-full">
+                <Link
+                  href={
+                    exam.estado === "borrador"
+                      ? `/profesor/examen/${exam.idPublicacion}/editar`
+                      : `/profesor/examen/${exam.idPublicacion}`
+                  }
+                  className="block w-full"
+                >
                   <Button className="w-full py-2 px-4 text-xs font-semibold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm">
-                    Gestionar Evaluación
+                    {exam.estado === "borrador"
+                      ? "Continuar borrador"
+                      : "Gestionar evaluación"}
                   </Button>
                 </Link>
               </div>

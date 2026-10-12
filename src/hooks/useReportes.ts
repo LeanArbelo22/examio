@@ -20,10 +20,13 @@ function normalizarListado(data: ReporteRendimientoListado | ReporteRendimientoD
       totalAlumnos: 1,
       conIntentos: data.kpis.totalIntentos > 0 ? 1 : 0,
       totalIntentos: data.kpis.totalIntentos,
+      intentosAlcanceAcademico: data.kpis.intentosAlcanceAcademico,
       promedioGeneral: data.kpis.promedioGeneral,
+      escalaPromedio: data.kpis.escalaPromedio,
+      alcanceIntentos: data.kpis.alcanceIntentos,
       tasaAprobacion: data.kpis.porcentajeAprobacion,
     },
-    alumnos: [{ ...data.alumno, totalIntentos: data.kpis.totalIntentos, totalCorregidos: data.kpis.totalCorregidos, promedio: data.kpis.promedioGeneral, aprobados: data.kpis.aprobados, desaprobados: data.kpis.desaprobados, porcentajeAprobacion: data.kpis.porcentajeAprobacion }],
+    alumnos: [{ ...data.alumno, totalIntentos: data.kpis.totalIntentos, intentosAlcanceAcademico: data.kpis.intentosAlcanceAcademico, totalCorregidos: data.kpis.totalCorregidos, promedio: data.kpis.promedioGeneral, escalaPromedio: data.kpis.escalaPromedio, alcanceIntentos: data.kpis.alcanceIntentos, aprobados: data.kpis.aprobados, desaprobados: data.kpis.desaprobados, porcentajeAprobacion: data.kpis.porcentajeAprobacion }],
   };
 }
 

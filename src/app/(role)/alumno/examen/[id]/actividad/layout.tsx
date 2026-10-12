@@ -11,6 +11,7 @@ import {
 } from "@/hooks/useEvaluaciones";
 import { Button } from "@/components/ui/Button";
 import { ApiError } from "@/lib/api";
+import { useFocusIncidentTracking } from "@/hooks/useTelemetria";
 
 type ExamDocument = Document & { isExitingLegitimately?: boolean };
 
@@ -26,6 +27,7 @@ export default function ActivityLayout({
   const urlParams = useParams();
 
   const idIntento = Number(id);
+  useFocusIncidentTracking(idIntento, Number.isInteger(idIntento) && idIntento > 0);
   const currentActivityId = parseInt(urlParams.actividadId as string) || 1;
 
   const [errorServidor, setErrorServidor] = useState<string | null>(null);

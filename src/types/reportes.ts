@@ -4,13 +4,15 @@ import type { TipoActividad } from "./shared";
 export type ReporteRendimientoEstado =
   | "entregado"
   | "en_progreso"
-  | "vencido";
+  | "vencido"
+  | "anulado";
 export type ReporteRendimientoOrden =
   | "alumno"
   | "promedio"
   | "aprobados"
   | "intentos";
 export type OrdenDireccion = "asc" | "desc";
+export type AlcanceIntentosReporte = "todos" | "validos";
 
 export type ReporteEvaluacionesEstado =
   | "borrador"
@@ -32,6 +34,8 @@ export interface ReporteEvaluacionesFiltros {
   estado?: ReporteEvaluacionesEstado | "";
   fechaDesde?: string;
   fechaHasta?: string;
+  alcanceIntentos?: AlcanceIntentosReporte;
+  conPendientesCorreccion?: boolean | "";
   ordenarPor?: ReporteEvaluacionesOrden;
   ordenDireccion?: OrdenDireccion;
   pagina?: number;
@@ -47,9 +51,11 @@ export interface ReporteEvaluacionesKpis {
   totalEnProgreso: number;
   totalVencidos: number;
   totalAnulados: number;
+  totalIntentosAlcanceAcademico: number;
   totalIntentosCalificados: number;
   intentosPendientesCorreccion: number;
   promedioIntentosCalificados: number | null;
+  promedioIntentosCalificadosBase10: number | null;
   tasaAprobacionIntentos: number | null;
 }
 
@@ -69,6 +75,8 @@ export interface ReporteEvaluacionItem {
   fechaInicio: string;
   fechaFin: string;
   estado: ReporteEvaluacionesEstado;
+  escalaCalificacion: 10 | 100;
+  notaAprobacion: number;
   alumnosAlcanzados: number;
   alumnosQueIniciaron: number;
   sinIniciar: number;
@@ -77,15 +85,22 @@ export interface ReporteEvaluacionItem {
   enProgreso: number;
   vencidos: number;
   anulados: number;
+  intentosAlcanceAcademico: number;
   intentosCalificados: number;
   intentosPendientesCorreccion: number;
   promedioIntentosCalificados: number | null;
+  promedioIntentosCalificadosBase10: number | null;
   intentosAprobados: number;
   intentosDesaprobados: number;
   porcentajeAprobacionIntentos: number | null;
 }
 
 export interface ReporteEvaluacionesListado {
+  criterios: {
+    alcanceIntentos: AlcanceIntentosReporte;
+    escalaPromedio: 10;
+    conPendientesCorreccion: boolean | null;
+  };
   kpis: ReporteEvaluacionesKpis;
   graficos: {
     distribucionResultados: ReporteEvaluacionesDistribucionItem[];
@@ -102,6 +117,7 @@ export interface ReporteRendimientoFiltros {
   estado?: ReporteRendimientoEstado | "";
   fechaDesde?: string;
   fechaHasta?: string;
+  alcanceIntentos?: AlcanceIntentosReporte;
   promedioMin?: string;
   promedioMax?: string;
   ordenarPor?: ReporteRendimientoOrden;
@@ -121,7 +137,10 @@ export interface ReporteRendimientoKpis {
   totalAlumnos: number;
   conIntentos: number;
   totalIntentos: number;
+  intentosAlcanceAcademico: number;
   promedioGeneral: number;
+  escalaPromedio: 10;
+  alcanceIntentos: AlcanceIntentosReporte;
   tasaAprobacion: number;
 }
 
@@ -130,8 +149,11 @@ export interface ReporteRendimientoAlumno {
   nombre: string;
   apellido: string;
   totalIntentos: number;
+  intentosAlcanceAcademico: number;
   totalCorregidos: number;
   promedio: number;
+  escalaPromedio: 10;
+  alcanceIntentos: AlcanceIntentosReporte;
   aprobados: number;
   desaprobados: number;
   porcentajeAprobacion: number;
@@ -145,8 +167,11 @@ export interface ReporteRendimientoListado {
 
 export interface ReporteRendimientoDetalleKpis {
   totalIntentos: number;
+  intentosAlcanceAcademico: number;
   totalCorregidos: number;
   promedioGeneral: number;
+  escalaPromedio: 10;
+  alcanceIntentos: AlcanceIntentosReporte;
   aprobados: number;
   desaprobados: number;
   porcentajeAprobacion: number;
@@ -157,12 +182,16 @@ export interface ReporteMejorIntento {
   notaFinal: number;
   notaAutomatica: number | null;
   fechaFin: string;
+  esIntentoValido: boolean;
+  seleccionIntentoValido: "automatica" | "manual";
 }
 
 export interface ReporteActividadAlumno {
   idActividad: number;
   titulo: string;
   tipo: TipoActividad;
+  escalaCalificacion: 10 | 100;
+  notaAprobacion: number;
   materia: string;
   division: string;
   intentos: number;
