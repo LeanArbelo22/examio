@@ -85,7 +85,10 @@ test("el alumno responde dentro del examen sin exponer credenciales", async ({ p
     document.dispatchEvent(event);
     return event.defaultPrevented;
   })).toBe(true);
-  await page.getByText("Opción persistida").click();
+  await page.getByRole("checkbox", { name: "Opción persistida" }).check();
+  await page.getByRole("checkbox", { name: "Otra opción" }).check();
+  await page.getByLabel("Justificación").fill("Ambas opciones forman parte del escenario E2E.");
+  await page.getByLabel("Justificación").blur();
   await expect(page.getByText("Guardado", { exact: true })).toBeVisible();
 
   const completedFocusEvent = page.waitForRequest(

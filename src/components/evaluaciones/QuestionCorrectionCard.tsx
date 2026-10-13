@@ -12,7 +12,8 @@ import { useCorregirPreguntaIntento } from "@/hooks/useEvaluaciones";
 import type { OpcionIntento, PreguntaIntento } from "@/types";
 
 const TYPE_BADGE: Record<string, { label: string; className: string }> = {
-  mc: { label: "Opción", className: "border-cyan-200 bg-cyan-50 text-cyan-700" },
+  mc: { label: "Selección única", className: "border-cyan-200 bg-cyan-50 text-cyan-700" },
+  multiple: { label: "Selección múltiple", className: "border-cyan-200 bg-cyan-50 text-cyan-700" },
   vf: { label: "V/F", className: "border-cyan-200 bg-cyan-50 text-cyan-700" },
   abierta: { label: "Abierta", className: "border-purple-200 bg-purple-50 text-purple-700" },
   code: { label: "Código", className: "border-purple-200 bg-purple-50 text-purple-700" },
@@ -26,19 +27,47 @@ function AnswerOptions({ options }: { options: OpcionIntento[] }) {
   const hasSelection = options.some(
     (option) => option.fueSeleccionada === true || option.fueSeleccionada === 1,
   );
+  const totalCorrect = options.filter((option) => option.esCorrecta).length;
+  const selectedCorrect = options.filter(
+    (option) =>
+      option.esCorrecta &&
+      (option.fueSeleccionada === true || option.fueSeleccionada === 1),
+  ).length;
+  const selectedIncorrect = options.filter(
+    (option) =>
+      !option.esCorrecta &&
+      (option.fueSeleccionada === true || option.fueSeleccionada === 1),
+  ).length;
 
   return (
     <div className="space-y-2">
       {!hasSelection && (
         <p className="mb-2 text-sm italic text-slate-500">El alumno omitió esta pregunta.</p>
       )}
+      {hasSelection && totalCorrect > 0 && (
+        <p className="mb-2 text-xs font-semibold text-slate-600">
+          Seleccionó {selectedCorrect} de {totalCorrect} opciones correctas
+          {selectedIncorrect > 0
+            ? ` y ${selectedIncorrect} ${selectedIncorrect === 1 ? "incorrecta" : "incorrectas"}.`
+            : "."}
+        </p>
+      )}
       {options.map((option) => {
         const selected = option.fueSeleccionada === true || option.fueSeleccionada === 1;
-        const classes = option.esCorrecta
-          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-          : selected
-            ? "border-red-200 bg-red-50 text-red-800"
-            : "border-slate-200 bg-slate-50 text-slate-600";
+        const classes = option.esCorrecta && selected
+          ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+          : option.esCorrecta
+            ? "border-amber-200 bg-amber-50 text-amber-900"
+            : selected
+              ? "border-red-200 bg-red-50 text-red-800"
+              : "border-slate-200 bg-slate-50 text-slate-600";
+        const label = option.esCorrecta && selected
+          ? "Elegida · correcta"
+          : option.esCorrecta
+            ? "Correcta no elegida"
+            : selected
+              ? "Elegida · incorrecta"
+              : "";
 
         return (
           <div
@@ -47,7 +76,7 @@ function AnswerOptions({ options }: { options: OpcionIntento[] }) {
           >
             <span>{option.texto}</span>
             <span className="shrink-0 text-xs font-bold">
-              {option.esCorrecta ? "Correcta" : selected ? "Elegida" : ""}
+              {label}
             </span>
           </div>
         );
@@ -147,10 +176,41 @@ export function QuestionCorrectionCard({
         ) : (
           <AnswerOptions options={question.opciones} />
         )}
+        {(question.modoJustificacion ?? "sin_justificacion") !== "sin_justificacion" && (
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+              Justificación del alumno
+            </p>
+            <p className="whitespace-pre-wrap text-sm text-slate-700">
+              {question.respuesta?.justificacion || (
+                <span className="italic text-slate-500">Sin justificación.</span>
+              )}
+            </p>
+          </div>
+        )}
       </div>
+
+      {question.tratamientoJustificacion === "revision_manual" && (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-bold">Requiere revisión docente</p>
+          <p className="mt-1">
+            Las opciones aportan un puntaje sugerido de{" "}
+            <strong>{formatGrade(question.puntajeAutomaticoOpciones)}</strong>,
+            pero tenés que confirmar el puntaje final de esta pregunta.
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-600">
         <span>Puntaje máximo: <strong>{formatGrade(maximum)}</strong></span>
+        {question.puntajeAutomaticoOpciones !== undefined &&
+          question.puntajeAutomaticoOpciones !== null &&
+          question.tratamientoJustificacion !== "revision_manual" && (
+            <span>
+              Puntaje por opciones:{" "}
+              <strong>{formatGrade(question.puntajeAutomaticoOpciones)}</strong>
+            </span>
+          )}
         <span>
           Origen: <strong>{question.origenCorreccion === "automatica" ? "Automático" : question.origenCorreccion === "manual" ? "Manual" : "Pendiente"}</strong>
         </span>

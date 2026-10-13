@@ -244,6 +244,10 @@ El proyecto utiliza App Router.
 - `/profesor/intento/[idIntento]`
 - `/profesor/reportes`
 
+El inicio docente agrupa las actividades por materia dentro de la misma pantalla.
+Si una materia posee varias comisiones, presenta un segundo nivel por
+`MateriaDivision`; con una sola comisión, muestra directamente sus actividades.
+
 Los route groups `(role)` y `(gestion)` organizan layouts y código sin agregar segmentos a la URL.
 
 ## Layouts y providers

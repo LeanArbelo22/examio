@@ -125,6 +125,10 @@ export interface PreguntaSorteada {
   tipo: TipoPregunta;
   grupoConceptualmente?: string;
   puntajeMaximo?: number;
+  modoJustificacion?: ModoJustificacion;
+  estrategiaCorreccion?: EstrategiaCorreccion;
+  tratamientoJustificacion?: TratamientoJustificacion;
+  respuesta?: RespuestaBorradorIntento | null;
 }
 
 export interface OpcionSorteada {
@@ -155,6 +159,8 @@ export interface AlertaAntifraude {
 export interface EvaluacionDocente {
   idPublicacion: number;
   idActividad: number;
+  idMateria: number;
+  idMateriaDivision: number;
   titulo: string;
   descripcion?: string;
   tipo: TipoActividad;
@@ -223,14 +229,16 @@ export interface EvaluacionDetalle extends ConfiguracionCalificacion {
 export interface OpcionIntento {
   idOpcion: number;
   texto: string;
-  esCorrecta: boolean;
+  esCorrecta?: boolean;
   fueSeleccionada: boolean | number;
 }
 
 export interface RespuestaIntento {
   idRespuesta: number;
   rtaTexto: string | null;
-  opcionesSeleccionadas: OpcionIntento[];
+  opcionesSeleccionadas?: OpcionIntento[];
+  justificacion?: string | null;
+  revision?: number;
   esCorrecta?: boolean | null;
   comentariosDocente?: string | null;
 }
@@ -244,7 +252,11 @@ export interface PreguntaIntento {
   grupoConceptualmente: string;
   puntajeMaximo: number | null;
   puntajeObtenido: number | null;
+  puntajeAutomaticoOpciones?: number | null;
   origenCorreccion: OrigenCorreccion;
+  modoJustificacion?: ModoJustificacion;
+  estrategiaCorreccion?: EstrategiaCorreccion;
+  tratamientoJustificacion?: TratamientoJustificacion;
   comentariosDocente: string | null;
   corregidoPor: number | null;
   fechaCorreccion: string | null;
@@ -557,8 +569,26 @@ export interface IniciarIntentoPayload {
 export interface GuardarRespuestaPayload {
   IdIntento: number;
   IdPregunta: number;
+  IdOpcionesSeleccionadas?: number[];
   IdOpcionNueva?: number;
-  RtaTexto?: string;
+  RtaTexto?: string | null;
+  Justificacion?: string | null;
+  RevisionEsperada?: number;
+  EventoId?: string;
+}
+
+export interface RespuestaBorradorIntento {
+  idRespuesta: number | null;
+  idsOpcionesSeleccionadas: number[];
+  rtaTexto: string | null;
+  justificacion: string | null;
+  revision: number;
+}
+
+export interface GuardarRespuestaResultado extends RespuestaBorradorIntento {
+  idIntento: number;
+  idPregunta: number;
+  replay: boolean;
 }
 
 export interface AlertaPayload {

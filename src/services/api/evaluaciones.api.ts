@@ -9,6 +9,7 @@ import {
   OpcionSorteada,
   IniciarIntentoPayload,
   GuardarRespuestaPayload,
+  GuardarRespuestaResultado,
   AlertaPayload,
   NavegacionPayload,
   EvaluacionPendiente,
@@ -170,8 +171,10 @@ export const iniciarIntentoExamen = async (
   return { idIntento: result.idIntento };
 };
 
-export const guardarRespuestaAtomica = (payload: GuardarRespuestaPayload): Promise<void> =>
-  apiFetch<void>("/intentos/guardar-respuesta", {
+export const guardarRespuestaAtomica = (
+  payload: GuardarRespuestaPayload,
+): Promise<GuardarRespuestaResultado> =>
+  apiFetch<GuardarRespuestaResultado>("/intentos/guardar-respuesta", {
     method: "POST",
     body: JSON.stringify(payload),
   });

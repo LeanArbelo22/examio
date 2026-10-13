@@ -91,4 +91,54 @@ describe("QuestionCorrectionCard", () => {
       payload: { puntajeObtenido: 0, comentariosDocente: null },
     });
   });
+
+  it("muestra la justificación y el puntaje sugerido para revisión manual", () => {
+    render(
+      <QuestionCorrectionCard
+        idIntento={73}
+        question={{
+          ...question,
+          tipo: "multiple",
+          modoJustificacion: "obligatoria",
+          tratamientoJustificacion: "revision_manual",
+          puntajeAutomaticoOpciones: 1.25,
+          respuesta: {
+            idRespuesta: 90,
+            rtaTexto: null,
+            justificacion: "Ambas opciones cumplen la condición.",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Selección múltiple")).toBeVisible();
+    expect(screen.getByText("Ambas opciones cumplen la condición.")).toBeVisible();
+    expect(screen.getByText("Requiere revisión docente")).toBeVisible();
+    expect(screen.getByText(/1.25/)).toBeVisible();
+  });
+
+  it("distingue opciones correctas elegidas de correctas no elegidas", () => {
+    render(
+      <QuestionCorrectionCard
+        idIntento={73}
+        question={{
+          ...question,
+          tipo: "multiple",
+          puntajeObtenido: 0.75,
+          puntajeAutomaticoOpciones: 0.75,
+          origenCorreccion: "automatica",
+          opciones: [
+            { idOpcion: 1, texto: "A", esCorrecta: true, fueSeleccionada: true },
+            { idOpcion: 2, texto: "B", esCorrecta: true, fueSeleccionada: true },
+            { idOpcion: 3, texto: "C", esCorrecta: true, fueSeleccionada: true },
+            { idOpcion: 4, texto: "D", esCorrecta: true, fueSeleccionada: false },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Seleccionó 3 de 4 opciones correctas.")).toBeVisible();
+    expect(screen.getAllByText("Elegida · correcta")).toHaveLength(3);
+    expect(screen.getByText("Correcta no elegida")).toBeVisible();
+  });
 });

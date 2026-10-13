@@ -5,6 +5,13 @@ let evaluationState = "borrador";
 let lastDraftRequest = null;
 let selectedValidAttempt = null;
 const focusIncidents = new Map();
+let examAnswer = {
+  idRespuesta: null,
+  idsOpcionesSeleccionadas: [],
+  rtaTexto: null,
+  justificacion: null,
+  revision: 0,
+};
 
 const users = {
   "admin@cervantes.edu.ar": { id: 1, name: "Admin E2E", role: "admin" },
@@ -413,7 +420,15 @@ const server = createServer(async (request, response) => {
     return send(response, 200, {
       success: true,
       data: [
-        { idPregunta: 501, enunciado: "¿Cuál es la respuesta E2E?", tipo: "mc" },
+        {
+          idPregunta: 501,
+          enunciado: "¿Cuáles son respuestas E2E?",
+          tipo: "multiple",
+          modoJustificacion: "obligatoria",
+          estrategiaCorreccion: "parcial_sin_penalizacion",
+          tratamientoJustificacion: "informativa",
+          respuesta: examAnswer.idRespuesta ? examAnswer : null,
+        },
       ],
     });
   }
@@ -425,15 +440,38 @@ const server = createServer(async (request, response) => {
     return send(response, 200, {
       success: true,
       data: [
-        { idOpcion: 9001, texto: "Opción persistida", fueSeleccionada: false },
-        { idOpcion: 9002, texto: "Otra opción", fueSeleccionada: false },
+        {
+          idOpcion: 9001,
+          texto: "Opción persistida",
+          fueSeleccionada: examAnswer.idsOpcionesSeleccionadas.includes(9001),
+        },
+        {
+          idOpcion: 9002,
+          texto: "Otra opción",
+          fueSeleccionada: examAnswer.idsOpcionesSeleccionadas.includes(9002),
+        },
       ],
     });
   }
 
   if (request.method === "POST" && url.pathname === "/api/intentos/guardar-respuesta") {
-    await readJson(request);
-    return send(response, 200, { success: true, data: null });
+    const body = await readJson(request);
+    examAnswer = {
+      idRespuesta: 9100,
+      idsOpcionesSeleccionadas: body.IdOpcionesSeleccionadas ?? [],
+      rtaTexto: body.RtaTexto ?? null,
+      justificacion: body.Justificacion ?? null,
+      revision: examAnswer.revision + 1,
+    };
+    return send(response, 200, {
+      success: true,
+      data: {
+        ...examAnswer,
+        idIntento: 73,
+        idPregunta: 501,
+        replay: false,
+      },
+    });
   }
 
   if (request.method === "POST" && url.pathname === "/api/telemetria/alerta") {

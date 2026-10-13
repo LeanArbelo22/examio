@@ -48,6 +48,7 @@ export default function ActivityLayout({
     isSyncing,
     syncRevision,
     syncNow,
+    completeMissingJustifications,
     requestFinalization,
     cancelFinalization,
     clearOutbox,
@@ -76,6 +77,7 @@ export default function ActivityLayout({
     setShowConfirmModal(true);
 
     try {
+      await completeMissingJustifications(preguntas ?? []);
       await requestFinalization();
       if (!isOnline) {
         setErrorServidor(
@@ -115,7 +117,9 @@ export default function ActivityLayout({
       router.replace("/alumno");
     } catch (error: unknown) {
       setErrorServidor(
-        error instanceof ApiError &&
+        error instanceof ApiError && error.code === "REQUIRED_JUSTIFICATION_MISSING"
+          ? "No pudimos registrar las justificaciones vacías. El intento sigue abierto y podés reintentar la entrega."
+          : error instanceof ApiError &&
           (error.statusCode === 0 ||
             error.statusCode === 401 ||
             error.statusCode === 409 ||
@@ -132,6 +136,7 @@ export default function ActivityLayout({
     }
   }, [
     clearOutbox,
+    completeMissingJustifications,
     finalizarExamen,
     idIntento,
     isOnline,
@@ -383,7 +388,7 @@ export default function ActivityLayout({
               <p className="mt-2 text-xs text-slate-500 leading-relaxed">
                 {errorServidor
                   ? "El servidor central rechazó la operación. El intento sigue abierto y protegido, no perdiste tus respuestas."
-                  : "Se enviarán todas tus respuestas guardadas al servidor central y se calculará tu calificación inmutable."}
+                  : "Se enviarán todas tus respuestas guardadas al servidor central. Las justificaciones obligatorias que dejes vacías se registrarán como “Sin respuesta”."}
               </p>
 
               {/* Alerta interna sin romper el foco */}

@@ -41,7 +41,7 @@ API REST desarrollada en Express 5 + TypeScript 6 que abstrae la lógica de nego
 | **mssql 12** | Driver TDS para SQL Server. `pool` es singleton. Soporta `sql.Transaction` para operaciones atómicas. |
 | **Zod 4** | Esquemas de validación en cada `POST`/`PUT`. El middleware `validateRequest` rechaza payloads inválidos con `400` + array `errors`. |
 | **jsonwebtoken + bcryptjs** | Autenticación stateless. `bcrypt.compare()` para contraseñas. JWT con payload `{ id, email, role, idAlumno, idDocente }` y expiración de 1 hora. |
-| **ts-jest + supertest** | 412 tests de referencia con mock completo de `mssql`. Sin dependencia de BD real. Supertest importa `src/app.ts` sin abrir un puerto. |
+| **ts-jest + supertest** | 418 tests de referencia con mock completo de `mssql`. Sin dependencia de BD real. Supertest importa `src/app.ts` sin abrir un puerto. |
 
 La construcción de Express está separada del arranque del proceso:
 
@@ -603,6 +603,40 @@ ni inscripción masiva; esas reglas no se infieren en este endpoint.
 }
 ```
 
+**Contrato `GET /api/docentes/:legajo/evaluaciones`:** devuelve una fila por
+publicación, sin agrupar, ordenada por `fechaFin DESC`. Un docente sólo puede
+consultar su propio legajo; `admin` conserva alcance global.
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "idPublicacion": 31,
+      "idActividad": 25,
+      "idMateria": 8,
+      "idMateriaDivision": 17,
+      "titulo": "Primer parcial",
+      "tipo": "evaluacion",
+      "duracionMinutos": 90,
+      "cantidadIntentosMaximos": 2,
+      "estado": "publicada",
+      "fechaInicio": "2026-10-20T12:00:00.000Z",
+      "fechaFin": "2026-10-20T13:30:00.000Z",
+      "materia": "Fundamentos de Redes de Datos",
+      "division": "1° A",
+      "carrera": "Tecnicatura Superior en Redes",
+      "alumnosInscriptos": 28,
+      "totalIntentos": 19
+    }
+  ]
+}
+```
+
+Los identificadores provienen directamente de `Actividad.Id`, `Materia.Id` y
+`MateriaDivision.Id`. `carrera` se resuelve mediante `Materia.IdCarrera`; el
+frontend puede agrupar por IDs sin depender de nombres potencialmente repetidos.
+
 ### 4.4 Carreras
 
 | Método | Endpoint | Zod | Roles |
@@ -896,7 +930,7 @@ Esta funcionalidad requiere aplicar manualmente
 del banco y de revisión/idempotencia. Validar luego con
 `scripts/verificar-calificacion-intentos-telemetria.sql`. El backend no ejecuta DDL al arrancar.
 
-#### Selección múltiple y justificación — modelo de etapa 1
+#### Selección múltiple y justificación — etapas 1 y 2
 
 Los borradores de evaluación y el banco admiten `Tipo="multiple"` y tres campos
 aditivos por pregunta:
@@ -913,15 +947,34 @@ de una correcta. `ContenidoHash` es calculado por el servidor sobre tipo, enunci
 configuración y opciones ordenadas. Identifica contenido equivalente, no propiedad ni
 procedencia, y cambia cuando una copia se adapta.
 
-Esta etapa sólo habilita edición, persistencia y copias. Hasta desplegar el runtime de
-la etapa 2, publicar una evaluación que use `multiple` o justificación devuelve
-`409 QUESTION_RUNTIME_NOT_AVAILABLE`. Los contratos legacy mantienen sus defaults.
+El runtime de la etapa 2 permite publicar estas configuraciones, congela enunciado,
+tipo, configuración y opciones al iniciar el intento, restaura la respuesta en progreso
+y guarda el conjunto completo de opciones de forma atómica. Los contratos legacy
+mantienen sus defaults.
 
 Requiere aplicar manualmente
 `migrations/20261013_respuestas_multiples_justificacion.sql` después de la migración
 de calificación y ejecutar
 `scripts/verificar-respuestas-multiples-justificacion.sql`. La migración prepara
 snapshots e historial, pero no recalifica ni modifica notas históricas.
+
+Después debe aplicarse `migrations/20261014_runtime_respuestas_multiples.sql` y
+ejecutarse `scripts/verificar-runtime-respuestas-multiples.sql`. Esta segunda migración
+actualiza los SP existentes de inicio, render, opciones y entrega; no crea SP nuevos.
+
+Reglas de autocorrección congeladas por intento:
+
+- `exacta`: máximo sólo al seleccionar todas las correctas y ninguna incorrecta.
+- `parcial_sin_penalizacion`: proporción de correctas seleccionadas sobre el total de
+  correctas, sin descontar distractores.
+- `parcial_penalizada`: resta además la proporción de distractores seleccionados y aplica
+  piso cero. Todos los resultados se redondean a dos decimales.
+
+Con `TratamientoJustificacion="informativa"`, el puntaje de opciones puede ser definitivo.
+Con `revision_manual`, se conserva en `puntajeAutomaticoOpciones` como valor provisional,
+pero `puntajeObtenido` queda pendiente hasta la corrección docente. Una pregunta contestada
+con justificación obligatoria no puede entregarse sin ella; guardar el borrador incompleto sí
+está permitido. Una pregunta totalmente omitida no exige justificación para entregar.
 
 #### Selección del intento académicamente válido — etapa 3
 
@@ -1251,6 +1304,46 @@ mantienen sin cambios por compatibilidad.
 
 **Body `POST /api/intentos/guardar-respuesta`:**
 
+Contrato nuevo para selección múltiple, justificación, concurrencia optimista e
+idempotencia offline:
+
+```json
+{
+  "IdIntento": 1,
+  "IdPregunta": 10,
+  "IdOpcionesSeleccionadas": [3, 5],
+  "Justificacion": "Ambas condiciones se cumplen.",
+  "RevisionEsperada": 2,
+  "EventoId": "b0c1d99d-dac3-4ad7-b983-9c400267bd31"
+}
+```
+
+`EventoId` y `RevisionEsperada` se envían juntos. Repetir el mismo evento y contenido
+devuelve el resultado anterior sin duplicar cambios; reutilizarlo con otro contenido o
+guardar sobre una revisión obsoleta devuelve `409`. El array vacío representa una
+selección omitida y permite guardar borradores incompletos.
+
+Respuesta:
+
+```json
+{
+  "success": true,
+  "message": "Respuesta guardada y auditada correctamente.",
+  "data": {
+    "idRespuesta": 21,
+    "idIntento": 1,
+    "idPregunta": 10,
+    "idsOpcionesSeleccionadas": [3, 5],
+    "rtaTexto": null,
+    "justificacion": "Ambas condiciones se cumplen.",
+    "revision": 3,
+    "replay": false
+  }
+}
+```
+
+El contrato legacy de selección única se conserva:
+
 ```json
 {
   "IdIntento": 1,
@@ -1258,6 +1351,19 @@ mantienen sin cambios por compatibilidad.
   "IdOpcionNueva": 3
 }
 ```
+
+También continúa aceptándose `RtaTexto` para `abierta` y `code`. Las opciones deben
+pertenecer al snapshot de la pregunta y `mc`/`vf` admiten como máximo una. El alumno
+sólo puede modificar sus propios intentos en estado `en_progreso`.
+
+`GET /api/evaluaciones/intento/:idIntento/renderizar` agrega la configuración congelada
+y `respuesta` (`idsOpcionesSeleccionadas`, texto, justificación y revisión), sin exponer
+claves correctas. `GET /api/evaluaciones/pregunta/:idPregunta/opciones/:idIntento`
+renderiza texto y selección desde el snapshot; `esCorrecta` se omite para alumnos.
+
+`POST /api/intentos/:id/finalizar` conserva su body vacío e idempotencia. Puede devolver
+`409 REQUIRED_JUSTIFICATION_MISSING`; en ese caso el intento continúa `en_progreso` y
+ninguna nota fue modificada.
 
 **Body `PUT /api/intentos/:idIntento/calificar`:**
 
@@ -2083,7 +2189,7 @@ Endpoint consolidado que devuelve el rendimiento académico de alumnos. Soporta 
 
 ```bash
 npm install         # Una sola vez
-npm test            # Suite completa (412 tests de referencia actual)
+npm test            # Suite completa (418 tests de referencia actual)
 npx jest --verbose  # Reporte detallado
 npx jest tests/auth.test.ts  # Archivo específico
 npx jest -t "carreras"       # Por patrón de nombre
@@ -2422,10 +2528,10 @@ En una única transacción: bloquea y autoriza la actividad, comprueba revisión
 de intentos, guarda la última edición, resuelve importaciones, valida desde SQL la
 estructura final, opcionalmente resuelve el banco, publica e incrementa la revisión.
 La validación autoritativa exige ventana no vencida, al menos un grupo y una variante,
-enunciados completos, `mc` con dos opciones y una correcta, `vf` con Verdadero/Falso
-y una correcta, y `abierta`/`code` sin opciones. Mientras sólo esté desplegada la
-etapa 1, `multiple` y cualquier justificación se rechazan con 409 para no ser
-interpretados por el runtime legacy. `code` puede publicarse en evaluación,
+enunciados completos, `mc` con dos opciones y una correcta, `multiple` con dos opciones
+y al menos una correcta, `vf` con Verdadero/Falso y una correcta, y `abierta`/`code`
+sin opciones. El runtime de etapa 2 permite publicar justificaciones y estrategias
+de selección múltiple. `code` puede publicarse en evaluación,
 pero al copiarse al banco queda como borrador.
 
 Con `GuardarTodoEnBanco=true`, una referencia se reutiliza solo si contenido, estado
@@ -2469,7 +2575,7 @@ al arrancar. Repetirlas y ejecutar `scripts/verificar-banco-preguntas.sql` y
 Los tests Jest usan SQL mockeado y no sustituyen esas pruebas reales.
 
 Validación local de esta entrega: `npm test -- --runInBand` y
-`npx jest --runInBand --detectOpenHandles`, ambos con 21 suites/412 pruebas. El puerto
+`npx jest --runInBand --detectOpenHandles`, ambos con 21 suites/418 pruebas. El puerto
 55803 quedó libre. `npm run build` continúa bloqueado por la configuración TypeScript
 global preexistente (`rootDir` sin `include`, y después la incompatibilidad
 NodeNext/CommonJS/verbatim y tipos de `mssql` ya documentada). No se ejecutó SQL Server

@@ -40,13 +40,3 @@ export function normalizeQuestionConfiguration(
         : (configuration.tratamientoJustificacion ?? "informativa"),
   };
 }
-
-export function requiresPendingQuestionRuntime(
-  question: { tipo: TipoPregunta; modoJustificacion?: ModoJustificacion },
-) {
-  return (
-    question.tipo === "multiple" ||
-    (question.modoJustificacion ?? "sin_justificacion") !==
-      "sin_justificacion"
-  );
-}

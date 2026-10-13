@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import {
   clearExamOutbox,
   enqueuePendingAnswer,
+  getPendingAnswer,
 } from "@/lib/exam-answer-outbox";
 import { evaluacionKeys } from "@/lib/query-keys";
 import { guardarRespuestaAtomica } from "@/services/api/evaluaciones.api";
@@ -38,7 +39,11 @@ describe("useExamAnswerSync", () => {
     await enqueuePendingAnswer({
       IdIntento: idIntento,
       IdPregunta: 15,
+      IdOpcionesSeleccionadas: [],
       RtaTexto: "respuesta offline",
+      Justificacion: null,
+      RevisionEsperada: 0,
+      EventoId: "00000000-0000-4000-8000-000000000901",
     });
     const { wrapper } = createQueryTestHarness();
     const { result } = renderHook(() => useExamAnswerSync(idIntento), { wrapper });
@@ -54,17 +59,60 @@ describe("useExamAnswerSync", () => {
     await clearExamOutbox(idIntento);
   });
 
+  it("registra Sin respuesta para una justificación obligatoria vacía", async () => {
+    const idIntento = 903;
+    const { wrapper } = createQueryTestHarness();
+    const { result } = renderHook(() => useExamAnswerSync(idIntento), { wrapper });
+
+    await act(() => result.current.completeMissingJustifications([{
+      idPregunta: 17,
+      enunciado: "Elegí las opciones correctas",
+      tipo: "multiple",
+      modoJustificacion: "obligatoria",
+      respuesta: {
+        idRespuesta: 60,
+        idsOpcionesSeleccionadas: [4, 5],
+        rtaTexto: null,
+        justificacion: null,
+        revision: 2,
+      },
+    }]));
+
+    await expect(getPendingAnswer(idIntento, 17)).resolves.toMatchObject({
+      state: "pending",
+      payload: {
+        IdOpcionesSeleccionadas: [4, 5],
+        Justificacion: "Sin respuesta",
+        RevisionEsperada: 2,
+      },
+    });
+    await clearExamOutbox(idIntento);
+  });
+
   it("sincroniza una sola vez ante llamadas concurrentes y actualiza la query relacionada", async () => {
     const idIntento = 902;
     await enqueuePendingAnswer({
       IdIntento: idIntento,
       IdPregunta: 16,
-      IdOpcionNueva: 9,
+      IdOpcionesSeleccionadas: [9],
+      RtaTexto: null,
+      Justificacion: null,
+      RevisionEsperada: 0,
+      EventoId: "00000000-0000-4000-8000-000000000902",
     });
     let resolveRequest: (() => void) | undefined;
     guardarMock.mockImplementation(
-      () => new Promise<void>((resolve) => {
-        resolveRequest = resolve;
+      () => new Promise((resolve) => {
+        resolveRequest = () => resolve({
+          idRespuesta: 55,
+          idIntento,
+          idPregunta: 16,
+          idsOpcionesSeleccionadas: [9],
+          rtaTexto: null,
+          justificacion: null,
+          revision: 1,
+          replay: false,
+        });
       }),
     );
     const { queryClient, wrapper } = createQueryTestHarness();
