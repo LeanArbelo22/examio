@@ -33,8 +33,17 @@ const SAFE_CODE_MESSAGES: Record<string, string> = {
     "El intento todavía no fue entregado y no puede corregirse.",
   ATTEMPT_SCOPE_FORBIDDEN:
     "No tenés permisos para corregir este intento.",
-  QUESTION_RUNTIME_NOT_AVAILABLE:
-    "La evaluación usa selección múltiple o justificación. Podés guardarla como borrador, pero todavía no está disponible para ser respondida por alumnos.",
+  RESPONSE_REVISION_CONFLICT:
+    "La respuesta cambió en otra pestaña. Elegí qué versión querés conservar.",
+  RESPONSE_EVENT_CONFLICT:
+    "No se pudo repetir el guardado porque la operación ya fue usada con otro contenido.",
+  RESPONSE_CONTENT_INVALID: "La respuesta no corresponde al tipo de pregunta.",
+  RESPONSE_OPTIONS_INVALID: "Una de las opciones seleccionadas no es válida.",
+  JUSTIFICATION_NOT_ALLOWED: "Esta pregunta no admite justificación.",
+  ATTEMPT_QUESTION_NOT_FOUND: "La pregunta ya no pertenece a este intento.",
+  ATTEMPT_NOT_IN_PROGRESS: "El intento ya no admite nuevas respuestas.",
+  REQUIRED_JUSTIFICATION_MISSING:
+    "Completá la justificación de las preguntas respondidas antes de entregar.",
 };
 
 export function getErrorCategory(error: unknown): ErrorCategory {

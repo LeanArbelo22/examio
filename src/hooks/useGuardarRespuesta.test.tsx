@@ -28,9 +28,18 @@ describe("useGuardarRespuesta", () => {
 
   beforeEach(() => guardarMock.mockReset());
 
-  it("actualiza la opción optimísticamente y confirma la misma versión", async () => {
+  it("guarda el conjunto completo y actualiza la selección confirmada", async () => {
     const idIntento = 801;
-    guardarMock.mockResolvedValue(undefined);
+    guardarMock.mockResolvedValue({
+      idRespuesta: 44,
+      idIntento,
+      idPregunta: 15,
+      idsOpcionesSeleccionadas: [9],
+      rtaTexto: null,
+      justificacion: "Motivo",
+      revision: 1,
+      replay: false,
+    });
     const { queryClient, wrapper } = createQueryTestHarness();
     const key = evaluacionKeys.opciones(idIntento, 15);
     queryClient.setQueryData(key, options);
@@ -40,7 +49,11 @@ describe("useGuardarRespuesta", () => {
       result.current.mutateAsync({
         IdIntento: idIntento,
         IdPregunta: 15,
-        IdOpcionNueva: 9,
+        IdOpcionesSeleccionadas: [9],
+        RtaTexto: null,
+        Justificacion: "Motivo",
+        RevisionEsperada: 0,
+        EventoId: "00000000-0000-4000-8000-000000000801",
       }),
     );
 
@@ -49,6 +62,10 @@ describe("useGuardarRespuesta", () => {
       { idOpcion: 9, texto: "B", fueSeleccionada: true },
     ]);
     expect((await getExamOutboxSnapshot(idIntento)).answers).toEqual([]);
+    expect(guardarMock).toHaveBeenCalledWith(expect.objectContaining({
+      IdOpcionesSeleccionadas: [9],
+      RevisionEsperada: 0,
+    }));
     await clearExamOutbox(idIntento);
   });
 

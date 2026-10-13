@@ -21,6 +21,18 @@ su alcance. No reemplaza los contratos de `README.md`, el modelo de
 - No registrar ni persistir tokens, contraseñas, hashes o secretos reutilizables.
 - Reflejar en README únicamente comportamiento efectivo y verificado.
 
+## Navegación docente por evaluaciones
+
+**Estado: COMPLETADA**
+
+- [x] Ampliar aditivamente `GET /api/docentes/:legajo/evaluaciones` con IDs de
+  actividad, materia y comisión, más carrera obtenida por la relación real.
+- [x] Mantener una fila por publicación, los campos legacy y el orden por fecha de fin.
+- [x] Restringir al docente autenticado a su propio legajo; admin conserva alcance global.
+- [x] Cubrir comisiones múltiples, materias homónimas, aislamiento y respuesta vacía.
+- [x] Mantener documentado, fuera de alcance, el SP duplicado de `/materias` y
+  `/comisiones`.
+
 ## Calificación configurable — etapa 1
 
 **Estado: COMPLETADA — SQL APLICADO Y VERIFICADO EN BASE DE PRUEBA**
@@ -289,9 +301,12 @@ no degradar el aislamiento de la suite Jest estándar.
 - [x] Migración idempotente con preparación de respuesta, snapshots e historial.
 - [x] Bloqueo 409 al publicar contenido cuyo runtime corresponde a la etapa 2.
 - [x] Cobertura HTTP focalizada y documentación.
-- [ ] Aplicar dos veces `20261013_respuestas_multiples_justificacion.sql` en SQL Server
+- [x] Aplicar dos veces `20261013_respuestas_multiples_justificacion.sql` en SQL Server
   de prueba y ejecutar su verificador de sólo lectura.
-- [ ] Etapa 2: render, guardado atómico, entrega y corrección del nuevo modelo.
+- [x] Etapa 2 backend: render inmutable, guardado atómico/revisionado, entrega y
+  corrección del nuevo modelo, con compatibilidad legacy y cobertura HTTP.
+- [ ] Aplicar dos veces `20261014_runtime_respuestas_multiples.sql` en SQL Server de
+  prueba y ejecutar `verificar-runtime-respuestas-multiples.sql`.
 
 ---
 
@@ -480,7 +495,7 @@ evaluaciones, además del detalle por publicación. No implementado en esta entr
 
 ### Evidencia de validación local
 
-- Suite completa actual: **21 suites / 412 pruebas aprobadas**, también con
+- Suite completa actual: **21 suites / 418 pruebas aprobadas**, también con
   `--runInBand --detectOpenHandles`. Jest finaliza naturalmente sin `--forceExit`.
 - Suite del banco: **66 pruebas aprobadas**; incluye integración HTTP de copias
   durante creación/edición, rollback, conflictos y aislamiento.

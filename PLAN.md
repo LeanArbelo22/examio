@@ -590,8 +590,25 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 - [x] Permitir guardar contenido nuevo en borradores/banco y bloquear su publicación con un mensaje funcional mientras el runtime de alumno no esté disponible.
 - [x] Proteger el runtime actual del alumno para que `multiple` no se interprete como selección única ni como respuesta abierta.
 - [x] Agregar pruebas focalizadas de UI, schemas, defaults, transformadores, copias, bloqueo temporal y mensaje `QUESTION_RUNTIME_NOT_AVAILABLE`.
-- [!] Requisito de despliegue: aplicar dos veces `20261013_respuestas_multiples_justificacion.sql`, después de `20261011_calificacion_intentos_telemetria.sql`, y ejecutar `verificar-respuestas-multiples-justificacion.sql` contra SQL Server real.
-- [ ] Etapa 2 backend/frontend: habilitar renderizado, persistencia de selecciones múltiples y justificación durante el intento; hasta entonces el contenido nuevo no puede publicarse.
+- [x] Requisito de despliegue: las migraciones `20261013_respuestas_multiples_justificacion.sql` y `20261014_runtime_respuestas_multiples.sql` fueron aplicadas en la base real.
+
+### Etapa 2 — Resolución, entrega y corrección
+
+- [x] Backend: renderizar desde snapshots, persistir el conjunto completo de opciones y justificación, aplicar revisión optimista e idempotencia por `EventoId`, y habilitar publicación de `multiple`.
+- [x] Sincronizar `docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` después de la entrega backend.
+- [x] Ampliar tipos y servicio sobre los endpoints efectivos existentes, sin crear rutas ni query keys nuevas.
+- [x] Evolucionar la outbox de respuestas para conservar por separado el evento en vuelo y la edición más reciente, rebasar revisiones confirmadas y proteger cambios tardíos.
+- [x] Implementar selección única, selección múltiple, omisión explícita, texto y justificación con restauración desde snapshot/outbox.
+- [x] Tratar conflictos de revisión de forma visible, conservando la edición local y ofreciendo restaurar servidor o reenviar explícitamente la versión local.
+- [x] Completar al entregar las justificaciones obligatorias vacías con `"Sin respuesta"`, sincronizarlas antes del cierre y conservar el intento ante cualquier rechazo.
+- [x] Retirar el bloqueo temporal de publicación y ampliar corrección/revisión con justificación y puntaje sugerido por opciones.
+- [x] Agregar y ejecutar tests Vitest focalizados y ESLint sobre los archivos modificados.
+- [x] Actualizar el escenario E2E del examen para selección múltiple, justificación y respuesta canónica; su ejecución queda delegada a la validación manual de esta iteración.
+- [ ] Completar la comprobación manual contra la API y SQL Server reales: publicación, recarga, offline/replay, conflicto entre pestañas, entrega y revisión manual.
+- [x] Evitar que el cleanup de navegación vuelva a encolar un `EventoId` ya confirmado y genere conflictos falsos de revisión al regresar a una pregunta.
+- [x] Diferenciar en la corrección docente opciones correctas elegidas/no elegidas y mostrar cuántas respuestas correctas fueron efectivamente seleccionadas.
+- [x] Presentar de forma neutral la revisión del alumno cuando el backend omite `esCorrecta`; no inferir una respuesta incorrecta desde un campo ausente.
+- [!] La anulación autoritativa por incidente, la confirmación final de corrección y la habilitación real de claves en la revisión requieren contratos backend adicionales.
 
 ---
 

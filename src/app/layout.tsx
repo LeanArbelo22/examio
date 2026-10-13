@@ -21,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${geistSans.variable} scroll-smooth`}>
-      <body className="min-h-screen bg-slate-50 font-sans text-slate-900 antialiased flex flex-col pt-0 m-0 overflow-x-hidden">
+      <body className="min-h-screen bg-slate-50 font-sans text-slate-900 antialiased flex flex-col pt-0 m-0">
         <Providers>
           <Navbar />
           <main className="flex-1 flex flex-col">{children}</main>

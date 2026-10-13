@@ -22,16 +22,16 @@ describe("errors", () => {
     expect(isRetryableError(new ApiError("Inválido", 400, "REQUEST_INVALID"))).toBe(false);
   });
 
-  it("explica el bloqueo temporal del runtime de preguntas", () => {
+  it("explica un conflicto de revisión sin exponer detalles internos", () => {
     expect(
       getUserErrorMessage(
         new ApiError(
-          "Runtime pendiente",
+          "Revisión obsoleta",
           409,
-          "QUESTION_RUNTIME_NOT_AVAILABLE",
+          "RESPONSE_REVISION_CONFLICT",
         ),
       ),
-    ).toContain("Podés guardarla como borrador");
+    ).toContain("otra pestaña");
   });
 
   it("agrupa el primer error de validación de cada campo", () => {

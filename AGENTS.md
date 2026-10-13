@@ -252,23 +252,28 @@ React Query gestiona estado remoto confirmado. El estado local controla interacc
 efímera y la outbox IndexedDB del examen conserva respuestas pendientes; no trasladar
 esas respuestas a React Query como única fuente durable.
 
-## Testing
+## Testing y validación
 
-El testing usa Vitest 4, jsdom, React Testing Library, `user-event`, `jest-dom`,
-MSW 2 y Playwright. Los tests unitarios se ubican junto al módulo probado como `*.test.ts` o `*.test.tsx`;
-la configuración común vive en `vitest.config.ts` y `vitest.setup.ts`.
-`src/test/msw/server.ts` expone el servidor Node compartido para simular `fetch`.
-Declarar handlers por test, usar rutas BFF same-origin y mantener
-`onUnhandledRequest: "error"`; no crear mocks globales permisivos ni simular tokens.
-Los tests de hooks deben usar `src/test/query-client.tsx`, que crea un `QueryClient`
-aislado y sin reintentos. Mockear el servicio de dominio para probar keys,
-`enabled`, payloads e invalidaciones; usar MSW cuando el objeto de la prueba sea HTTP.
-La outbox IndexedDB se prueba con `fake-indexeddb`; crear una fábrica aislada y usar
-identificadores de intento únicos para evitar estado compartido entre casos. Probar
-siempre también el fallback sin IndexedDB y exigir que informe `durable: false`.
-Los E2E viven en `e2e/` y usan una API efímera local para atravesar NextAuth,
-middleware y BFF sin SQL Server, cuentas reales ni datos persistentes. Mantener sus
-contratos mínimos acotados a los flujos críticos; no convertir el stub en otra API.
+El frontend utiliza Vitest, React Testing Library, MSW y Playwright. La configuración y los tests existentes deben reutilizarse; no agregar infraestructura de testing ni dependencias sin justificación y aprobación.
+
+Aplicar una validación proporcional al cambio:
+
+1. Ejecutar primero el test específico del módulo modificado, si existe.
+2. Ejecutar ESLint sobre los archivos modificados.
+3. Ampliar a la suite completa, E2E, typecheck o build únicamente cuando el alcance del cambio lo justifique.
+
+### Manejo de errores
+
+* Si aparece un error, identificar primero si está relacionado directamente con el cambio realizado.
+* Investigar únicamente los archivos y dependencias necesarios para determinar su causa.
+* Realizar como máximo dos intentos de diagnóstico o corrección por problema, salvo que exista una causa concreta y una solución clara.
+* No repetir el mismo comando sin modificar la hipótesis o las condiciones relevantes.
+* Si el error es preexistente, externo al cambio o requiere una investigación amplia, documentarlo brevemente y continuar cuando sea seguro.
+* No corregir problemas ajenos a la tarea ni iniciar refactors para resolverlos incidentalmente.
+* No ejecutar repetidamente toda la suite, E2E o build para diagnosticar un error localizado.
+
+Al finalizar, informar brevemente qué validaciones se ejecutaron y cuáles quedaron pendientes, con el motivo. No afirmar que una validación pasó si no se ejecutó correctamente.
+
 
 Validar de forma proporcional:
 
@@ -353,13 +358,19 @@ Respetar `prefers-reduced-motion`; no depender de animación para comunicar esta
 - **Importaciones y puntajes personalizados:** el contenido pendiente del banco todavía no tiene un
   grupo editable al que asignar puntaje. Debe guardarse primero como borrador, recargar el detalle y
   recién entonces publicarse.
-- **Selección múltiple y justificación — etapa fundacional:** `mc` sigue siendo selección única y
-  `multiple` permite varias correctas. La UI sólo ofrece justificación en `mc`, `multiple` y `vf`;
-  `abierta` y `code` fuerzan `sin_justificacion`. Banco y borradores ya persisten modo de justificación,
-  estrategia y tratamiento; `contenidoHash` lo calcula exclusivamente el backend. Hasta completar
-  el runtime de respuestas, cualquier evaluación con `multiple` o justificación debe conservarse
-  como borrador y la publicación responde `QUESTION_RUNTIME_NOT_AVAILABLE`. No degradar ni eliminar
-  esa configuración para publicar, ni implementar respuestas múltiples sobre el payload legacy.
+- **Selección múltiple y justificación:** `mc` sigue siendo selección única y `multiple` permite
+  varias selecciones. La UI sólo ofrece justificación en `mc`, `multiple` y `vf`; `abierta` y `code`
+  fuerzan `sin_justificacion`. El alumno guarda siempre el estado completo mediante
+  `IdOpcionesSeleccionadas`, texto, justificación, `RevisionEsperada` y un `EventoId` estable por
+  intención. El hash de contenido y los snapshots pertenecen al backend. No volver al payload legacy
+  para el runtime ni exponer `esCorrecta` en contratos del alumno.
+- **Concurrencia de respuestas:** la outbox conserva por separado el evento exacto en vuelo y la
+  edición local más reciente. Un reintento incierto mantiene UUID y body; una confirmación tardía
+  sólo confirma su versión y rebasa cualquier edición posterior. Un `RESPONSE_REVISION_CONFLICT`
+  conserva la respuesta local y exige que el alumno elija explícitamente entre servidor y versión
+  local. Reencolar el mismo `EventoId` y contenido es un no-op, incluso después de confirmarlo;
+  nunca resucitarlo desde el cleanup de navegación ni reintentar un 409 generando silenciosamente
+  otra revisión o UUID.
 - **Compatibilidad histórica de notas:** no se recalifican intentos anteriores. Los nuevos intentos
   conservan snapshot del puntaje y la corrección canónica opera sobre `IntentoPregunta`. El detalle
   efectivo no expone `idIntentoPregunta` ni un `estadoCorreccion` literal: la UI escribe por
@@ -419,6 +430,13 @@ válido; los contadores operativos siempre incluyen todos. Los promedios globale
 escalas 10/100 se interpretan sobre 10, mientras cada publicación conserva escala y umbral.
 No se reemplazó la navegación completa del docente ni se creó un sidebar global.
 
+El inicio `/profesor` agrupa las actividades por `idMateria` y mantiene la barra de
+gestión visible. Materias, comisiones y actividades cambian como vistas internas del
+mismo componente, con retorno explícito en cada nivel y sin crear rutas adicionales.
+Una materia con una sola comisión muestra directamente sus actividades. La agrupación
+usa IDs entregados por el backend; nunca debe reconstruirse por nombres de materia,
+carrera o división.
+
 El Banco privado está disponible en `/profesor/banco-preguntas`, con workspace de
 preguntas/grupos y rutas independientes de creación/edición. `QuestionContentEditor`
 es el límite reutilizable entre banco y evaluación. La creación de grupos puede mezclar
@@ -446,11 +464,16 @@ el mismo UUID conserva inicio/cierre, se sincroniza al recuperar conectividad y 
 estado, nota o validez. La corrección docente muestra resumen y cronología como información,
 no como determinación automática de fraude.
 
-La etapa fundacional de selección múltiple y justificación está integrada en los editores de banco
-y borradores. `QuestionContentEditor` diferencia selección única (`mc`) de selección múltiple
-(`multiple`), conserva justificación/estrategia/tratamiento en copias y nunca calcula el hash de
-contenido. La resolución por alumnos pertenece a la siguiente etapa: mientras no esté disponible,
-la UI permite guardar el contenido pero bloquea su publicación sin transformarlo.
+La selección múltiple y justificación está integrada de punta a punta. `QuestionContentEditor`
+diferencia selección única (`mc`) de selección múltiple (`multiple`), conserva configuración en
+banco/borradores y nunca calcula el hash. El runtime del alumno restaura respuestas desde snapshots,
+guarda conjuntos completos con revisión e idempotencia durable, permite justificación sólo en
+preguntas cerradas y, al entregar, registra `"Sin respuesta"` en las justificaciones obligatorias
+vacías antes de sincronizar y finalizar. La publicación ya no
+posee el bloqueo temporal de Etapa 1. La corrección docente presenta la justificación y diferencia el
+puntaje sugerido por opciones de la corrección definitiva cuando se requiere revisión manual.
+Mientras el backend no habilite una revisión autoritativa, la vista del alumno trata la ausencia de
+`esCorrecta` como información no disponible y nunca como una respuesta incorrecta.
 
 Playwright usa `.next-e2e` mediante `EXAMIO_NEXT_DIST_DIR`, por lo que los E2E y builds
 de validación pueden ejecutarse sin finalizar un `next dev` activo sobre `.next`.
@@ -471,6 +494,17 @@ No hay bypass de login activo.
 9. No modificar contratos de backend desde el frontend; documentar cualquier dato faltante.
 10. Validar archivos tocados, TypeScript y build según el riesgo del cambio.
 11. Actualizar la documentación correcta cuando una decisión persistente cambie.
+
+## Eficiencia de trabajo
+
+* Delimitar el alcance antes de investigar y modificar.
+* Leer primero los archivos directamente relacionados con la tarea.
+* No relevar nuevamente la arquitectura ni recorrer todo el repositorio si AGENTS.md y la documentación disponible ya resuelven esas dudas.
+* No investigar errores preexistentes que no afecten el objetivo solicitado.
+* Evitar ciclos repetitivos de diagnóstico, ejecución y lectura de logs. Si no hay avances concretos, detenerse, registrar la limitación y continuar con el trabajo independiente.
+* Mantener los cambios acotados y evitar refactors no solicitados.
+* Priorizar una implementación correcta y validada proporcionalmente antes que una investigación exhaustiva de problemas ajenos.
+
 
 ## Contexto recomendado para agentes
 

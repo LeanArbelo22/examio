@@ -37,10 +37,13 @@ import { ApiError } from "@/lib/api";
 import {
   clearExamFinalizationRequest,
   clearExamOutbox,
-  confirmPendingAnswer,
+  claimPendingAnswer,
+  completePendingAnswer,
+  discardPendingAnswer,
   enqueuePendingAnswer,
   getExamOutboxSnapshot,
   getPendingAnswer,
+  rebasePendingAnswer,
   requestExamFinalization,
   subscribeExamOutbox,
   updatePendingAnswerState,
@@ -54,6 +57,7 @@ import type {
   PublicarEvaluacionPayload,
   IniciarIntentoPayload,
   GuardarRespuestaPayload,
+  GuardarRespuestaResultado,
   AlertaPayload,
   NavegacionPayload,
   OpcionSorteada,
@@ -97,65 +101,103 @@ function shouldKeepPendingAnswer(error: unknown): boolean {
   );
 }
 
-const syncPromises = new Map<number, Promise<number[]>>();
+const syncPromises = new Map<number, Promise<GuardarRespuestaResultado[]>>();
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function createAnswerEventId(): string {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = character === "x" ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
 async function synchronizePendingAnswers(
   idIntento: number,
-): Promise<number[]> {
+): Promise<GuardarRespuestaResultado[]> {
   const existing = syncPromises.get(idIntento);
   if (existing) return existing;
 
   const operation = (async () => {
     if (typeof navigator !== "undefined" && !navigator.onLine) return [];
 
-    const snapshot = await getExamOutboxSnapshot(idIntento);
-    const synchronizedQuestions: number[] = [];
+    const synchronizedAnswers: GuardarRespuestaResultado[] = [];
+    let continueSync = true;
 
-    for (const record of snapshot.answers) {
-      if (record.state === "failed") continue;
+    while (continueSync) {
+      continueSync = false;
+      const snapshot = await getExamOutboxSnapshot(idIntento);
 
-      let synchronized = false;
-      let lastError: unknown;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          await guardarRespuestaAtomica(record.payload);
-          synchronized = await confirmPendingAnswer(
-            record.key,
-            record.version,
-          );
-          if (synchronized) synchronizedQuestions.push(record.idPregunta);
-          break;
-        } catch (error: unknown) {
-          lastError = error;
-          if (!shouldKeepPendingAnswer(error)) {
-            await updatePendingAnswerState(
+      for (const record of snapshot.answers) {
+        if (record.state === "failed" || record.state === "conflict") continue;
+        if (
+          record.payload.EventoId === undefined ||
+          record.payload.RevisionEsperada === undefined
+        ) continue;
+
+        const sent = await claimPendingAnswer(record);
+        if (!sent) continue;
+
+        let synchronized = false;
+        let lastError: unknown;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            const result = await guardarRespuestaAtomica(sent.payload);
+            const completion = await completePendingAnswer(
               record,
-              "failed",
-              error instanceof Error ? error.message : "Respuesta rechazada",
+              sent,
+              result.revision,
             );
+            synchronizedAnswers.push(result);
+            synchronized = true;
+            continueSync ||= completion.hasNewer;
             break;
+          } catch (error: unknown) {
+            lastError = error;
+            if (!shouldKeepPendingAnswer(error)) {
+              const isConflict =
+                error instanceof ApiError &&
+                error.code === "RESPONSE_REVISION_CONFLICT";
+              await updatePendingAnswerState(
+                record,
+                isConflict ? "conflict" : "failed",
+                error instanceof Error ? error.message : "Respuesta rechazada",
+                error instanceof ApiError ? error.code : undefined,
+              );
+              break;
+            }
+            if (attempt < 2) await wait(750 * 2 ** attempt);
           }
-          if (attempt < 2) await wait(750 * 2 ** attempt);
+        }
+
+        if (!synchronized && shouldKeepPendingAnswer(lastError)) {
+          await updatePendingAnswerState(
+            record,
+            "pending",
+            lastError instanceof Error
+              ? lastError.message
+              : "Sin conexión para sincronizar",
+            lastError instanceof ApiError ? lastError.code : undefined,
+          );
+          return synchronizedAnswers;
         }
       }
 
-      if (!synchronized && shouldKeepPendingAnswer(lastError)) {
-        await updatePendingAnswerState(
-          record,
-          "pending",
-          lastError instanceof Error
-            ? lastError.message
-            : "Sin conexión para sincronizar",
-        );
-        break;
-      }
+      const remaining = await getExamOutboxSnapshot(idIntento);
+      continueSync ||= remaining.answers.some(
+        (answer) =>
+          answer.state !== "failed" &&
+          answer.state !== "conflict" &&
+          answer.payload.EventoId !== undefined &&
+          answer.payload.RevisionEsperada !== undefined,
+      );
     }
 
-    return synchronizedQuestions;
+    return synchronizedAnswers;
   })().finally(() => {
     syncPromises.delete(idIntento);
   });
@@ -345,55 +387,43 @@ export const usePrecargarOpcionesExamen = (
 export const useGuardarRespuesta = () => {
   const queryClient = useQueryClient();
 
+  const applyResult = useCallback((result: GuardarRespuestaResultado) => {
+    queryClient.setQueryData<PreguntaSorteada[]>(
+      evaluacionKeys.sorteo(result.idIntento),
+      (questions) => questions?.map((question) =>
+        question.idPregunta === result.idPregunta
+          ? {
+              ...question,
+              respuesta: {
+                idRespuesta: result.idRespuesta,
+                idsOpcionesSeleccionadas: result.idsOpcionesSeleccionadas,
+                rtaTexto: result.rtaTexto,
+                justificacion: result.justificacion,
+                revision: result.revision,
+              },
+            }
+          : question,
+      ),
+    );
+    queryClient.setQueryData<OpcionSorteada[]>(
+      evaluacionKeys.opciones(result.idIntento, result.idPregunta),
+      (options) => options?.map((option) => ({
+        ...option,
+        fueSeleccionada: result.idsOpcionesSeleccionadas.includes(option.idOpcion),
+      })),
+    );
+  }, [queryClient]);
+
   const mutation = useMutation({
-    mutationFn: (payload: GuardarRespuestaPayload) => guardarRespuestaAtomica(payload),
-    onMutate: async (payload) => {
-      const outboxRecord = await enqueuePendingAnswer(payload);
-      if (payload.IdOpcionNueva === undefined) return { outboxRecord };
-
-      const queryKey = evaluacionKeys.opciones(
-        payload.IdIntento,
-        payload.IdPregunta,
-      );
-      await queryClient.cancelQueries({ queryKey });
-      const previousOptions =
-        queryClient.getQueryData<OpcionSorteada[]>(queryKey);
-
-      queryClient.setQueryData<OpcionSorteada[]>(queryKey, (options) =>
-        options?.map((option) => ({
-          ...option,
-          fueSeleccionada: option.idOpcion === payload.IdOpcionNueva,
-        })),
-      );
-
-      return { previousOptions, queryKey, outboxRecord };
-    },
-    onSuccess: async (_data, _payload, context) => {
-      if (!context?.outboxRecord) return;
-      await confirmPendingAnswer(
-        context.outboxRecord.key,
-        context.outboxRecord.version,
-      );
-    },
-    onError: async (error, _payload, context) => {
-      if (!context?.outboxRecord) return;
-      if (shouldKeepPendingAnswer(error)) {
-        await updatePendingAnswerState(
-          context.outboxRecord,
-          "pending",
-          error instanceof Error ? error.message : "Sin conexión para guardar",
-        );
-        return;
+    mutationFn: async (payload: GuardarRespuestaPayload) => {
+      const current = await getPendingAnswer(payload.IdIntento, payload.IdPregunta);
+      if (current?.payload.EventoId !== payload.EventoId) {
+        await enqueuePendingAnswer(payload);
       }
-
-      await updatePendingAnswerState(
-        context.outboxRecord,
-        "failed",
-        error instanceof Error ? error.message : "Respuesta rechazada",
-      );
-      if (context.previousOptions) {
-        queryClient.setQueryData(context.queryKey, context.previousOptions);
-      }
+      return synchronizePendingAnswers(payload.IdIntento);
+    },
+    onSuccess: (results) => {
+      results.forEach(applyResult);
     },
   });
 
@@ -402,7 +432,31 @@ export const useGuardarRespuesta = () => {
     [],
   );
 
-  return { ...mutation, persistPending };
+  const restoreServerAnswer = useCallback(async (
+    idIntento: number,
+    idPregunta: number,
+  ) => {
+    await discardPendingAnswer(idIntento, idPregunta);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: evaluacionKeys.sorteo(idIntento) }),
+      queryClient.invalidateQueries({
+        queryKey: evaluacionKeys.opciones(idIntento, idPregunta),
+      }),
+    ]);
+  }, [queryClient]);
+
+  const retryLocalAnswer = useCallback(async (
+    idIntento: number,
+    idPregunta: number,
+    revision: number,
+  ) => {
+    const record = await rebasePendingAnswer(idIntento, idPregunta, revision);
+    if (!record) return;
+    const results = await synchronizePendingAnswers(idIntento);
+    results.forEach(applyResult);
+  }, [applyResult]);
+
+  return { ...mutation, persistPending, restoreServerAnswer, retryLocalAnswer };
 };
 
 export const usePendingAnswer = (
@@ -460,8 +514,31 @@ export const useExamAnswerSync = (idIntento: number) => {
     }
     setIsSyncing(true);
     try {
-      const synchronizedQuestions =
+      const synchronizedAnswers =
         await synchronizePendingAnswers(idIntento);
+      const synchronizedQuestions = [
+        ...new Set(synchronizedAnswers.map((answer) => answer.idPregunta)),
+      ];
+      queryClient.setQueryData<PreguntaSorteada[]>(
+        evaluacionKeys.sorteo(idIntento),
+        (questions) => questions?.map((question) => {
+          const result = [...synchronizedAnswers]
+            .reverse()
+            .find((answer) => answer.idPregunta === question.idPregunta);
+          return result
+            ? {
+                ...question,
+                respuesta: {
+                  idRespuesta: result.idRespuesta,
+                  idsOpcionesSeleccionadas: result.idsOpcionesSeleccionadas,
+                  rtaTexto: result.rtaTexto,
+                  justificacion: result.justificacion,
+                  revision: result.revision,
+                },
+              }
+            : question;
+        }),
+      );
       await Promise.all(
         synchronizedQuestions.map((idPregunta) =>
           queryClient.invalidateQueries({
@@ -477,6 +554,44 @@ export const useExamAnswerSync = (idIntento: number) => {
       setIsSyncing(false);
     }
   }, [idIntento, queryClient]);
+
+  const completeMissingJustifications = useCallback(async (
+    questions: PreguntaSorteada[],
+  ) => {
+    let completed = 0;
+    for (const question of questions) {
+      if (
+        question.modoJustificacion !== "obligatoria" ||
+        !["mc", "multiple", "vf"].includes(question.tipo)
+      ) continue;
+
+      const current = await getPendingAnswer(idIntento, question.idPregunta);
+      if (current?.state === "conflict") continue;
+      const selectedOptions = current?.payload.IdOpcionesSeleccionadas ??
+        (current?.payload.IdOpcionNueva !== undefined
+          ? [current.payload.IdOpcionNueva]
+          : question.respuesta?.idsOpcionesSeleccionadas ?? []);
+      const justification = current?.payload.Justificacion ??
+        question.respuesta?.justificacion ?? "";
+      if (selectedOptions.length === 0 || justification.trim().length > 0) continue;
+
+      await enqueuePendingAnswer({
+        IdIntento: idIntento,
+        IdPregunta: question.idPregunta,
+        IdOpcionesSeleccionadas: selectedOptions,
+        RtaTexto: null,
+        Justificacion: "Sin respuesta",
+        RevisionEsperada: Math.max(
+          current?.payload.RevisionEsperada ?? 0,
+          question.respuesta?.revision ?? 0,
+        ),
+        EventoId: createAnswerEventId(),
+      });
+      completed += 1;
+    }
+    await refreshSnapshot();
+    return completed;
+  }, [idIntento, refreshSnapshot]);
 
   useEffect(() => {
     const initialRefresh = window.setTimeout(() => {
@@ -551,6 +666,7 @@ export const useExamAnswerSync = (idIntento: number) => {
     isSyncing,
     syncRevision,
     syncNow,
+    completeMissingJustifications,
     requestFinalization,
     cancelFinalization,
     clearOutbox,

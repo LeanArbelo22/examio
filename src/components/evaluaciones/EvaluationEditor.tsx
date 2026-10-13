@@ -46,7 +46,6 @@ import {
 } from "@/lib/exam-scoring";
 import {
   DEFAULT_QUESTION_CONFIGURATION,
-  requiresPendingQuestionRuntime,
 } from "@/lib/question-configuration";
 import {
   defaultExamSchedule,
@@ -301,19 +300,6 @@ function EvaluationEditorForm({
 
   const openPublishConfirmation = () => {
     if (
-      form.preguntas.some((group) =>
-        group.variantes.some(requiresPendingQuestionRuntime),
-      )
-    ) {
-      setFeedback({
-        variant: "warning",
-        message:
-          "Esta evaluación usa selección múltiple o justificación. Podés guardarla como borrador, pero todavía no está disponible para ser respondida por alumnos.",
-      });
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    if (
       (form.modoPuntaje ?? "iguales") === "personalizados" &&
       pendingImports.length > 0
     ) {
@@ -342,19 +328,6 @@ function EvaluationEditorForm({
 
   const publishDraft = async () => {
     if (!detail || !idPublicacion) return;
-    if (
-      form.preguntas.some((group) =>
-        group.variantes.some(requiresPendingQuestionRuntime),
-      )
-    ) {
-      setPublishModalOpen(false);
-      setFeedback({
-        variant: "warning",
-        message:
-          "Esta evaluación puede conservarse como borrador, pero todavía no puede publicarse porque contiene selección múltiple o justificación.",
-      });
-      return;
-    }
     const validation = examFormSchema.safeParse(form);
     if (!validation.success) {
       setPublishModalOpen(false);

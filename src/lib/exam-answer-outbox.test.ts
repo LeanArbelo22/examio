@@ -11,9 +11,11 @@ const answer = (
 ): GuardarRespuestaPayload => ({
   IdIntento: idIntento,
   IdPregunta: idPregunta,
-  ...(typeof value === "number"
-    ? { IdOpcionNueva: value }
-    : { RtaTexto: value }),
+  IdOpcionesSeleccionadas: typeof value === "number" ? [value] : [],
+  RtaTexto: typeof value === "string" ? value : null,
+  Justificacion: null,
+  RevisionEsperada: 0,
+  EventoId: `00000000-0000-4000-8000-${String(idPregunta).padStart(12, "0")}`,
 });
 
 async function loadOutbox(): Promise<OutboxModule> {
@@ -60,9 +62,48 @@ describe("exam answer outbox", () => {
 
     const pending = await outbox.getPendingAnswer(73, 15);
     expect(pending?.version).toBe(latest.version);
-    expect(pending?.payload.IdOpcionNueva).toBe(9);
+    expect(pending?.payload.IdOpcionesSeleccionadas).toEqual([9]);
     expect(pending?.state).toBe("pending");
     expect(pending?.lastError).toBeUndefined();
+  });
+
+  it("preserva el evento en vuelo y rebasa una edición posterior", async () => {
+    const outbox = await loadOutbox();
+    const first = await outbox.enqueuePendingAnswer(answer(75, 21, 8));
+    const sent = await outbox.claimPendingAnswer(first);
+    expect(sent?.payload.IdOpcionesSeleccionadas).toEqual([8]);
+
+    const latestPayload = {
+      ...answer(75, 21, 9),
+      EventoId: "00000000-0000-4000-8000-000000000999",
+    };
+    await outbox.enqueuePendingAnswer(latestPayload);
+    const completion = await outbox.completePendingAnswer(first, sent!, 1);
+
+    expect(completion).toEqual({ confirmed: false, hasNewer: true });
+    const pending = await outbox.getPendingAnswer(75, 21);
+    expect(pending?.payload.IdOpcionesSeleccionadas).toEqual([9]);
+    expect(pending?.payload.RevisionEsperada).toBe(1);
+    expect(pending?.payload.EventoId).toBe(latestPayload.EventoId);
+    expect(pending?.inFlight).toBeUndefined();
+  });
+
+  it("no resucita un evento confirmado cuando el cleanup lo vuelve a persistir", async () => {
+    const outbox = await loadOutbox();
+    const payload = answer(76, 22, 8);
+    const record = await outbox.enqueuePendingAnswer(payload);
+    const sent = await outbox.claimPendingAnswer(record);
+
+    await outbox.completePendingAnswer(record, sent!, 1);
+    const confirmed = await outbox.getPendingAnswer(76, 22);
+    expect(confirmed?.state).toBe("confirmed");
+    expect(confirmed?.payload.RevisionEsperada).toBe(1);
+
+    const repeated = await outbox.enqueuePendingAnswer(payload);
+    expect(repeated.version).toBe(confirmed?.version);
+    expect(repeated.state).toBe("confirmed");
+    expect(repeated.payload.RevisionEsperada).toBe(1);
+    await expect(outbox.listPendingAnswers(76)).resolves.toEqual([]);
   });
 
   it("persiste solicitud de entrega y aísla intentos diferentes", async () => {

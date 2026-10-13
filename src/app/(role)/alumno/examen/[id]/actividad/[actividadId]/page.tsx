@@ -1,195 +1,267 @@
 "use client";
 
-import { use, useState, useEffect, useRef } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import {
   useGetExamenSorteado,
   useGetOpcionesPregunta,
   useGuardarRespuesta,
   usePendingAnswer,
 } from "@/hooks/useEvaluaciones";
-import type { OpcionSorteada } from "@/types";
+import type {
+  GuardarRespuestaPayload,
+  OpcionSorteada,
+  PreguntaSorteada,
+} from "@/types";
 import { FeedbackMessage } from "@/components/ui/FeedbackMessage";
 
-export default function ActivityPage({ params }: { params: Promise<{ id: string; actividadId: string }> }) {
+interface AnswerDraft {
+  selectedOptionIds: number[];
+  text: string;
+  justification: string;
+}
+
+function createEventId(): string {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = character === "x" ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
+function answerFromSources(
+  question: PreguntaSorteada,
+  options: OpcionSorteada[] | undefined,
+  pending: ReturnType<typeof usePendingAnswer>,
+): AnswerDraft {
+  const server = question.respuesta;
+  const pendingOptions = pending?.payload.IdOpcionesSeleccionadas ??
+    (pending?.payload.IdOpcionNueva !== undefined
+      ? [pending.payload.IdOpcionNueva]
+      : undefined);
+
+  return {
+    selectedOptionIds:
+      pendingOptions ??
+      server?.idsOpcionesSeleccionadas ??
+      options?.filter((option) => option.fueSeleccionada).map((option) => option.idOpcion) ??
+      [],
+    text: pending?.payload.RtaTexto ?? server?.rtaTexto ?? "",
+    justification:
+      pending?.payload.Justificacion ?? server?.justificacion ?? "",
+  };
+}
+
+export default function ActivityPage({
+  params,
+}: {
+  params: Promise<{ id: string; actividadId: string }>;
+}) {
   const { id, actividadId } = use(params);
   const idIntento = Number(id);
-  const questionIndex = parseInt(actividadId) - 1;
-
-  const [openText, setOpenText] = useState("");
-  const [isPersistingDraft, setIsPersistingDraft] = useState(false);
+  const questionIndex = Number.parseInt(actividadId, 10) - 1;
   const draftTimerRef = useRef<number | undefined>(undefined);
-  const restoredQuestionRef = useRef<string | undefined>(undefined);
+  const latestPayloadRef = useRef<GuardarRespuestaPayload | undefined>(undefined);
+  const restoredKeyRef = useRef<string | undefined>(undefined);
+  const conflictRefreshedVersionRef = useRef<string | undefined>(undefined);
 
-  const { data: preguntas } = useGetExamenSorteado(idIntento);
-  const currentQuestion = preguntas?.[questionIndex] ?? null;
-
-  const { data: opciones } = useGetOpcionesPregunta(currentQuestion?.idPregunta || 0, idIntento);
   const {
-    mutate: enviarRespuesta,
-    isPending: isSaving,
-    persistPending,
-  } = useGuardarRespuesta();
+    data: preguntas,
+    refetch: refetchQuestions,
+  } = useGetExamenSorteado(idIntento);
+  const currentQuestion = preguntas?.[questionIndex] ?? null;
+  const {
+    data: opciones,
+    refetch: refetchOptions,
+  } = useGetOpcionesPregunta(currentQuestion?.idPregunta || 0, idIntento);
   const pendingAnswer = usePendingAnswer(
     idIntento,
     currentQuestion?.idPregunta ?? 0,
   );
+  const {
+    mutate: synchronizeAnswer,
+    isPending: isSaving,
+    persistPending,
+    restoreServerAnswer,
+    retryLocalAnswer,
+  } = useGuardarRespuesta();
 
-  const openTextRef = useRef(openText);
+  const [draft, setDraft] = useState<AnswerDraft>({
+    selectedOptionIds: [],
+    text: "",
+    justification: "",
+  });
+  const [isPersistingDraft, setIsPersistingDraft] = useState(false);
+
+  const questionKey = currentQuestion
+    ? `${idIntento}:${currentQuestion.idPregunta}`
+    : "";
+
   useEffect(() => {
-    openTextRef.current = openText;
-  }, [openText]);
+    if (!currentQuestion) return;
+    const source = answerFromSources(currentQuestion, opciones, pendingAnswer);
+    const selectedOptionsVersion = opciones
+      ?.filter((option) => option.fueSeleccionada)
+      .map((option) => option.idOpcion)
+      .join(",") ?? "";
+    const sourceVersion = `${questionKey}:${pendingAnswer?.version ?? "server"}:${currentQuestion.respuesta?.revision ?? 0}:${selectedOptionsVersion}`;
+    if (restoredKeyRef.current === sourceVersion) return;
+    restoredKeyRef.current = sourceVersion;
+    setDraft(source);
+  }, [currentQuestion, opciones, pendingAnswer, questionKey]);
+
+  useEffect(() => {
+    if (
+      !currentQuestion ||
+      !pendingAnswer ||
+      (pendingAnswer.payload.EventoId !== undefined &&
+        pendingAnswer.payload.RevisionEsperada !== undefined)
+    ) return;
+
+    const migrated = answerFromSources(currentQuestion, opciones, pendingAnswer);
+    const payload: GuardarRespuestaPayload = {
+      IdIntento: idIntento,
+      IdPregunta: currentQuestion.idPregunta,
+      IdOpcionesSeleccionadas: migrated.selectedOptionIds,
+      RtaTexto: migrated.text.trim() || null,
+      Justificacion: migrated.justification.trim() || null,
+      RevisionEsperada: currentQuestion.respuesta?.revision ?? 0,
+      EventoId: createEventId(),
+    };
+    latestPayloadRef.current = payload;
+    synchronizeAnswer(payload);
+  }, [currentQuestion, idIntento, opciones, pendingAnswer, synchronizeAnswer]);
+
+  useEffect(() => {
+    if (
+      pendingAnswer?.state !== "conflict" ||
+      conflictRefreshedVersionRef.current === pendingAnswer.version
+    ) return;
+    conflictRefreshedVersionRef.current = pendingAnswer.version;
+    void Promise.all([refetchQuestions(), refetchOptions()]);
+  }, [pendingAnswer, refetchOptions, refetchQuestions]);
 
   useEffect(() => {
     return () => {
       window.clearTimeout(draftTimerRef.current);
-      if (
-        currentQuestion?.idPregunta &&
-        (currentQuestion.tipo ?? "").toLowerCase() === "abierta"
-      ) {
-        const text = openTextRef.current.trim();
-        if (text) {
-          enviarRespuesta({
-            IdIntento: idIntento,
-            IdPregunta: currentQuestion.idPregunta,
-            RtaTexto: text,
-          });
-        }
+      const latestPayload = latestPayloadRef.current;
+      latestPayloadRef.current = undefined;
+      if (latestPayload) {
+        void persistPending(latestPayload);
       }
     };
-  }, [
-    actividadId,
-    currentQuestion?.idPregunta,
-    currentQuestion?.tipo,
-    enviarRespuesta,
-    idIntento,
-  ]);
+  }, [persistPending, questionKey]);
 
-  useEffect(() => {
-    if (currentQuestion?.idPregunta) {
-      Promise.resolve().then(() => {
-        const questionKey = `${idIntento}:${currentQuestion.idPregunta}`;
-        if (pendingAnswer?.payload.RtaTexto !== undefined) {
-          setOpenText(pendingAnswer.payload.RtaTexto);
-          restoredQuestionRef.current = questionKey;
-          return;
-        }
-        if (restoredQuestionRef.current === questionKey) return;
+  const isClosed = currentQuestion
+    ? ["mc", "multiple", "vf"].includes(currentQuestion.tipo)
+    : false;
+  const supportsJustification =
+    isClosed &&
+    (currentQuestion?.modoJustificacion ?? "sin_justificacion") !==
+      "sin_justificacion";
+  const hasAnswer = isClosed
+    ? draft.selectedOptionIds.length > 0
+    : draft.text.trim().length > 0;
+  const expectedRevision = Math.max(
+    pendingAnswer?.payload.RevisionEsperada ?? 0,
+    currentQuestion?.respuesta?.revision ?? 0,
+  );
 
-        const storedText = localStorage.getItem(`examio_rta_abierta_${idIntento}_${currentQuestion.idPregunta}`);
-        setOpenText(storedText ?? "");
-        restoredQuestionRef.current = questionKey;
-        if (storedText !== null) {
-          void persistPending({
-            IdIntento: idIntento,
-            IdPregunta: currentQuestion.idPregunta,
-            RtaTexto: storedText,
-          }).then(() => {
-            localStorage.removeItem(
-              `examio_rta_abierta_${idIntento}_${currentQuestion.idPregunta}`,
-            );
-          });
-        }
+  const createPayload = (next: AnswerDraft): GuardarRespuestaPayload => ({
+    IdIntento: idIntento,
+    IdPregunta: currentQuestion?.idPregunta ?? 0,
+    IdOpcionesSeleccionadas: isClosed ? next.selectedOptionIds : [],
+    RtaTexto: isClosed ? null : next.text.trim() || null,
+    Justificacion: supportsJustification
+      ? next.justification.trim() || null
+      : null,
+    RevisionEsperada: expectedRevision,
+    EventoId: createEventId(),
+  });
+
+  const saveImmediately = (next: AnswerDraft) => {
+    if (!currentQuestion) return;
+    setDraft(next);
+    const payload = createPayload(next);
+    latestPayloadRef.current = payload;
+    synchronizeAnswer(payload);
+  };
+
+  const queueTextChange = (next: AnswerDraft) => {
+    if (!currentQuestion) return;
+    setDraft(next);
+    setIsPersistingDraft(true);
+    const payload = createPayload(next);
+    latestPayloadRef.current = payload;
+    void persistPending(payload);
+    window.clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = window.setTimeout(() => {
+      synchronizeAnswer(payload, {
+        onSettled: () => setIsPersistingDraft(false),
       });
-    }
-  }, [
-    idIntento,
-    currentQuestion?.idPregunta,
-    pendingAnswer?.payload.RtaTexto,
-    pendingAnswer?.version,
-    persistPending,
-  ]);
-
-  const handleSeleccionarOpcion = (idOpcion: number) => {
-    if (!currentQuestion?.idPregunta) return;
-
-    enviarRespuesta({
-      IdIntento: idIntento,
-      IdPregunta: currentQuestion.idPregunta,
-      IdOpcionNueva: idOpcion,
-    });
+    }, 750);
   };
 
-  const handleOpenTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const texto = e.target.value;
-    setOpenText(texto);
-    openTextRef.current = texto;
-    if (currentQuestion?.idPregunta) {
-      setIsPersistingDraft(true);
-      const payload = {
-        IdIntento: idIntento,
-        IdPregunta: currentQuestion.idPregunta,
-        RtaTexto: texto,
-      };
-      void persistPending(payload);
-      window.clearTimeout(draftTimerRef.current);
-      draftTimerRef.current = window.setTimeout(() => {
-        enviarRespuesta(payload, {
-          onSettled: () => setIsPersistingDraft(false),
-        });
-      }, 750);
-    }
-  };
-
-  const handleTextBlur = () => {
-    if (!currentQuestion?.idPregunta) return;
+  const flushTextChange = () => {
+    const payload = latestPayloadRef.current;
+    if (!payload) return;
     window.clearTimeout(draftTimerRef.current);
     setIsPersistingDraft(true);
-    const text = openText.trim();
-    openTextRef.current = text;
-    enviarRespuesta({
-      IdIntento: idIntento,
-      IdPregunta: currentQuestion.idPregunta,
-      RtaTexto: text,
-    }, {
+    synchronizeAnswer(payload, {
       onSettled: () => setIsPersistingDraft(false),
     });
   };
 
+  const selectOption = (idOpcion: number) => {
+    const selected = currentQuestion?.tipo === "multiple"
+      ? draft.selectedOptionIds.includes(idOpcion)
+        ? draft.selectedOptionIds.filter((optionId) => optionId !== idOpcion)
+        : [...draft.selectedOptionIds, idOpcion].sort((a, b) => a - b)
+      : [idOpcion];
+    saveImmediately({ ...draft, selectedOptionIds: selected });
+  };
+
+  const answerStatus = useMemo(() => {
+    if (pendingAnswer?.state === "conflict") {
+      return { label: "Conflicto de guardado", className: "bg-rose-50 text-rose-700" };
+    }
+    if (pendingAnswer?.state === "failed") {
+      return { label: "Error de guardado", className: "bg-rose-50 text-rose-700" };
+    }
+    if (isSaving || isPersistingDraft || pendingAnswer?.state === "syncing") {
+      return { label: "Guardando…", className: "bg-blue-50 text-blue-700" };
+    }
+    if (pendingAnswer?.state === "pending") {
+      return { label: "Pendiente de sincronización", className: "bg-amber-50 text-amber-700" };
+    }
+    if (hasAnswer) {
+      return { label: "Guardado", className: "bg-emerald-50 text-emerald-700" };
+    }
+    return null;
+  }, [hasAnswer, isPersistingDraft, isSaving, pendingAnswer?.state]);
+
   if (!currentQuestion) {
     return (
-      <div className="text-center p-4">
-        <p className="text-sm font-semibold text-slate-700">Buscando reactivo en el entorno seguro...</p>
+      <div className="p-4 text-center">
+        <p className="text-sm font-semibold text-slate-700">
+          Buscando pregunta en el entorno seguro...
+        </p>
       </div>
     );
   }
-
-  if (currentQuestion.tipo === "multiple") {
-    return (
-      <FeedbackMessage
-        variant="warning"
-        message="Esta pregunta todavía no está disponible para ser respondida. Avisale al docente antes de continuar."
-      />
-    );
-  }
-
-  const selectedOptionId =
-    pendingAnswer?.payload.IdOpcionNueva ??
-    opciones?.find((option: OpcionSorteada) => option.fueSeleccionada)?.idOpcion;
-  const hasAnswer =
-    selectedOptionId !== undefined || openText.trim().length > 0;
-  const answerStatus = isSaving || isPersistingDraft
-    ? { label: "Guardando…", className: "bg-blue-50 text-blue-700" }
-    : pendingAnswer?.state === "failed"
-      ? { label: "Error de guardado", className: "bg-rose-50 text-rose-700" }
-      : pendingAnswer?.state === "pending"
-        ? {
-            label: "Pendiente de sincronización",
-            className: "bg-amber-50 text-amber-700",
-          }
-        : hasAnswer
-          ? { label: "Guardado", className: "bg-emerald-50 text-emerald-700" }
-          : null;
 
   return (
     <div key={`${idIntento}_${actividadId}`} className="space-y-6 antialiased">
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <div>
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">EXAMIO Entorno Seguro</span>
-          <h2 className="text-xl font-black text-slate-800 tracking-tight mt-0.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            EXAMIO Entorno Seguro
+          </span>
+          <h2 className="mt-0.5 text-xl font-black tracking-tight text-slate-800">
             Pregunta {actividadId} de {preguntas?.length}
           </h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {currentQuestion.puntajeMaximo !== undefined && (
             <span className="rounded-md bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
               {currentQuestion.puntajeMaximo} punto
@@ -199,62 +271,143 @@ export default function ActivityPage({ params }: { params: Promise<{ id: string;
           {answerStatus && (
             <span
               role="status"
-              className={`text-xs font-semibold px-2.5 py-1 rounded-md ${answerStatus.className}`}
+              className={`rounded-md px-2.5 py-1 text-xs font-semibold ${answerStatus.className}`}
             >
               {answerStatus.label}
             </span>
           )}
-          <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">
-            Obligatoria
-          </span>
         </div>
       </div>
 
-      <div className="text-slate-700 text-sm md:text-base leading-relaxed font-medium bg-slate-50 border border-slate-100 p-4 rounded-xl">
+      {pendingAnswer?.state === "conflict" && (
+        <div className="space-y-3">
+          <FeedbackMessage
+            variant="error"
+            message="Esta respuesta cambió en otra pestaña. Tu edición local sigue protegida; elegí qué versión conservar."
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void restoreServerAnswer(idIntento, currentQuestion.idPregunta)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Usar respuesta guardada
+            </button>
+            <button
+              type="button"
+              onClick={() => void retryLocalAnswer(
+                idIntento,
+                currentQuestion.idPregunta,
+                currentQuestion.respuesta?.revision ?? 0,
+              )}
+              className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Guardar mi respuesta
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm font-medium leading-relaxed text-slate-700 md:text-base">
         {currentQuestion.enunciado}
       </div>
 
-      <div className="space-y-3 pt-2">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-          Seleccioná una opción:
-        </p>
-        
-        {opciones?.map((option: OpcionSorteada) => {
-          const idOpcion = option.idOpcion;
-          const texto = option.texto;
-          const isSelected = selectedOptionId === idOpcion;
-
-          return (
-            <div
-              key={idOpcion}
-              onClick={() => handleSeleccionarOpcion(idOpcion)}
-              className={`w-full flex items-center gap-4 p-4 rounded-xl border text-sm font-semibold transition-all duration-200 cursor-pointer select-none ${
-                isSelected
-                  ? 'border-indigo-600 bg-indigo-50/40 text-indigo-900 shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
-              }`}
+      {isClosed ? (
+        <fieldset className="space-y-3 pt-2">
+          <legend className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+            {currentQuestion.tipo === "multiple"
+              ? "Seleccioná una o más opciones"
+              : "Seleccioná una opción"}
+          </legend>
+          {opciones?.map((option) => {
+            const selected = draft.selectedOptionIds.includes(option.idOpcion);
+            return (
+              <label
+                key={option.idOpcion}
+                className={`flex w-full cursor-pointer select-none items-center gap-4 rounded-xl border p-4 text-sm font-semibold transition-colors ${
+                  selected
+                    ? "border-indigo-600 bg-indigo-50/40 text-indigo-900 shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50/50"
+                }`}
+              >
+                <input
+                  type={currentQuestion.tipo === "multiple" ? "checkbox" : "radio"}
+                  name={`pregunta-${currentQuestion.idPregunta}`}
+                  checked={selected}
+                  onChange={() => selectOption(option.idOpcion)}
+                  className="h-5 w-5 shrink-0 accent-indigo-600"
+                />
+                <span className="leading-tight">{option.texto}</span>
+              </label>
+            );
+          })}
+          {draft.selectedOptionIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => saveImmediately({ ...draft, selectedOptionIds: [] })}
+              className="text-sm font-semibold text-indigo-700 underline-offset-4 hover:underline"
             >
-              <div className={`h-5 w-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
-                isSelected ? 'border-indigo-600 bg-indigo-600 scale-100' : 'border-slate-300 bg-white'
-              }`}>
-                {isSelected && <div className="h-2 w-2 rounded-full bg-white" />}
-              </div>
-              <span className="leading-tight">{texto}</span>
-            </div>
-          );
-        })}
-
-        {(currentQuestion.tipo ?? "").toLowerCase() === "abierta" && (
+              Limpiar respuesta
+            </button>
+          )}
+        </fieldset>
+      ) : (
+        <div>
+          <label
+            htmlFor={`respuesta-${currentQuestion.idPregunta}`}
+            className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500"
+          >
+            Tu respuesta
+          </label>
           <textarea
-            rows={4}
-            placeholder="Escribí tu respuesta en formato de ensayo libre..."
-            value={openText}
-            onChange={handleOpenTextChange}
-            onBlur={handleTextBlur}
-            className="block w-full px-4 py-3 text-sm rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all resize-none font-medium"
+            id={`respuesta-${currentQuestion.idPregunta}`}
+            rows={currentQuestion.tipo === "code" ? 8 : 5}
+            placeholder={
+              currentQuestion.tipo === "code"
+                ? "Escribí tu solución..."
+                : "Escribí tu respuesta..."
+            }
+            value={draft.text}
+            onChange={(event) => queueTextChange({ ...draft, text: event.target.value })}
+            onBlur={flushTextChange}
+            className="block w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium focus:border-indigo-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
           />
-        )}
-      </div>
+        </div>
+      )}
+
+      {supportsJustification && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <label
+            htmlFor={`justificacion-${currentQuestion.idPregunta}`}
+            className="block text-sm font-bold text-slate-700"
+          >
+            Justificación
+            {currentQuestion.modoJustificacion === "opcional" && (
+              <span className="font-normal text-slate-500"> (opcional)</span>
+            )}
+          </label>
+          <p id={`justificacion-ayuda-${currentQuestion.idPregunta}`} className="mt-1 text-xs text-slate-500">
+            {currentQuestion.modoJustificacion === "obligatoria"
+              ? "Podés explicar tu elección. Si dejás este campo vacío, se registrará como “Sin respuesta” al entregar."
+              : "Podés explicar por qué elegiste esa respuesta."}
+            {currentQuestion.tratamientoJustificacion === "revision_manual" &&
+              " El docente revisará tu explicación antes de confirmar el puntaje."}
+          </p>
+          <textarea
+            id={`justificacion-${currentQuestion.idPregunta}`}
+            rows={3}
+            maxLength={10000}
+            value={draft.justification}
+            onChange={(event) => queueTextChange({
+              ...draft,
+              justification: event.target.value,
+            })}
+            onBlur={flushTextChange}
+            aria-describedby={`justificacion-ayuda-${currentQuestion.idPregunta}`}
+            className="mt-3 block w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-indigo-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+          />
+        </div>
+      )}
     </div>
   );
 }

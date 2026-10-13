@@ -14,6 +14,7 @@ import {
   guardarIncidenteFoco,
   obtenerIncidentesFoco,
   obtenerResumenIncidentesFoco,
+  guardarRespuestaAtomica,
 } from "./evaluaciones.api";
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -145,6 +146,37 @@ describe("iniciarIntentoExamen", () => {
         body: JSON.stringify(payload),
       },
     );
+  });
+
+  it("envía una respuesta completa con revisión e idempotencia", async () => {
+    apiFetchMock.mockResolvedValue({
+      idRespuesta: 21,
+      idIntento: 73,
+      idPregunta: 15,
+      idsOpcionesSeleccionadas: [3, 5],
+      rtaTexto: null,
+      justificacion: "Ambas cumplen.",
+      revision: 4,
+      replay: false,
+    });
+    const payload = {
+      IdIntento: 73,
+      IdPregunta: 15,
+      IdOpcionesSeleccionadas: [3, 5],
+      RtaTexto: null,
+      Justificacion: "Ambas cumplen.",
+      RevisionEsperada: 3,
+      EventoId: "00000000-0000-4000-8000-000000000073",
+    };
+
+    await expect(guardarRespuestaAtomica(payload)).resolves.toMatchObject({
+      idsOpcionesSeleccionadas: [3, 5],
+      revision: 4,
+    });
+    expect(apiFetchMock).toHaveBeenCalledWith("/intentos/guardar-respuesta", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   });
 
   it("envía la corrección canónica por puntaje y comentario", async () => {

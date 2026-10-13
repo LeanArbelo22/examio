@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   normalizeQuestionConfiguration,
-  requiresPendingQuestionRuntime,
 } from "./question-configuration";
 
 describe("question configuration", () => {
@@ -11,17 +10,6 @@ describe("question configuration", () => {
       estrategiaCorreccion: "exacta",
       tratamientoJustificacion: "informativa",
     });
-  });
-
-  it("detecta contenido que todavía no puede publicarse", () => {
-    expect(requiresPendingQuestionRuntime({ tipo: "multiple" })).toBe(true);
-    expect(
-      requiresPendingQuestionRuntime({
-        tipo: "mc",
-        modoJustificacion: "opcional",
-      }),
-    ).toBe(true);
-    expect(requiresPendingQuestionRuntime({ tipo: "mc" })).toBe(false);
   });
 
   it("descarta justificación para desarrollo y programación", () => {
