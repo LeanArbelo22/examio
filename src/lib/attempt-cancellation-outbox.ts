@@ -1,32 +1,34 @@
-import type { IncidenteFocoPayload } from "@/types";
+import type { TipoIncidenteSeguridad } from "@/types";
 
-export type FocusIncidentState = "pending" | "failed";
+export type AttemptCancellationState = "pending" | "failed";
 
-export interface PendingFocusIncident {
+export interface PendingAttemptCancellation {
   key: string;
   version: string;
   idIntento: number;
   eventoId: string;
-  payload: IncidenteFocoPayload;
-  state: FocusIncidentState;
+  tipoIncidente: TipoIncidenteSeguridad;
+  state: AttemptCancellationState;
+  createdAt: number;
   updatedAt: number;
   attempts: number;
   lastError?: string;
 }
 
-const DATABASE_NAME = "examio-focus-incident-outbox";
+const DATABASE_NAME = "examio-attempt-cancellation-outbox";
 const DATABASE_VERSION = 1;
-const STORE = "incidents";
-const memoryIncidents = new Map<string, PendingFocusIncident>();
+const STORE = "cancellations";
+const memoryRecords = new Map<string, PendingAttemptCancellation>();
+const listeners = new Set<() => void>();
 let databasePromise: Promise<IDBDatabase> | null = null;
 let durableStorageAvailable = true;
 
-const recordKey = (idIntento: number, eventoId: string) =>
-  `${idIntento}:${eventoId}`;
-
+const recordKey = (idIntento: number) => String(idIntento);
 const createVersion = () =>
   globalThis.crypto?.randomUUID?.() ??
   `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const notify = () => listeners.forEach((listener) => listener());
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -54,8 +56,7 @@ async function openDatabase(): Promise<IDBDatabase> {
     request.onupgradeneeded = () => {
       const database = request.result;
       if (!database.objectStoreNames.contains(STORE)) {
-        const store = database.createObjectStore(STORE, { keyPath: "key" });
-        store.createIndex("idIntento", "idIntento");
+        database.createObjectStore(STORE, { keyPath: "key" });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -81,22 +82,42 @@ async function withDurableStorage<T>(
   }
 }
 
-export async function saveFocusIncident(
+export async function getAttemptCancellation(
+  idIntento: number,
+): Promise<PendingAttemptCancellation | undefined> {
+  const key = recordKey(idIntento);
+  return withDurableStorage(
+    async (database) => {
+      const transaction = database.transaction(STORE, "readonly");
+      const record = await requestResult(
+        transaction.objectStore(STORE).get(key),
+      ) as PendingAttemptCancellation | undefined;
+      if (record) memoryRecords.set(key, record);
+      return record;
+    },
+    () => memoryRecords.get(key),
+  );
+}
+
+export async function enqueueAttemptCancellation(
   idIntento: number,
   eventoId: string,
-  payload: IncidenteFocoPayload,
-): Promise<PendingFocusIncident> {
-  const key = recordKey(idIntento, eventoId);
-  const previous = memoryIncidents.get(key);
-  const record: PendingFocusIncident = {
-    key,
+  tipoIncidente: TipoIncidenteSeguridad,
+): Promise<PendingAttemptCancellation> {
+  const existing = await getAttemptCancellation(idIntento);
+  if (existing) return existing;
+
+  const now = Date.now();
+  const record: PendingAttemptCancellation = {
+    key: recordKey(idIntento),
     version: createVersion(),
     idIntento,
     eventoId,
-    payload,
+    tipoIncidente,
     state: "pending",
-    updatedAt: Date.now(),
-    attempts: previous?.attempts ?? 0,
+    createdAt: now,
+    updatedAt: now,
+    attempts: 0,
   };
   await withDurableStorage(
     async (database) => {
@@ -104,41 +125,22 @@ export async function saveFocusIncident(
       transaction.objectStore(STORE).put(record);
       await transactionComplete(transaction);
     },
-    () => {
-      memoryIncidents.set(key, record);
-    },
+    () => memoryRecords.set(record.key, record),
   );
-  memoryIncidents.set(key, record);
+  memoryRecords.set(record.key, record);
+  notify();
   return record;
 }
 
-export async function listFocusIncidents(
-  idIntento: number,
-): Promise<PendingFocusIncident[]> {
-  return withDurableStorage(
-    async (database) => {
-      const transaction = database.transaction(STORE, "readonly");
-      const records = await requestResult(
-        transaction.objectStore(STORE).index("idIntento").getAll(idIntento),
-      ) as PendingFocusIncident[];
-      records.forEach((record) => memoryIncidents.set(record.key, record));
-      return records.sort((left, right) => left.updatedAt - right.updatedAt);
-    },
-    () => [...memoryIncidents.values()]
-      .filter((record) => record.idIntento === idIntento)
-      .sort((left, right) => left.updatedAt - right.updatedAt),
-  );
-}
-
-export async function removeFocusIncident(
-  record: Pick<PendingFocusIncident, "key" | "version">,
+export async function removeAttemptCancellation(
+  record: Pick<PendingAttemptCancellation, "key" | "version">,
 ): Promise<boolean> {
   const removed = await withDurableStorage(
     async (database) => {
       const transaction = database.transaction(STORE, "readwrite");
       const store = transaction.objectStore(STORE);
       const current = await requestResult(store.get(record.key)) as
-        | PendingFocusIncident
+        | PendingAttemptCancellation
         | undefined;
       if (current?.version !== record.version) {
         transaction.abort();
@@ -148,24 +150,26 @@ export async function removeFocusIncident(
       await transactionComplete(transaction);
       return true;
     },
-    () => memoryIncidents.get(record.key)?.version === record.version,
+    () => memoryRecords.get(record.key)?.version === record.version,
   );
-  if (removed && memoryIncidents.get(record.key)?.version === record.version) {
-    memoryIncidents.delete(record.key);
+  if (removed && memoryRecords.get(record.key)?.version === record.version) {
+    memoryRecords.delete(record.key);
   }
+  if (removed) notify();
   return removed;
 }
 
-export async function failFocusIncident(
-  record: PendingFocusIncident,
+export async function failAttemptCancellation(
+  record: PendingAttemptCancellation,
   lastError: string,
 ): Promise<void> {
-  const records = await listFocusIncidents(record.idIntento);
-  const current = records.find((candidate) => candidate.key === record.key);
+  const current = await getAttemptCancellation(record.idIntento);
   if (current?.version !== record.version) return;
-  const failed = {
+  const failed: PendingAttemptCancellation = {
     ...current,
-    state: "failed" as const,
+    version: createVersion(),
+    state: "failed",
+    updatedAt: Date.now(),
     attempts: current.attempts + 1,
     lastError,
   };
@@ -175,13 +179,17 @@ export async function failFocusIncident(
       transaction.objectStore(STORE).put(failed);
       await transactionComplete(transaction);
     },
-    () => {
-      memoryIncidents.set(failed.key, failed);
-    },
+    () => memoryRecords.set(failed.key, failed),
   );
-  memoryIncidents.set(failed.key, failed);
+  memoryRecords.set(failed.key, failed);
+  notify();
 }
 
-export function isFocusOutboxDurable(): boolean {
+export function subscribeAttemptCancellation(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function isAttemptCancellationOutboxDurable(): boolean {
   return durableStorageAvailable;
 }

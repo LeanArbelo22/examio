@@ -356,12 +356,20 @@ export function StudentHistoryWorkspace() {
                     <p className="text-[11px] text-slate-500">
                       Aprobación: {attempt.notaAprobacion} / {attempt.escalaCalificacion}
                     </p>
-                    <Link
-                      href={`/alumno/intento/${attempt.idIntento}`}
-                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-                    >
-                      Ver detalle →
-                    </Link>
+                    {attempt.revisionDisponible ? (
+                      <Link
+                        href={`/alumno/intento/${attempt.idIntento}`}
+                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                      >
+                        Revisar examen →
+                      </Link>
+                    ) : (
+                      <span className="text-xs font-semibold text-slate-500">
+                        {attempt.correccionPendiente
+                          ? "Corrección en curso"
+                          : "Revisión no disponible"}
+                      </span>
+                    )}
                   </div>
                 </article>
               ))}

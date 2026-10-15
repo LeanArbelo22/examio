@@ -5,15 +5,18 @@ import { createQueryTestHarness } from "@/test/query-client";
 import {
   obtenerDetalleRendimientoAlumno,
   obtenerReporteRendimientoEvaluaciones,
+  obtenerReporteRendimientoPreguntas,
 } from "@/services/api/reportes.api";
 import type {
   ReporteEvaluacionesFiltros,
   ReporteEvaluacionesListado,
   ReporteRendimientoDetalle,
+  ReportePreguntasListado,
 } from "@/types";
 import {
   useDetalleRendimientoAlumno,
   useReporteRendimientoEvaluaciones,
+  useReporteRendimientoPreguntas,
 } from "./useReportes";
 
 vi.mock("@/services/api/reportes.api", async (importOriginal) => {
@@ -22,11 +25,13 @@ vi.mock("@/services/api/reportes.api", async (importOriginal) => {
     ...actual,
     obtenerDetalleRendimientoAlumno: vi.fn(),
     obtenerReporteRendimientoEvaluaciones: vi.fn(),
+    obtenerReporteRendimientoPreguntas: vi.fn(),
   };
 });
 
 const detalleMock = vi.mocked(obtenerDetalleRendimientoAlumno);
 const evaluacionesMock = vi.mocked(obtenerReporteRendimientoEvaluaciones);
+const preguntasMock = vi.mocked(obtenerReporteRendimientoPreguntas);
 
 function reporteEvaluaciones(pagina: number): ReporteEvaluacionesListado {
   return {
@@ -61,6 +66,7 @@ describe("hooks de reportes", () => {
   beforeEach(() => {
     detalleMock.mockReset();
     evaluacionesMock.mockReset();
+    preguntasMock.mockReset();
   });
 
   it("incluye todos los filtros en la key y conserva la página anterior durante el cambio", async () => {
@@ -142,5 +148,54 @@ describe("hooks de reportes", () => {
       ordenarPor: undefined,
       ordenDireccion: undefined,
     });
+  });
+
+  it("incluye filtros, paginación y orden en la consulta de preguntas", async () => {
+    const report: ReportePreguntasListado = {
+      criterios: {
+        alcanceIntentos: "validos",
+        estadoCorreccion: "confirmada",
+        normalizacionPuntaje: "porcentaje_puntaje_maximo",
+        identidadContenido: "contenidoHashSnapshot",
+      },
+      kpis: {
+        presentadas: 0,
+        respondidas: 0,
+        omitidas: 0,
+        pendientesCorreccion: 0,
+        correctas: 0,
+        parciales: 0,
+        incorrectas: 0,
+        justificacionesEntregadas: 0,
+        porcentajePuntajePromedio: null,
+        tasaAcierto: null,
+        muestrasTiempo: 0,
+        muestrasTiempoNuevas: 0,
+        muestrasTiempoLegacy: 0,
+        coberturaTemporal: 0,
+        tiempoPromedioMilisegundos: null,
+        tiempoMaximoMilisegundos: null,
+      },
+      items: [],
+      pagination: { page: 2, limit: 20, total: 0, totalPages: 0 },
+    };
+    preguntasMock.mockResolvedValue(report);
+    const filtros = {
+      idMateria: "3",
+      alcanceIntentos: "validos" as const,
+      estadoCorreccion: "confirmada" as const,
+      pagina: 2,
+      limite: 20,
+      ordenarPor: "tasaAcierto" as const,
+      ordenDireccion: "desc" as const,
+    };
+    const { queryClient, wrapper } = createQueryTestHarness();
+    const { result } = renderHook(() => useReporteRendimientoPreguntas(filtros), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(preguntasMock).toHaveBeenCalledWith(filtros);
+    expect(queryClient.getQueryData(reporteKeys.preguntas(filtros))).toEqual(report);
   });
 });

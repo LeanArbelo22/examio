@@ -15,6 +15,11 @@ import {
   obtenerIncidentesFoco,
   obtenerResumenIncidentesFoco,
   guardarRespuestaAtomica,
+  anularIntentoPorIncidente,
+  confirmarCorreccionIntento,
+  guardarEventoTemporal,
+  guardarEventosTemporalesLote,
+  obtenerEventosTemporales,
 } from "./evaluaciones.api";
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -306,5 +311,78 @@ describe("iniciarIntentoExamen", () => {
       3,
       "/telemetria/intentos/73/incidentes",
     );
+  });
+
+  it("usa los endpoints autoritativos de anulación y confirmación", async () => {
+    apiFetchMock.mockResolvedValue({});
+    const eventoId = "4e096ceb-51fd-49a1-8f80-c3760edaf021";
+
+    await anularIntentoPorIncidente(73, eventoId);
+    await confirmarCorreccionIntento(73);
+
+    expect(apiFetchMock).toHaveBeenNthCalledWith(
+      1,
+      `/intentos/73/anular-por-incidente/${eventoId}`,
+      { method: "PUT" },
+    );
+    expect(apiFetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/intentos/73/confirmar-correccion",
+      { method: "PUT" },
+    );
+  });
+
+  it("usa los contratos individual, batch y paginado de telemetría temporal", async () => {
+    apiFetchMock
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        items: [{ duracionMilisegundos: "31800" }],
+        resumen: {
+          total: 1,
+          intervalosAbiertos: 0,
+          duracionesPorTipo: [{ tipo: "question_active", duracionMilisegundos: "31800" }],
+          tiemposPorPregunta: [{
+            idIntentoPregunta: 83,
+            idPregunta: 15,
+            duracionMilisegundos: "31800",
+            fuente: "nueva",
+          }],
+        },
+        paginacion: { pagina: 2, limite: 20, total: 1, totalPaginas: 1 },
+      });
+    const eventoId = "4e096ceb-51fd-49a1-8f80-c3760edaf021";
+    const payload = {
+      Tipo: "question_active" as const,
+      IdIntentoPregunta: 83,
+      SesionClienteId: "50f8b18c-c03a-46fd-b830-ea3fc2d53f50",
+      SecuenciaCliente: 12,
+      FechaInicioCliente: "2026-10-14T14:05:00.000Z",
+      VersionContrato: 1 as const,
+    };
+
+    await guardarEventoTemporal(73, eventoId, payload);
+    await guardarEventosTemporalesLote(73, [{ EventoId: eventoId, ...payload }]);
+    const events = await obtenerEventosTemporales(73, 2, 20);
+
+    expect(apiFetchMock).toHaveBeenNthCalledWith(
+      1,
+      `/telemetria/intentos/73/eventos/${eventoId}`,
+      { method: "PUT", body: JSON.stringify(payload) },
+    );
+    expect(apiFetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/telemetria/intentos/73/eventos/lote",
+      {
+        method: "POST",
+        body: JSON.stringify({ Eventos: [{ EventoId: eventoId, ...payload }] }),
+      },
+    );
+    expect(apiFetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/telemetria/intentos/73/eventos?pagina=2&limite=20",
+    );
+    expect(events.items[0].duracionMilisegundos).toBe(31_800);
+    expect(events.resumen.tiemposPorPregunta[0].duracionMilisegundos).toBe(31_800);
   });
 });

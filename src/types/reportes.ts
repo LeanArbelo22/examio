@@ -1,5 +1,5 @@
 import type { Alumno } from "./alumnos";
-import type { TipoActividad } from "./shared";
+import type { TipoActividad, TipoPregunta } from "./shared";
 
 export type ReporteRendimientoEstado =
   | "entregado"
@@ -204,4 +204,188 @@ export interface ReporteRendimientoDetalle {
   alumno: Pick<Alumno, "matricula" | "nombre" | "apellido">;
   kpis: ReporteRendimientoDetalleKpis;
   actividades: ReporteActividadAlumno[];
+}
+
+export type EstadoCorreccionReporteContenido =
+  | "todas"
+  | "pendiente"
+  | "confirmada";
+
+export type ReportePreguntasOrden =
+  | "pregunta"
+  | "presentadas"
+  | "respondidas"
+  | "omitidas"
+  | "pendientesCorreccion"
+  | "tasaAcierto"
+  | "porcentajePuntaje"
+  | "tiempoPromedio";
+
+export type ReporteGruposOrden =
+  | "grupo"
+  | Exclude<ReportePreguntasOrden, "pregunta">;
+
+export type ReporteOpcionesOrden =
+  | "posicion"
+  | "selecciones"
+  | "porcentajeSeleccion";
+
+export interface ReporteContenidoFiltrosBase {
+  idMateria?: string;
+  idMateriaDivision?: string;
+  idActividad?: string;
+  idPublicacion?: string;
+  idGrupoPregunta?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  estadoIntento?: ReporteRendimientoEstado | "";
+  alcanceIntentos?: AlcanceIntentosReporte;
+  estadoCorreccion?: EstadoCorreccionReporteContenido;
+  pagina?: number;
+  limite?: number;
+  ordenDireccion?: OrdenDireccion;
+}
+
+export interface ReportePreguntasFiltros extends ReporteContenidoFiltrosBase {
+  idPregunta?: string;
+  ordenarPor?: ReportePreguntasOrden;
+}
+
+export interface ReporteGruposFiltros extends ReporteContenidoFiltrosBase {
+  ordenarPor?: ReporteGruposOrden;
+}
+
+export interface ReporteOpcionesFiltros extends ReporteContenidoFiltrosBase {
+  ordenarPor?: ReporteOpcionesOrden;
+}
+
+export interface ReporteContenidoCriterios {
+  alcanceIntentos: AlcanceIntentosReporte;
+  estadoCorreccion: EstadoCorreccionReporteContenido;
+  normalizacionPuntaje: "porcentaje_puntaje_maximo";
+  identidadContenido: "contenidoHashSnapshot";
+}
+
+export interface ReporteContenidoKpis {
+  presentadas: number;
+  respondidas: number;
+  omitidas: number;
+  pendientesCorreccion: number;
+  correctas: number;
+  parciales: number;
+  incorrectas: number;
+  justificacionesEntregadas: number;
+  porcentajePuntajePromedio: number | null;
+  tasaAcierto: number | null;
+  muestrasTiempo: number;
+  muestrasTiempoNuevas: number;
+  muestrasTiempoLegacy: number;
+  coberturaTemporal: number;
+  tiempoPromedioMilisegundos: number | null;
+  tiempoMaximoMilisegundos: number | null;
+}
+
+export interface ReporteContenidoMetricas {
+  presentadas: number;
+  respondidas: number;
+  omitidas: number;
+  pendientesCorreccion: number;
+  correctas: number;
+  parciales: number;
+  incorrectas: number;
+  porcentajePuntajePromedio: number | null;
+  tasaAcierto: number | null;
+  muestrasTiempo: number;
+  muestrasTiempoNuevas: number;
+  muestrasTiempoLegacy: number;
+  coberturaTemporal: number;
+  tiempoPromedioMilisegundos: number | null;
+  tiempoMedianaMilisegundos: number | null;
+  tiempoMaximoMilisegundos: number | null;
+}
+
+export interface ReportePreguntaItem extends ReporteContenidoMetricas {
+  claveContenido: string;
+  contenidoHashSnapshot: string | null;
+  idPregunta: number;
+  idGrupoPregunta: number;
+  cantidadPreguntasOrigen: number;
+  cantidadGrupos: number;
+  enunciado: string;
+  tipo: TipoPregunta;
+  grupo: string;
+  tieneProcedenciaBanco: boolean;
+  cantidadOrigenesBanco: number;
+  incluyeSnapshotReconstruido: boolean;
+  justificacionesEntregadas: number;
+  puntajePromedioObtenido: number | null;
+}
+
+export interface ReporteGrupoVariante extends ReporteContenidoMetricas {
+  idGrupoPregunta: number;
+  claveContenido: string;
+  contenidoHashSnapshot: string | null;
+  idPregunta: number;
+  enunciado: string;
+  tipo: TipoPregunta;
+}
+
+export interface ReporteGrupoItem extends ReporteContenidoMetricas {
+  idGrupoPregunta: number;
+  idActividad: number;
+  grupo: string;
+  cantidadVariantes: number;
+  tieneProcedenciaBanco: boolean;
+  justificacionesEntregadas: number;
+  diferenciaVariantesPuntosPorcentuales: number | null;
+  variantes: ReporteGrupoVariante[];
+}
+
+export interface ReporteContenidoPaginacion {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ReportePreguntasListado {
+  criterios: ReporteContenidoCriterios;
+  kpis: ReporteContenidoKpis;
+  items: ReportePreguntaItem[];
+  pagination: ReporteContenidoPaginacion;
+}
+
+export interface ReporteGruposListado {
+  criterios: ReporteContenidoCriterios;
+  kpis: ReporteContenidoKpis;
+  items: ReporteGrupoItem[];
+  pagination: ReporteContenidoPaginacion;
+}
+
+export interface ReporteOpcionItem {
+  claveContenido: string;
+  contenidoHashSnapshot: string | null;
+  posicion: number;
+  texto: string;
+  esCorrecta: boolean;
+  esDistractor: boolean;
+  presentaciones: number;
+  selecciones: number;
+  porcentajeSeleccion: number | null;
+}
+
+export interface ReporteOpcionesKpis {
+  presentadas: number;
+  respondidas: number;
+  omitidas: number;
+  justificacionesEntregadas: number;
+  totalSelecciones: number;
+  seleccionesDistractores: number;
+}
+
+export interface ReporteOpcionesListado {
+  criterios: ReporteContenidoCriterios & { idPregunta: number };
+  kpis: ReporteOpcionesKpis;
+  items: ReporteOpcionItem[];
+  pagination: ReporteContenidoPaginacion;
 }

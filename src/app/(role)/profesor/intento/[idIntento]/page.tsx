@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FinalGradeOverride } from "@/components/evaluaciones/FinalGradeOverride";
 import { QuestionCorrectionCard } from "@/components/evaluaciones/QuestionCorrectionCard";
 import { AttemptFocusTelemetry } from "@/components/evaluaciones/AttemptFocusTelemetry";
+import { CorrectionConfirmation } from "@/components/evaluaciones/CorrectionConfirmation";
 import { FeedbackMessage } from "@/components/ui/FeedbackMessage";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { RequestErrorState } from "@/components/ui/RequestErrorState";
@@ -130,6 +131,10 @@ export default function AttemptCorrectionPage({ params }: { params: Promise<{ id
           ))}
         </div>
       </section>
+
+      {isDelivered && (
+        <CorrectionConfirmation attempt={attempt} pendingCount={pendingCount} />
+      )}
     </main>
   );
 }

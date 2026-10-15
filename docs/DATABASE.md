@@ -195,12 +195,17 @@ El sorteo ocurre **exclusivamente aquí**. Cualquier renderizado posterior consu
 Ejecutado por `GET /api/evaluaciones/intento/:idIntento/renderizar`. Es una consulta de **solo lectura** sobre `IntentoPregunta`:
 
 ```sql
-SELECT P.Id AS IdPregunta, P.Enunciado, P.Tipo, GP.TituloReferencia AS GrupoConceptualmente
+SELECT IP.Id AS IdIntentoPregunta, P.Id AS IdPregunta,
+       P.Enunciado, P.Tipo, GP.TituloReferencia AS GrupoConceptualmente
 FROM IntentoPregunta IP
 INNER JOIN Pregunta P ON IP.IdPregunta = P.Id
 INNER JOIN GrupoPregunta GP ON P.IdGrupoPregunta = GP.Id
 WHERE IP.IdIntento = @IdIntento;
 ```
+
+`IdIntentoPregunta` identifica la instancia congelada y sorteada dentro del intento;
+`IdPregunta` conserva la referencia a la pregunta de origen. El frontend no debe inferir
+uno desde el otro. La telemetría `question_active` utiliza el primero.
 
 No hay sorteo ni `NEWID()`. Con la etapa 2, el procedimiento usa primero los campos
 snapshot de `IntentoPregunta`, devuelve configuración y borrador guardado, además del
@@ -753,6 +758,90 @@ La sincronización nueva o de cierre se acepta hasta siete días después de
 `Intento.FechaFin`, con cinco minutos de tolerancia de reloj. Los replays idénticos ya
 persistidos siguen siendo idempotentes aun después de esa ventana. No se agregaron
 tablas, columnas ni Stored Procedures en esta etapa.
+
+### 9.6 Anulación y confirmación de corrección — etapa previa a telemetría temporal
+
+DDL: `migrations/20261015_anulacion_confirmacion_revision.sql`. Verificación de sólo
+lectura: `scripts/verificar-anulacion-confirmacion-revision.sql`.
+
+`Intento` incorpora `CorreccionConfirmada`, actor, fecha y origen. Los intentos
+históricos entregados sin puntajes pendientes reciben origen `backfill`; no se modifican
+puntajes ni notas. `HistorialEstadoCorreccionIntento` registra confirmación automática,
+confirmación manual y reaperturas por pregunta o nota. La finalización confirma
+automáticamente sólo cuando todos los `IntentoPregunta` tienen puntaje definitivo.
+
+`AnulacionIntentoIncidente` tiene una fila por intento y una FK compuesta hacia
+`IncidenteIntento(IdIntento,EventoId)`. Conserva tipo, motivo autoritativo, usuario y
+fecha. La transacción cambia únicamente el estado/fecha del intento y limpia notas; no
+elimina `Respuesta`, `RespuestaOpcion`, snapshots ni historiales. `IncidenteIntento`
+admite temporalmente `focus_lost` y `fullscreen_exit`; la etapa 3 ampliará el catálogo.
+
+La revisión de alumno está disponible sólo cuando el intento está `entregado` y
+`CorreccionConfirmada=1`. Hasta la política de revisión de la etapa 5, esa condición es
+la única habilitación y permite construir la devolución desde snapshots.
+
+### 9.7 Telemetría temporal confiable — etapa 3
+
+DDL: `migrations/20261016_telemetria_temporal.sql`, posterior a
+`20261015_anulacion_confirmacion_revision.sql`. Verificación de sólo lectura:
+`scripts/verificar-telemetria-temporal.sql`. Es idempotente, transaccional y no crea ni
+modifica Stored Procedures.
+
+La etapa reutiliza `IncidenteIntento` y conserva la unicidad histórica
+`(IdIntento,EventoId)`. Agrega, de forma nullable para compatibilidad con filas legacy,
+`IdIntentoPregunta`, `SesionClienteId`, `SecuenciaCliente` y `Codigo`; agrega también
+`VersionContrato` con default 1. El índice único filtrado
+`(IdIntento,SesionClienteId,SecuenciaCliente)` impide duplicar un evento reenviado con
+otro UUID. La FK de pregunta y la validación de servicio exigen que un
+`question_active` refiera una pregunta del mismo intento.
+
+La misma migración redefine aditivamente `SP_Intento_ObtenerExamenDinamico` para incluir
+`IP.Id AS IdIntentoPregunta` junto con `IP.IdPregunta`. Esto permite que el cliente
+registre tiempos sobre la instancia sorteada sin inferir identificadores.
+
+Si un ambiente aplicó `20261016_telemetria_temporal.sql` antes de incorporarse esa
+redefinición, ejecutar únicamente `scripts/aplicar-render-id-intento-pregunta.sql`.
+No reaplicar `20261011` ni `20261014` sobre un esquema posterior, porque también
+redefinen otros procedimientos con la versión propia de aquella etapa.
+
+`TipoEventoTelemetria` cataloga si cada tipo es intervalo, incidente, requiere pregunta
+y admite cierre posterior. Incluye tiempos por pregunta, foco, pantalla completa,
+conectividad y falta de sesión como intervalos; reanudación, recarga, error de
+sincronización, entrega fallida y finalización como eventos puntuales. Las filas legacy
+de foco/pantalla completa quedan admitidas por el mismo catálogo sin exigir sesión ni
+secuencia retroactivamente.
+
+La duración informada no se consolida en otra tabla: las lecturas unen intervalos
+completados que se superponen antes de sumar. Los intervalos abiertos no aportan tiempo.
+Por pregunta, `MetricasNavegacion` sólo funciona como fallback cuando no existen
+intervalos nuevos `question_active`. La migración no reinterpreta ni duplica métricas
+históricas y los eventos no actualizan estado, notas ni selección del intento válido.
+
+### 9.8 Rendimiento por pregunta y grupo — etapa 4
+
+No se crean tablas de agregación ni Stored Procedures. Los reportes parten de
+`IntentoPregunta`, sus puntajes/snapshots, `Respuesta`/`RespuestaOpcion`, la selección
+canónica de intentos y la telemetría temporal. Las consultas usan CTEs, tablas temporales
+y `PERCENTILE_CONT`; los KPIs se calculan antes de paginar y no realizan N+1.
+
+La unidad histórica de una variante es `IntentoPregunta.ContenidoHashSnapshot`. Un hash
+nulo legacy queda aislado mediante `IdPregunta`; `IdBancoPreguntaOrigen` e
+`IdBancoGrupoOrigen` sólo informan procedencia y nunca enlazan la copia con cambios
+posteriores del banco. La distribución de opciones usa
+`IntentoPreguntaOpcionSnapshot`, conservando texto y clave correctos al momento del
+intento.
+
+Los tiempos unen intervalos completos `question_active` superpuestos por
+`IdIntentoPregunta`. Un intervalo abierto no suma. `MetricasNavegacion` se usa como
+fallback únicamente para una pregunta sin telemetría nueva; la ausencia de ambos se
+representa como tiempo nulo y queda reflejada en cobertura/muestras.
+
+DDL de soporte: `migrations/20261017_indices_rendimiento_preguntas.sql`, posterior a
+`20261016_telemetria_temporal.sql`. Sólo crea índices idempotentes sobre los accesos por
+publicación/alumno/estado/fecha, intento/pregunta y fallback de navegación. No cambia
+datos ni contratos. Verificación de sólo lectura:
+`scripts/verificar-indices-rendimiento-preguntas.sql`; además de estructura muestra uso
+y recomendaciones del optimizador para revisar planes con un volumen representativo.
 
 ## 10. Modelo de selección múltiple y justificación
 

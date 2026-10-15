@@ -599,6 +599,7 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 - [x] Ampliar tipos y servicio sobre los endpoints efectivos existentes, sin crear rutas ni query keys nuevas.
 - [x] Evolucionar la outbox de respuestas para conservar por separado el evento en vuelo y la edición más reciente, rebasar revisiones confirmadas y proteger cambios tardíos.
 - [x] Implementar selección única, selección múltiple, omisión explícita, texto y justificación con restauración desde snapshot/outbox.
+- [x] Conservar exactamente los espacios internos y finales durante el autoguardado de respuestas abiertas y justificaciones, sin convertir un texto compuesto sólo por espacios en respuesta válida.
 - [x] Tratar conflictos de revisión de forma visible, conservando la edición local y ofreciendo restaurar servidor o reenviar explícitamente la versión local.
 - [x] Completar al entregar las justificaciones obligatorias vacías con `"Sin respuesta"`, sincronizarlas antes del cierre y conservar el intento ante cualquier rechazo.
 - [x] Retirar el bloqueo temporal de publicación y ampliar corrección/revisión con justificación y puntaje sugerido por opciones.
@@ -608,7 +609,65 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 - [x] Evitar que el cleanup de navegación vuelva a encolar un `EventoId` ya confirmado y genere conflictos falsos de revisión al regresar a una pregunta.
 - [x] Diferenciar en la corrección docente opciones correctas elegidas/no elegidas y mostrar cuántas respuestas correctas fueron efectivamente seleccionadas.
 - [x] Presentar de forma neutral la revisión del alumno cuando el backend omite `esCorrecta`; no inferir una respuesta incorrecta desde un campo ausente.
-- [!] La anulación autoritativa por incidente, la confirmación final de corrección y la habilitación real de claves en la revisión requieren contratos backend adicionales.
+
+### Etapa 2.1 — Anulación, confirmación y revisión segura
+
+- [x] Backend: incorporar anulación autoritativa e idempotente por incidente, confirmación auditada de corrección y revisión condicionada por `revisionDisponible`.
+- [x] Aplicar la migración `20261015_anulacion_confirmacion_revision.sql` y su verificador en las bases correspondientes.
+- [x] Sincronizar `docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` con la entrega backend.
+- [x] Ampliar contratos, servicios y hooks sin crear rutas ni clientes HTTP paralelos.
+- [x] Incorporar “Confirmar corrección” al final de la pantalla docente, deshabilitado mientras existan puntajes pendientes, y presentar el estado confirmado.
+- [x] Ofrecer revisión al alumno sólo cuando `revisionDisponible` sea verdadero y traducir `REVIEW_NOT_AVAILABLE` a un mensaje funcional.
+- [x] Congelar el examen ante la primera pérdida de foco o salida de fullscreen, sincronizar respuestas e incidente y solicitar la anulación autoritativa.
+- [x] Persistir la solicitud de anulación en una outbox IndexedDB independiente para conservar la intención sin conexión y evitar duplicados.
+- [x] Agregar pruebas focalizadas de contratos, confirmación, visibilidad de revisión, outbox y orden de sincronización.
+- [ ] Validar manualmente contra API y SQL Server reales: pérdida de foco online/offline, replay, intento anulado sin nota, confirmación, reapertura posterior y revisión del alumno.
+- [!] La política temporal sigue siendo estricta: la primera pérdida detectada anula. Debe sustituirse por configuración de evaluación cuando el backend entregue políticas de fullscreen e incidentes.
+
+### Etapa 3 — Telemetría temporal confiable
+
+- [x] Backend: entregar catálogo temporal, escritura individual y batch, listado paginado y métricas con unión de intervalos.
+- [x] Aplicar la migración `20261016_telemetria_temporal.sql`, actualizar el SP de render y ejecutar su verificador.
+- [x] Sincronizar `docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` con la entrega backend.
+- [x] Exponer `idIntentoPregunta` en el contrato del runtime sin inferirlo desde `idPregunta`.
+- [x] Incorporar tipos, servicios y query keys para escritura batch y lectura paginada.
+- [x] Reemplazar la cola específica de foco en el runtime por una outbox temporal uniforme con sesión y secuencia persistentes.
+- [x] Registrar tiempos por pregunta, foco, fullscreen, conectividad, recarga/reanudación, errores de entrega y finalización.
+- [x] Conservar la anulación en una outbox independiente y ordenar respuestas → telemetría → anulación.
+- [x] Rehacer el panel docente para mostrar cronología paginada, intervalos abiertos y tiempos por pregunta.
+- [x] Simplificar el panel docente: retirar métricas técnicas, ocultar `question_active` detrás de “Más detalles” y normalizar duraciones `BIGINT` antes de agregarlas.
+- [x] Registrar una sola apertura por documento y distinguir “Examen iniciado” de reanudaciones por recarga, reconexión o retorno al intento.
+- [x] Agregar pruebas focalizadas de sesión/secuencia, apertura/cierre, batch, retry, servicios y runtime.
+- [ ] Validar manualmente offline/reload, cierre posterior, replay, secuencias concurrentes y métricas contra SQL Server real.
+
+### Etapa 4 — Rendimiento por pregunta y grupo
+
+- [x] Implementar en backend reportes agregados server-side de eficiencia por pregunta, grupo estructural y distribución de opciones, sin consultas N+1 desde el cliente.
+- [x] Incluir apariciones, respuestas, omisiones, correcciones correctas/parciales/incorrectas, pendientes, puntaje relativo y tiempos agregados obtenidos desde la telemetría temporal.
+- [x] Soportar filtros por materia, comisión, actividad, publicación, grupo, pregunta, rango de fechas, estado, corrección y alcance académico `todos|validos`.
+- [ ] Incorporar filtro por tipo de pregunta cuando el backend lo exponga; no forma parte del contrato efectivo de la etapa entregada.
+- [x] Agrupar variantes por grupo estructural y contenido histórico por `ContenidoHashSnapshot`, sin depender del enunciado ni del ID de una copia.
+- [!] `ContenidoHashSnapshot` identifica contenido idéntico histórico, pero no representa un linaje vivo si una copia independiente se modifica. No presentar derivados distintos como la misma pregunta del banco.
+- [x] Reutilizar en frontend layout, filtros, KPIs, tablas y gráficos para las vistas “Por pregunta” y “Por grupo”, con opciones/distractores en detalle accesible.
+- [ ] Validar manualmente los tres reportes con datos reales, escalas mixtas, intentos válidos, correcciones pendientes y muestras temporales parciales.
+
+### Mejora transversal pendiente — Filtros y visualizaciones de reportes
+
+- [ ] Reemplazar en los reportes docentes los catálogos institucionales de materias y comisiones por opciones derivadas exclusivamente de las evaluaciones autorizadas del docente.
+- [ ] Implementar filtros dependientes `materia → comisión → actividad → publicación`, limpiando valores inferiores incompatibles y deshabilitando selects sin opciones.
+- [ ] Solicitar al backend un catálogo de filtros del historial del alumno, obtenido desde su JWT y su historial completo, con `idMateria` e `idMateriaDivision`; no construirlo desde la página visible ni desde catálogos globales.
+- [ ] Sustituir los inputs técnicos de ID de grupo/pregunta por opciones con nombres cuando exista un catálogo autorizado para ese nivel.
+- [ ] Ampliar `ReportFilterPanel` con opciones dependientes, estados de carga/vacío, resumen de filtros aplicados y sección de filtros avanzados.
+- [ ] Eliminar gráficos de barras derivados de la página actual cuando puedan interpretarse como una visión global.
+- [ ] En rendimiento por alumno, reemplazar las series visibles por un ranking server-side acotado y claramente identificado como Top N; conservar KPIs globales.
+- [ ] En rendimiento por evaluación, mantener la distribución global e incorporar una visualización de participación: alcanzados, iniciaron y entregaron.
+- [ ] En rendimiento por pregunta, presentar rankings server-side de menor rendimiento y mayor tiempo mediano, independientes de la paginación de la tabla.
+- [ ] Identificar preguntas y grupos en los gráficos mediante referencias cortas (`P1`, `G1`) acompañadas por una leyenda accesible con el texto completo, muestra y valor exacto.
+- [ ] En rendimiento por grupo, agregar detalle de variantes y solicitar al backend ordenamiento por diferencia entre variantes antes de presentar un ranking global de esa métrica.
+- [ ] Mantener el gráfico de opciones/distractores únicamente en el detalle de preguntas cerradas, donde el conjunto es finito y se acompaña con tabla textual.
+- [ ] Indicar en toda visualización si los datos son globales, Top N o pertenecen a una página; mostrar tamaño de muestra, cobertura temporal y diferenciar cero de “Sin datos”.
+- [ ] Mantener puntajes de preguntas/grupos como porcentajes normalizados y tratar diferencias entre variantes como descriptivas, sin afirmar significancia estadística.
+- [ ] Agregar pruebas focalizadas de alcance por rol, limpieza de filtros dependientes, URLs con IDs ajenos, rankings server-side y equivalentes textuales accesibles.
 
 ---
 

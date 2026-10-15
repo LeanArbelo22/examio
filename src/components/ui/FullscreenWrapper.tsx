@@ -5,12 +5,17 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import {
   useRegistrarAlerta,
-  useFinalizarExamen,
 } from "@/hooks/useEvaluaciones";
+import type { AttemptCancellationStatus } from "@/hooks/useTelemetria";
 
 interface FullscreenWrapperProps {
   children: React.ReactNode;
-  idIntento: number; // <-- Inyectamos el ID transaccional del intento actual
+  idIntento: number;
+  interruptionStatus: AttemptCancellationStatus;
+  interruptionError?: string | null;
+  cancellationDurable: boolean;
+  telemetryDurable: boolean;
+  onFullscreenViolation: () => void;
 }
 
 type ExamDocument = Document & { isExitingLegitimately?: boolean };
@@ -18,6 +23,11 @@ type ExamDocument = Document & { isExitingLegitimately?: boolean };
 export function FullscreenWrapper({
   children,
   idIntento,
+  interruptionStatus,
+  interruptionError,
+  cancellationDurable,
+  telemetryDurable,
+  onFullscreenViolation,
 }: FullscreenWrapperProps) {
   const router = useRouter();
   const resumeMarker = `examio_exam_entered_${idIntento}`;
@@ -28,16 +38,15 @@ export function FullscreenWrapper({
   );
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(true);
-  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [localInterruption, setLocalInterruption] = useState(false);
 
   // Invocamos los hooks analíticos reales
   const { mutate: enviarAlerta } = useRegistrarAlerta();
-  const { mutate: forzarCierreExamen } = useFinalizarExamen();
   const isFinalizingRef = useRef(false);
 
   // Función centralizada para ejecutar la penalización antifraude de EXAMIO
   const triggerFraudePenalty = useCallback(
-    async (tipoIncidente: string, detalle: string) => {
+    async () => {
       if (isFinalizingRef.current) return;
       isFinalizingRef.current = true;
 
@@ -50,19 +59,10 @@ export function FullscreenWrapper({
       }
 
       setIsFullscreen(false);
-      setShowWarningModal(true);
-
-      // 1. Impacta el incidente en la tabla AlertaFraude en SQL Server
-      enviarAlerta({
-        IdIntento: idIntento,
-        TipoIncidente: tipoIncidente,
-        Detalle: detalle,
-      });
-
-      // 2. Ejecuta SP_Intento_FinalizarExamen poniendo el estado en 'anulado' o 'entregado' bajo revisión
-      forzarCierreExamen(idIntento);
+      setLocalInterruption(true);
+      onFullscreenViolation();
     },
-    [enviarAlerta, forzarCierreExamen, idIntento],
+    [onFullscreenViolation],
   );
 
   // Detectar salida manual de pantalla completa (Tecla ESC)
@@ -73,10 +73,7 @@ export function FullscreenWrapper({
       if (doc.isExitingLegitimately) return; // ESCUDO ACTIVO
 
       if (!document.fullscreenElement && isFullscreen) {
-        triggerFraudePenalty(
-          "fullscreen_exit",
-          "El alumno forzó la salida de la pantalla completa.",
-        );
+        triggerFraudePenalty();
       }
     };
 
@@ -86,6 +83,16 @@ export function FullscreenWrapper({
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
   }, [isFullscreen, triggerFraudePenalty]);
+
+  useEffect(() => {
+    if (interruptionStatus === "idle") return;
+    isFinalizingRef.current = true;
+    const doc = document as ExamDocument;
+    doc.isExitingLegitimately = true;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => undefined);
+    }
+  }, [interruptionStatus]);
 
   // Bloqueo estricto de Portapapeles e Inspección de código
   useEffect(() => {
@@ -146,6 +153,7 @@ export function FullscreenWrapper({
 
   const requestFullscreen = async () => {
     try {
+      (document as ExamDocument).isExitingLegitimately = false;
       await document.documentElement.requestFullscreen();
       sessionStorage.setItem(resumeMarker, "true");
       setIsFullscreen(true);
@@ -156,9 +164,10 @@ export function FullscreenWrapper({
   };
 
   const handleExitRedirect = () => {
-    setShowWarningModal(false);
     router.replace("/alumno");
   };
+
+  const showWarningModal = localInterruption || interruptionStatus !== "idle";
 
   return (
     <>
@@ -244,10 +253,22 @@ export function FullscreenWrapper({
                 Evaluación Interrumpida
               </h2>
               <p className="mt-2 text-sm text-slate-500 leading-relaxed">
-                Detectamos una salida del entorno seguro o pérdida de foco. Por
-                normativas antifraude, tus respuestas han sido congeladas y
-                enviadas para revisión.
+                {interruptionStatus === "cancelled"
+                  ? "El intento fue anulado. Tus respuestas anteriores se conservaron para consulta institucional."
+                  : interruptionStatus === "failed"
+                    ? "El intento quedó bloqueado, pero no pudimos confirmar la anulación. Comunicate con el docente antes de continuar."
+                    : "Detectamos una salida del entorno seguro o pérdida de foco. La interacción quedó bloqueada mientras protegemos tus respuestas y registramos la anulación."}
               </p>
+              {interruptionStatus === "pending" && (
+                <p className="mt-3 text-xs font-semibold text-amber-700" role="status">
+                  {cancellationDurable && telemetryDurable
+                    ? "La solicitud quedó guardada y se enviará automáticamente, incluso si perdés la conexión."
+                    : "Mantené esta pantalla abierta mientras se completa la anulación."}
+                </p>
+              )}
+              {interruptionError && interruptionStatus === "failed" && (
+                <p className="mt-3 text-xs text-red-700">{interruptionError}</p>
+              )}
               <div className="mt-6">
                 <Button
                   onClick={handleExitRedirect}

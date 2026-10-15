@@ -32,6 +32,7 @@ import {
   seleccionarIntentoValido,
   restaurarSeleccionAutomaticaIntento,
   obtenerMisIntentos,
+  confirmarCorreccionIntento,
 } from "@/services/api/evaluaciones.api";
 import { ApiError } from "@/lib/api";
 import {
@@ -762,6 +763,18 @@ export const useCorregirPreguntaIntento = (idIntento: number) => {
       corregirPreguntaIntento(idIntento, idPregunta, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: intentoKeys.detail(idIntento) });
+    },
+  });
+};
+
+export const useConfirmarCorreccionIntento = (idIntento: number) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => confirmarCorreccionIntento(idIntento),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: intentoKeys.all });
+      queryClient.invalidateQueries({ queryKey: evaluacionKeys.all });
+      queryClient.invalidateQueries({ queryKey: alumnoKeys.all });
     },
   });
 };

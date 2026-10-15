@@ -65,6 +65,8 @@ export const intentoKeys = {
   alertas: (id: number) => [...intentoKeys.all, id, "alertas"] as const,
   incidentesFoco: (id: number) => [...intentoKeys.all, id, "incidentes-foco"] as const,
   resumenFoco: (id: number) => [...intentoKeys.incidentesFoco(id), "resumen"] as const,
+    eventosTemporales: (id: number, pagina: number, limite: number) =>
+      [...intentoKeys.all, id, "eventos-temporales", { pagina, limite }] as const,
   mios: (filtros: object) => [...intentoKeys.all, "mios", filtros] as const,
 };
 
@@ -81,6 +83,14 @@ export const reporteKeys = {
   rendimientoEvaluaciones: ["reportes", "rendimiento-evaluaciones"] as const,
   evaluaciones: (filtros: object) =>
     [...reporteKeys.rendimientoEvaluaciones, "listado", filtros] as const,
+  rendimientoPreguntas: ["reportes", "rendimiento-preguntas"] as const,
+  preguntas: (filtros: object) =>
+    [...reporteKeys.rendimientoPreguntas, "listado", filtros] as const,
+  opcionesPregunta: (idPregunta: number, filtros: object) =>
+    [...reporteKeys.rendimientoPreguntas, "opciones", idPregunta, filtros] as const,
+  rendimientoGrupos: ["reportes", "rendimiento-grupos"] as const,
+  grupos: (filtros: object) =>
+    [...reporteKeys.rendimientoGrupos, "listado", filtros] as const,
 };
 
 export const bancoPreguntasKeys = {

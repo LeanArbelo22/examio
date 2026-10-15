@@ -3,20 +3,23 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { EvaluacionesReport } from "./EvaluacionesReport";
 import { RendimientoReport } from "./RendimientoReport";
+import { ContentPerformanceReport } from "./ContentPerformanceReport";
 
 const reports = [
   { id: "alumnos", label: "Por alumno" },
   { id: "evaluaciones", label: "Por evaluación" },
+  { id: "preguntas", label: "Por pregunta" },
+  { id: "grupos", label: "Por grupo" },
 ] as const;
 
 export function ReportesWorkspace() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const selected =
-    searchParams.get("reporte") === "evaluaciones"
-      ? "evaluaciones"
-      : "alumnos";
+  const requested = searchParams.get("reporte");
+  const selected = reports.some((report) => report.id === requested)
+    ? (requested as (typeof reports)[number]["id"])
+    : "alumnos";
 
   const selectReport = (report: (typeof reports)[number]["id"]) => {
     const params = new URLSearchParams();
@@ -30,7 +33,7 @@ export function ReportesWorkspace() {
     <div className="space-y-5">
       <nav
         aria-label="Tipo de reporte"
-        className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
+        className="flex w-fit max-w-full flex-wrap rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
       >
         {reports.map((report) => (
           <button
@@ -48,11 +51,10 @@ export function ReportesWorkspace() {
           </button>
         ))}
       </nav>
-      {selected === "evaluaciones" ? (
-        <EvaluacionesReport />
-      ) : (
-        <RendimientoReport />
-      )}
+      {selected === "evaluaciones" && <EvaluacionesReport />}
+      {selected === "alumnos" && <RendimientoReport />}
+      {selected === "preguntas" && <ContentPerformanceReport kind="preguntas" />}
+      {selected === "grupos" && <ContentPerformanceReport kind="grupos" />}
     </div>
   );
 }

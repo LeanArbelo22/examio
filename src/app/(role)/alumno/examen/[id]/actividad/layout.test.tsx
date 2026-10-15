@@ -13,7 +13,10 @@ const examMocks = vi.hoisted(() => ({
   syncNow: vi.fn(),
   completeMissingJustifications: vi.fn(),
   finalizarExamen: vi.fn(),
+  recordPointEvent: vi.fn(),
+  flushTelemetry: vi.fn(),
   questions: [{
+    idIntentoPregunta: 83,
     idPregunta: 15,
     enunciado: "Pregunta",
     tipo: "mc",
@@ -59,7 +62,20 @@ vi.mock("@/hooks/useEvaluaciones", () => ({
 }));
 
 vi.mock("@/hooks/useTelemetria", () => ({
-  useFocusIncidentTracking: vi.fn(),
+  useExamTemporalTelemetry: () => ({
+    recordFullscreenExit: vi.fn(),
+    recordPointEvent: examMocks.recordPointEvent,
+    flushTelemetry: examMocks.flushTelemetry,
+    durable: true,
+  }),
+  useAttemptCancellation: () => ({
+    status: "idle",
+    lastError: null,
+    isInterrupted: false,
+    durable: true,
+    requestCancellation: vi.fn(),
+    synchronizeCancellation: vi.fn(),
+  }),
 }));
 
 async function renderActivityLayout() {
@@ -83,12 +99,15 @@ describe("finalización coordinada del examen", () => {
     examMocks.syncNow.mockReset();
     examMocks.completeMissingJustifications.mockReset();
     examMocks.finalizarExamen.mockReset();
+    examMocks.recordPointEvent.mockReset().mockResolvedValue(undefined);
+    examMocks.flushTelemetry.mockReset().mockResolvedValue(undefined);
     examMocks.requestFinalization.mockResolvedValue(undefined);
     examMocks.cancelFinalization.mockResolvedValue(undefined);
     examMocks.clearOutbox.mockResolvedValue(undefined);
     examMocks.completeMissingJustifications.mockResolvedValue(0);
     examMocks.finalizarExamen.mockResolvedValue({ notaFinal: 8 });
     examMocks.questions = [{
+      idIntentoPregunta: 83,
       idPregunta: 15,
       enunciado: "Pregunta",
       tipo: "mc",
@@ -101,6 +120,7 @@ describe("finalización coordinada del examen", () => {
   it("completa la justificación vacía antes de sincronizar y entregar", async () => {
     const user = userEvent.setup();
     examMocks.questions = [{
+      idIntentoPregunta: 83,
       idPregunta: 15,
       enunciado: "Pregunta",
       tipo: "multiple",

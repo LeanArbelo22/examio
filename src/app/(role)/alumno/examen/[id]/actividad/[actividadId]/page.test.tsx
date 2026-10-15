@@ -8,11 +8,13 @@ const questionState = vi.hoisted(() => ({
   mode: "sin_justificacion",
 }));
 const saveAnswer = vi.hoisted(() => vi.fn());
+const persistAnswer = vi.hoisted(() => vi.fn());
 
 vi.mock("@/hooks/useEvaluaciones", () => ({
   useGetExamenSorteado: () => ({
     data: [
       {
+        idIntentoPregunta: 83,
         idPregunta: 15,
         enunciado: "¿Qué consulta es correcta?",
         tipo: questionState.type,
@@ -34,7 +36,7 @@ vi.mock("@/hooks/useEvaluaciones", () => ({
   useGuardarRespuesta: () => ({
     mutate: saveAnswer,
     isPending: false,
-    persistPending: vi.fn(),
+    persistPending: persistAnswer,
     restoreServerAnswer: vi.fn(),
     retryLocalAnswer: vi.fn(),
   }),
@@ -82,5 +84,28 @@ describe("ActivityPage", () => {
     expect(
       screen.getByText(/se registrará como “Sin respuesta”/i),
     ).toBeVisible();
+  });
+
+  it("conserva los espacios mientras el alumno escribe una respuesta abierta", async () => {
+    const user = userEvent.setup();
+    questionState.type = "abierta";
+    questionState.mode = "sin_justificacion";
+    persistAnswer.mockClear();
+
+    await act(async () => {
+      render(
+        <ActivityPage
+          params={Promise.resolve({ id: "73", actividadId: "1" })}
+        />,
+      );
+    });
+
+    const answer = screen.getByLabelText("Tu respuesta");
+    await user.type(answer, "respuesta con espacios");
+
+    expect(answer).toHaveValue("respuesta con espacios");
+    expect(persistAnswer).toHaveBeenLastCalledWith(
+      expect.objectContaining({ RtaTexto: "respuesta con espacios" }),
+    );
   });
 });

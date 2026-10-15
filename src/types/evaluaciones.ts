@@ -120,6 +120,7 @@ export interface MetricasNavegacion {
 }
 
 export interface PreguntaSorteada {
+  idIntentoPregunta: number;
   idPregunta: number;
   enunciado: string;
   tipo: TipoPregunta;
@@ -273,6 +274,12 @@ export interface IntentoCompleto {
   notaAutomatica: number | null;
   notaFinalCalculada: number | null;
   notaFinalManual: number | null;
+  correccionPendiente: boolean;
+  correccionConfirmada: boolean;
+  correccionConfirmadaPor?: number | null;
+  fechaCorreccionConfirmada?: string | null;
+  origenConfirmacionCorreccion?: "automatica" | "manual" | null;
+  revisionDisponible: boolean;
   escalaCalificacion: EscalaCalificacion;
   notaAprobacion: number;
   fechaInicio: string;
@@ -313,6 +320,17 @@ export interface ResultadoCorreccionPregunta
   fechaCorreccion?: string | null;
 }
 
+export interface ResultadoConfirmacionCorreccion {
+  idIntento: number;
+  correccionPendiente: false;
+  correccionConfirmada: true;
+  correccionConfirmadaPor: number | null;
+  fechaCorreccionConfirmada: string;
+  origenConfirmacionCorreccion: "automatica" | "manual";
+  revisionDisponible: boolean;
+  replay: boolean;
+}
+
 export interface AlumnoIntento {
   matricula: number;
   nombre: string;
@@ -322,6 +340,9 @@ export interface AlumnoIntento {
   estadoIntento: string | null;
   notaFinal: number | null;
   notaAutomatica: number | null;
+  correccionPendiente: boolean;
+  correccionConfirmada: boolean;
+  revisionDisponible: boolean;
   fechaInicioIntento: string | null;
   fechaFinIntento: string | null;
   numeroIntento: number | null;
@@ -347,6 +368,9 @@ export interface IntentoAlumnoPublicacion {
   notaAprobacion: number;
   estadoCorreccion: "pendiente" | "completa" | null;
   preguntasPendientesCorreccion: number;
+  correccionPendiente: boolean;
+  correccionConfirmada: boolean;
+  revisionDisponible: boolean;
   esIntentoValido: boolean;
   seleccionIntentoValido: SeleccionIntentoValido;
 }
@@ -392,6 +416,9 @@ export interface HistorialCorregidoItem {
   fechaFin: string;
   notaFinal: number | null;
   numeroIntento: number;
+  correccionPendiente: boolean;
+  correccionConfirmada: boolean;
+  revisionDisponible: boolean;
 }
 
 export type ResultadoIntentoAlumno = "aprobado" | "desaprobado" | "pendiente";
@@ -432,6 +459,9 @@ export interface IntentoHistorialAlumno {
   notaAprobacion: number;
   resultado: ResultadoIntentoAlumno;
   estadoCorreccion: "pendiente" | "completa" | null;
+  correccionPendiente: boolean;
+  correccionConfirmada: boolean;
+  revisionDisponible: boolean;
   esIntentoValido: boolean;
   seleccionIntentoValido: SeleccionIntentoValido;
 }

@@ -3,9 +3,15 @@ import {
   obtenerDetalleRendimientoAlumno,
   obtenerReporteRendimiento,
   obtenerReporteRendimientoEvaluaciones,
+  obtenerReporteRendimientoGrupos,
+  obtenerReporteRendimientoPreguntas,
+  obtenerReporteOpcionesPregunta,
 } from "@/services/api/reportes.api";
 import type {
   ReporteEvaluacionesFiltros,
+  ReporteGruposFiltros,
+  ReporteOpcionesFiltros,
+  ReportePreguntasFiltros,
   ReporteRendimientoDetalle,
   ReporteRendimientoFiltros,
   ReporteRendimientoListado,
@@ -65,4 +71,37 @@ export const useDetalleRendimientoAlumno = (
         ordenDireccion: undefined,
       }),
     enabled: isValidId(matricula),
+  });
+
+export const useReporteRendimientoPreguntas = (
+  filtros: ReportePreguntasFiltros,
+  enabled = true,
+) =>
+  useQuery({
+    queryKey: reporteKeys.preguntas(filtros),
+    queryFn: () => obtenerReporteRendimientoPreguntas(filtros),
+    enabled,
+    placeholderData: (previousData) => previousData,
+  });
+
+export const useReporteRendimientoGrupos = (
+  filtros: ReporteGruposFiltros,
+  enabled = true,
+) =>
+  useQuery({
+    queryKey: reporteKeys.grupos(filtros),
+    queryFn: () => obtenerReporteRendimientoGrupos(filtros),
+    enabled,
+    placeholderData: (previousData) => previousData,
+  });
+
+export const useReporteOpcionesPregunta = (
+  idPregunta: number | null,
+  filtros: ReporteOpcionesFiltros,
+) =>
+  useQuery({
+    queryKey: reporteKeys.opcionesPregunta(idPregunta!, filtros),
+    queryFn: () => obtenerReporteOpcionesPregunta(idPregunta!, filtros),
+    enabled: isValidId(idPregunta),
+    placeholderData: (previousData) => previousData,
   });
