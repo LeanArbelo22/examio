@@ -500,6 +500,7 @@ devuelve `revisionDisponible: true`; una edición posterior vuelve a abrir la co
 Playwright usa `.next-e2e` mediante `EXAMIO_NEXT_DIST_DIR`, por lo que los E2E y builds
 de validación pueden ejecutarse sin finalizar un `next dev` activo sobre `.next`.
 
+
 Las fases de autenticación, cliente API, tipado, React Query, errores, testing y accesibilidad siguen gobernadas por `PLAN.md`.
 No hay bypass de login activo.
 
