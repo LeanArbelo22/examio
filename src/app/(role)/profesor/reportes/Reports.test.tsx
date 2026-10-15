@@ -3,8 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ReporteEvaluacionesListado,
+  ReporteGruposListado,
+  ReporteOpcionesListado,
+  ReportePreguntasListado,
   ReporteRendimientoListado,
 } from "@/types";
+import { ContentPerformanceReport } from "./ContentPerformanceReport";
 import { EvaluacionesReport } from "./EvaluacionesReport";
 import { RendimientoReport } from "./RendimientoReport";
 
@@ -15,6 +19,9 @@ const reportMocks = vi.hoisted(() => ({
   push: vi.fn(),
   evaluacionesHook: vi.fn(),
   rendimientoHook: vi.fn(),
+  preguntasHook: vi.fn(),
+  gruposHook: vi.fn(),
+  opcionesHook: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -59,6 +66,12 @@ vi.mock("@/hooks/useReportes", () => ({
     reportMocks.evaluacionesHook(...args),
   useReporteRendimiento: (...args: unknown[]) =>
     reportMocks.rendimientoHook(...args),
+  useReporteRendimientoPreguntas: (...args: unknown[]) =>
+    reportMocks.preguntasHook(...args),
+  useReporteRendimientoGrupos: (...args: unknown[]) =>
+    reportMocks.gruposHook(...args),
+  useReporteOpcionesPregunta: (...args: unknown[]) =>
+    reportMocks.opcionesHook(...args),
 }));
 
 vi.mock("@/components/reports/EvaluationReportCharts", () => ({
@@ -76,6 +89,12 @@ vi.mock("@/components/reports/ReportCharts", () => ({
 vi.mock("@/components/reports/StudentReportDetail", () => ({
   StudentReportDetail: ({ matricula }: { matricula: number | null }) =>
     matricula ? <div>Detalle del alumno {matricula}</div> : null,
+}));
+
+vi.mock("@/components/reports/ContentPerformanceCharts", () => ({
+  ContentPerformanceCharts: ({ kind }: { kind: string }) => (
+    <div>Gráficos de {kind}</div>
+  ),
 }));
 
 const evaluationReport: ReporteEvaluacionesListado = {
@@ -171,6 +190,126 @@ const studentReport: ReporteRendimientoListado = {
   paginacion: { pagina: 1, limite: 20, total: 30, totalPaginas: 2 },
 };
 
+const contentKpis = {
+  presentadas: 40,
+  respondidas: 35,
+  omitidas: 5,
+  pendientesCorreccion: 2,
+  correctas: 20,
+  parciales: 8,
+  incorrectas: 5,
+  justificacionesEntregadas: 10,
+  porcentajePuntajePromedio: 74.5,
+  tasaAcierto: 60.6,
+  muestrasTiempo: 30,
+  muestrasTiempoNuevas: 28,
+  muestrasTiempoLegacy: 2,
+  coberturaTemporal: 0.75,
+  tiempoPromedioMilisegundos: 32500,
+  tiempoMaximoMilisegundos: 90000,
+};
+
+const contentCriteria = {
+  alcanceIntentos: "todos" as const,
+  estadoCorreccion: "todas" as const,
+  normalizacionPuntaje: "porcentaje_puntaje_maximo" as const,
+  identidadContenido: "contenidoHashSnapshot" as const,
+};
+
+const questionsReport: ReportePreguntasListado = {
+  criterios: contentCriteria,
+  kpis: contentKpis,
+  pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  items: [{
+    claveContenido: "hash-tcp",
+    contenidoHashSnapshot: "a".repeat(64),
+    idPregunta: 10,
+    idGrupoPregunta: 3,
+    cantidadPreguntasOrigen: 1,
+    cantidadGrupos: 1,
+    enunciado: "¿Qué protocolo garantiza la entrega?",
+    tipo: "mc",
+    grupo: "Protocolos",
+    tieneProcedenciaBanco: true,
+    cantidadOrigenesBanco: 1,
+    incluyeSnapshotReconstruido: false,
+    justificacionesEntregadas: 10,
+    puntajePromedioObtenido: 0.75,
+    presentadas: 40,
+    respondidas: 35,
+    omitidas: 5,
+    pendientesCorreccion: 2,
+    correctas: 20,
+    parciales: 8,
+    incorrectas: 5,
+    porcentajePuntajePromedio: 74.5,
+    tasaAcierto: 60.6,
+    muestrasTiempo: 30,
+    muestrasTiempoNuevas: 28,
+    muestrasTiempoLegacy: 2,
+    coberturaTemporal: 0.75,
+    tiempoPromedioMilisegundos: 32500,
+    tiempoMedianaMilisegundos: 30000,
+    tiempoMaximoMilisegundos: 90000,
+  }],
+};
+
+const groupsReport: ReporteGruposListado = {
+  criterios: contentCriteria,
+  kpis: contentKpis,
+  pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  items: [{
+    idGrupoPregunta: 3,
+    idActividad: 10,
+    grupo: "Protocolos",
+    cantidadVariantes: 2,
+    tieneProcedenciaBanco: true,
+    justificacionesEntregadas: 10,
+    diferenciaVariantesPuntosPorcentuales: 12.5,
+    variantes: [],
+    presentadas: 40,
+    respondidas: 35,
+    omitidas: 5,
+    pendientesCorreccion: 2,
+    correctas: 20,
+    parciales: 8,
+    incorrectas: 5,
+    porcentajePuntajePromedio: 74.5,
+    tasaAcierto: 60.6,
+    muestrasTiempo: 30,
+    muestrasTiempoNuevas: 28,
+    muestrasTiempoLegacy: 2,
+    coberturaTemporal: 0.75,
+    tiempoPromedioMilisegundos: 32500,
+    tiempoMedianaMilisegundos: 30000,
+    tiempoMaximoMilisegundos: 90000,
+  }],
+};
+
+const optionsReport: ReporteOpcionesListado = {
+  criterios: { ...contentCriteria, idPregunta: 10 },
+  kpis: {
+    presentadas: 40,
+    respondidas: 35,
+    omitidas: 5,
+    justificacionesEntregadas: 10,
+    totalSelecciones: 35,
+    seleccionesDistractores: 8,
+  },
+  pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+  items: [{
+    claveContenido: "hash-tcp",
+    contenidoHashSnapshot: "a".repeat(64),
+    posicion: 1,
+    texto: "TCP",
+    esCorrecta: true,
+    esDistractor: false,
+    presentaciones: 40,
+    selecciones: 27,
+    porcentajeSeleccion: 77.14,
+  }],
+};
+
 function successfulQuery(data: unknown) {
   return {
     data,
@@ -189,8 +328,14 @@ describe("reportes docentes", () => {
     reportMocks.push.mockReset();
     reportMocks.evaluacionesHook.mockReset();
     reportMocks.rendimientoHook.mockReset();
+    reportMocks.preguntasHook.mockReset();
+    reportMocks.gruposHook.mockReset();
+    reportMocks.opcionesHook.mockReset();
     reportMocks.evaluacionesHook.mockReturnValue(successfulQuery(evaluationReport));
     reportMocks.rendimientoHook.mockReturnValue(successfulQuery(studentReport));
+    reportMocks.preguntasHook.mockReturnValue(successfulQuery(questionsReport));
+    reportMocks.gruposHook.mockReturnValue(successfulQuery(groupsReport));
+    reportMocks.opcionesHook.mockReturnValue(successfulQuery(optionsReport));
   });
 
   it("usa KPIs y distribución global del backend en el reporte por evaluación", async () => {
@@ -269,5 +414,39 @@ describe("reportes docentes", () => {
       screen.getByText(/El filtro Actividad requiere una matrícula/),
     ).toBeVisible();
     expect(reportMocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("presenta métricas por pregunta y abre el detalle de opciones", async () => {
+    const user = userEvent.setup();
+    reportMocks.search = "reporte=preguntas";
+    render(<ContentPerformanceReport kind="preguntas" />);
+
+    expect(screen.getByText("¿Qué protocolo garantiza la entrega?")).toBeVisible();
+    expect(screen.getByText("75.0%")).toBeVisible();
+    expect(screen.getByText("Gráficos de preguntas")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Ver opciones" }));
+    expect(screen.getByRole("dialog", { name: "Opciones y distractores" })).toBeVisible();
+    expect(screen.getByText("TCP")).toBeVisible();
+    expect(reportMocks.opcionesHook).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({ limite: 100, ordenarPor: "posicion" }),
+    );
+  });
+
+  it("muestra variantes y sincroniza filtros del reporte por grupo", async () => {
+    const user = userEvent.setup();
+    reportMocks.search = "reporte=grupos";
+    render(<ContentPerformanceReport kind="grupos" />);
+
+    expect(screen.getByText("Protocolos")).toBeVisible();
+    expect(screen.getByText("2 variantes")).toBeVisible();
+    await user.selectOptions(screen.getByLabelText("Intentos académicos"), "validos");
+    await user.click(screen.getByRole("button", { name: "Buscar" }));
+
+    expect(reportMocks.replace).toHaveBeenCalledWith(
+      expect.stringContaining("alcanceIntentos=validos"),
+      { scroll: false },
+    );
   });
 });

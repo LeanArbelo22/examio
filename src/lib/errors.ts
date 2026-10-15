@@ -44,6 +44,24 @@ const SAFE_CODE_MESSAGES: Record<string, string> = {
   ATTEMPT_NOT_IN_PROGRESS: "El intento ya no admite nuevas respuestas.",
   REQUIRED_JUSTIFICATION_MISSING:
     "Completá la justificación de las preguntas respondidas antes de entregar.",
+  CORRECTION_INCOMPLETE:
+    "Corregí todas las preguntas antes de confirmar la corrección.",
+  REVIEW_NOT_AVAILABLE:
+    "La revisión todavía no está disponible. Esperá a que el docente confirme la corrección.",
+  ATTEMPT_ALREADY_CANCELLED:
+    "El intento ya fue anulado por un incidente anterior.",
+  FOCUS_EVENT_NOT_FOUND:
+    "El incidente todavía no fue sincronizado. Examio volverá a intentarlo automáticamente.",
+  INCIDENT_EVENT_NOT_ELIGIBLE:
+    "El incidente todavía no está disponible. Examio volverá a intentar la anulación automáticamente.",
+  TELEMETRY_EVENT_INVALID:
+    "No pudimos registrar uno de los eventos del examen.",
+  TELEMETRY_TYPE_INVALID:
+    "El tipo de evento del examen no es compatible.",
+  TELEMETRY_QUESTION_INVALID:
+    "No pudimos asociar el tiempo con la pregunta actual.",
+  TELEMETRY_SYNC_WINDOW_EXPIRED:
+    "Venció el plazo para sincronizar este evento del examen.",
 };
 
 export function getErrorCategory(error: unknown): ErrorCategory {

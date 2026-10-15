@@ -59,6 +59,9 @@ describe("StudentHistoryWorkspace", () => {
             notaAprobacion: 4,
             resultado: "aprobado",
             estadoCorreccion: "completa",
+            correccionPendiente: false,
+            correccionConfirmada: true,
+            revisionDisponible: true,
             esIntentoValido: true,
             seleccionIntentoValido: "automatica",
           },
@@ -87,6 +90,7 @@ describe("StudentHistoryWorkspace", () => {
     expect(screen.getByText("8.00 / 10")).toBeInTheDocument();
     expect(screen.getByText("Resultado académico")).toBeInTheDocument();
     expect(screen.getByText("2 intentos encontrados")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Revisar examen/ })).toBeVisible();
   });
 
   it("valida el rango de fechas antes de actualizar la URL", async () => {

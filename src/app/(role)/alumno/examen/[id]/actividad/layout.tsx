@@ -11,7 +11,11 @@ import {
 } from "@/hooks/useEvaluaciones";
 import { Button } from "@/components/ui/Button";
 import { ApiError } from "@/lib/api";
-import { useFocusIncidentTracking } from "@/hooks/useTelemetria";
+import {
+  useAttemptCancellation,
+  useExamTemporalTelemetry,
+  type SecurityViolationEvent,
+} from "@/hooks/useTelemetria";
 
 type ExamDocument = Document & { isExitingLegitimately?: boolean };
 
@@ -27,7 +31,6 @@ export default function ActivityLayout({
   const urlParams = useParams();
 
   const idIntento = Number(id);
-  useFocusIncidentTracking(idIntento, Number.isInteger(idIntento) && idIntento > 0);
   const currentActivityId = parseInt(urlParams.actividadId as string) || 1;
 
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
@@ -37,6 +40,7 @@ export default function ActivityLayout({
   const autoSubmittedRef = useRef(false);
   const deliveryRunningRef = useRef(false);
   const lastAutomaticSyncRevisionRef = useRef(0);
+  const securityInterruptedRef = useRef(false);
 
   const { data: preguntas, isLoading } = useGetExamenSorteado(idIntento);
   usePrecargarOpcionesExamen(idIntento, preguntas);
@@ -53,6 +57,32 @@ export default function ActivityLayout({
     cancelFinalization,
     clearOutbox,
   } = useExamAnswerSync(idIntento);
+  const {
+    status: cancellationStatus,
+    lastError: cancellationError,
+    isInterrupted,
+    durable: cancellationDurable,
+    requestCancellation,
+  } = useAttemptCancellation(idIntento, syncNow);
+  const handleSecurityViolation = useCallback(
+    (event: SecurityViolationEvent) => {
+      securityInterruptedRef.current = true;
+      requestCancellation(event);
+    },
+    [requestCancellation],
+  );
+  const currentQuestion = preguntas?.[currentActivityId - 1];
+  const {
+    recordFullscreenExit,
+    recordPointEvent,
+    flushTelemetry,
+    durable: telemetryDurable,
+  } = useExamTemporalTelemetry(
+    idIntento,
+    currentQuestion?.idIntentoPregunta,
+    Number.isInteger(idIntento) && idIntento > 0,
+    handleSecurityViolation,
+  );
 
   const totalQuestions = preguntas?.length || 0;
   const isDelivering = finalizando || isSyncing || isPreparingDelivery;
@@ -70,7 +100,11 @@ export default function ActivityLayout({
   };
 
   const ejecutarCierreTransaccional = useCallback(async () => {
-    if (deliveryRunningRef.current) return;
+    if (
+      deliveryRunningRef.current ||
+      securityInterruptedRef.current ||
+      isInterrupted
+    ) return;
     deliveryRunningRef.current = true;
     setIsPreparingDelivery(true);
     setErrorServidor(null);
@@ -96,6 +130,8 @@ export default function ActivityLayout({
       }
 
       await finalizarExamen(idIntento);
+      await recordPointEvent("attempt_finished").catch(() => undefined);
+      await flushTelemetry().catch(() => undefined);
       await clearOutbox();
       sessionStorage.removeItem(`examio_exam_entered_${idIntento}`);
       sessionStorage.removeItem(`examio_deadline_${idIntento}`);
@@ -116,6 +152,24 @@ export default function ActivityLayout({
       }
       router.replace("/alumno");
     } catch (error: unknown) {
+      const errorCode = error instanceof ApiError ? error.code : undefined;
+      void recordPointEvent("submission_failed", errorCode ?? "unknown");
+      if (
+        error instanceof ApiError &&
+        [
+          "SESSION_UNAVAILABLE",
+          "AUTH_INFRASTRUCTURE_ERROR",
+          "AUTH_CONTRACT_ERROR",
+          "REFRESH_CONFLICT",
+        ].includes(error.code ?? "")
+      ) {
+        void recordPointEvent("auth_session_unavailable", error.code);
+      } else if (
+        error instanceof ApiError &&
+        (error.statusCode === 0 || error.statusCode === 408)
+      ) {
+        void recordPointEvent("sync_error", error.code);
+      }
       setErrorServidor(
         error instanceof ApiError && error.code === "REQUIRED_JUSTIFICATION_MISSING"
           ? "No pudimos registrar las justificaciones vacías. El intento sigue abierto y podés reintentar la entrega."
@@ -144,7 +198,14 @@ export default function ActivityLayout({
     requestFinalization,
     router,
     syncNow,
+    isInterrupted,
+    flushTelemetry,
+    recordPointEvent,
   ]);
+
+  useEffect(() => {
+    if (isInterrupted) securityInterruptedRef.current = true;
+  }, [isInterrupted]);
 
   useEffect(() => {
     if (
@@ -216,7 +277,14 @@ export default function ActivityLayout({
   }
 
   return (
-    <FullscreenWrapper idIntento={idIntento}>
+    <FullscreenWrapper
+      idIntento={idIntento}
+      interruptionStatus={cancellationStatus}
+      interruptionError={cancellationError}
+      cancellationDurable={cancellationDurable}
+      telemetryDurable={telemetryDurable}
+      onFullscreenViolation={recordFullscreenExit}
+    >
       <div className="flex flex-col h-screen max-h-screen w-full bg-slate-50 text-slate-900 select-none overflow-hidden">
         {/* Header */}
         <header className="bg-white border-b border-slate-200/80 px-6 py-3.5 flex justify-between items-center z-10 shadow-sm shrink-0">

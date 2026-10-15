@@ -31,6 +31,13 @@ import {
   IncidenteFoco,
   IncidenteFocoPayload,
   ResumenIncidentesFoco,
+  ResultadoAnulacionIntento,
+  ResultadoConfirmacionCorreccion,
+  EventoTemporalPayload,
+  EventoTemporalLoteItem,
+  RespuestaLoteEventosTemporales,
+  ListaEventosTemporales,
+  EventoTemporal,
 } from "@/types/index";
 import { ApiError, apiFetch } from "@/lib/api";
 import { buildQueryString } from "@/lib/query-string";
@@ -210,6 +217,23 @@ export const corregirPreguntaIntento = (
     },
   );
 
+export const confirmarCorreccionIntento = (
+  idIntento: number,
+): Promise<ResultadoConfirmacionCorreccion> =>
+  apiFetch<ResultadoConfirmacionCorreccion>(
+    `/intentos/${idIntento}/confirmar-correccion`,
+    { method: "PUT" },
+  );
+
+export const anularIntentoPorIncidente = (
+  idIntento: number,
+  eventoId: string,
+): Promise<ResultadoAnulacionIntento> =>
+  apiFetch<ResultadoAnulacionIntento>(
+    `/intentos/${idIntento}/anular-por-incidente/${eventoId}`,
+    { method: "PUT" },
+  );
+
 // TELEMETRÍA
 export const registrarAlertaAntifraude = (payload: AlertaPayload): Promise<void> =>
   apiFetch<void>("/telemetria/alerta", {
@@ -252,3 +276,52 @@ export const obtenerIncidentesFoco = (
   apiFetch<IncidenteFoco[]>(
     `/telemetria/intentos/${idIntento}/incidentes`,
   );
+
+export const guardarEventoTemporal = (
+  idIntento: number,
+  eventoId: string,
+  payload: EventoTemporalPayload,
+): Promise<EventoTemporal & { resultado: "creado" | "actualizado" | "replay" }> =>
+  apiFetch<EventoTemporal & { resultado: "creado" | "actualizado" | "replay" }>(
+    `/telemetria/intentos/${idIntento}/eventos/${eventoId}`,
+    { method: "PUT", body: JSON.stringify(payload) },
+  );
+
+export const guardarEventosTemporalesLote = (
+  idIntento: number,
+  eventos: EventoTemporalLoteItem[],
+): Promise<RespuestaLoteEventosTemporales> =>
+  apiFetch<RespuestaLoteEventosTemporales>(
+    `/telemetria/intentos/${idIntento}/eventos/lote`,
+    { method: "POST", body: JSON.stringify({ Eventos: eventos }) },
+  );
+
+export const obtenerEventosTemporales = (
+  idIntento: number,
+  pagina = 1,
+  limite = 50,
+): Promise<ListaEventosTemporales> =>
+  apiFetch<ListaEventosTemporales>(
+    `/telemetria/intentos/${idIntento}/eventos${buildQueryString({ pagina, limite })}`,
+  ).then((response) => ({
+    ...response,
+    items: response.items.map((item) => ({
+      ...item,
+      duracionMilisegundos: item.duracionMilisegundos === null
+        ? null
+        : Number(item.duracionMilisegundos),
+    })),
+    resumen: {
+      ...response.resumen,
+      duracionesPorTipo: response.resumen.duracionesPorTipo.map((item) => ({
+        ...item,
+        duracionMilisegundos: Number(item.duracionMilisegundos),
+      })),
+      tiemposPorPregunta: response.resumen.tiemposPorPregunta.map((item) => ({
+        ...item,
+        duracionMilisegundos: item.duracionMilisegundos === null
+          ? null
+          : Number(item.duracionMilisegundos),
+      })),
+    },
+  }));

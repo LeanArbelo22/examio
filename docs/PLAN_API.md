@@ -154,8 +154,83 @@ La etapa reutiliza la migración ya aplicada
 La etapa reutiliza la migración ya aplicada
 `20261011_calificacion_intentos_telemetria.sql`; no requiere otro script SQL.
 
-**Siguiente trabajo funcional:** definir con producto la política de revisión del examen
-por alumno. Continúan fuera de alcance las consecuencias automáticas por telemetría.
+## Evolución — etapa previa a telemetría temporal
+
+**Estado: BACKEND IMPLEMENTADO — PENDIENTE SQL REAL E INTEGRACIÓN FRONTEND**
+
+- [x] Agregar anulación autoritativa e idempotente vinculada a un `EventoId` existente.
+- [x] Restringir la operación al alumno titular o administrador autorizado.
+- [x] Exigir intento en progreso, conservar respuestas y mantener todas las notas nulas.
+- [x] Ampliar aditivamente el incidente actual con `fullscreen_exit`.
+- [x] Persistir y auditar confirmación automática/manual de la corrección.
+- [x] Exigir puntajes definitivos antes de la confirmación docente.
+- [x] Reabrir la corrección al modificar una pregunta o la nota después de confirmar.
+- [x] Exponer `correccionConfirmada` y `revisionDisponible` en el historial propio.
+- [x] Bloquear con `REVIEW_NOT_AVAILABLE` el intento completo del alumno no confirmado.
+- [x] Exponer claves correctas al alumno únicamente después de la confirmación.
+- [x] Agregar migración idempotente y verificador de sólo lectura.
+- [x] Agregar cobertura HTTP focalizada de replay, RBAC, pendientes y revisión segura.
+- [ ] Aplicar dos veces `20261015_anulacion_confirmacion_revision.sql` en SQL Server
+  de prueba y ejecutar `verificar-anulacion-confirmacion-revision.sql`.
+- [ ] Probar desde el frontend: sincronizar respuestas, registrar incidente, anular y
+  confirmar/reabrir correcciones.
+- [ ] Probar anulación y confirmación concurrentes contra SQL Server real.
+
+La consecuencia temporal se activa sólo mediante el endpoint explícito de anulación;
+registrar un incidente por sí solo continúa sin modificar el intento. La etapa 3
+generalizará eventos y tiempos; la etapa 5 reemplazará la habilitación directa por una
+política y sesiones de revisión.
+
+## Evolución — etapa 3: telemetría temporal confiable
+
+**Estado: BACKEND IMPLEMENTADO — PENDIENTE SQL REAL E INTEGRACIÓN FRONTEND**
+
+- [x] Extender `IncidenteIntento` sin romper las filas ni endpoints legacy.
+- [x] Agregar catálogo de eventos y unicidad por intento, sesión y secuencia.
+- [x] Incorporar escritura individual idempotente y cierre posterior de intervalos.
+- [x] Incorporar lote de hasta 500 eventos con resultado y transacción por elemento.
+- [x] Agregar listado paginado, resumen, unión de solapamientos y fallback legacy.
+- [x] Exponer `idIntentoPregunta` junto con `idPregunta` en el render del examen.
+- [x] Validar reloj, duración, orden temporal, ventana de siete días y pertenencia.
+- [x] Mantener los eventos sin efectos sobre nota, estado o intento válido.
+- [x] Agregar migración idempotente, verificador de sólo lectura y tests focalizados.
+- [ ] Aplicar dos veces `20261016_telemetria_temporal.sql` en SQL Server de prueba y
+  ejecutar `verificar-telemetria-temporal.sql`.
+- [ ] Probar replays y UUID/secuencia concurrentes contra las constraints reales.
+- [ ] Contrastar en SQL real la unión de intervalos solapados y el fallback por pregunta.
+- [ ] Integrar la cola offline del frontend y probar recuperación posterior al cierre.
+
+Los endpoints legacy mantienen `200`, listado completo y ventana de siete días. El
+nuevo `GET /eventos` limita cada página a 100. El lote no usa una transacción global:
+un elemento rechazado o en conflicto no revierte los elementos válidos.
+
+## Evolución — etapa 4: rendimiento por pregunta y grupo
+
+**Estado: BACKEND IMPLEMENTADO — PENDIENTE ÍNDICES, PLANES E INTEGRACIÓN FRONTEND**
+
+- [x] Agregar reportes paginados de preguntas, grupos/variantes y distribución de opciones.
+- [x] Aplicar filtros por estructura académica, fechas, estado, corrección y alcance
+  `todos|validos`, con RBAC docente por comisión y administrador institucional.
+- [x] Calcular KPIs sobre todo el conjunto filtrado antes de paginar, con orden estable.
+- [x] Normalizar puntajes como porcentaje del máximo snapshot para combinar escalas 10/100.
+- [x] Conservar identidad histórica por `ContenidoHashSnapshot` y tratar el banco sólo
+  como procedencia de una copia independiente.
+- [x] Unir intervalos `question_active` superpuestos, devolver tiempos ausentes como null
+  y usar navegación legacy sólo como fallback por pregunta.
+- [x] Calcular opciones/distractores desde snapshots y adjuntar variantes por grupo sin N+1.
+- [x] Agregar tests focalizados, documentación, migración de índices y verificador de lectura.
+- [x] Ejecutar las consultas de preguntas, grupos, opciones y medianas en SQL Server real
+  con los datos disponibles, sin aplicar escrituras.
+- [ ] Aplicar dos veces `20261017_indices_rendimiento_preguntas.sql` y ejecutar
+  `verificar-indices-rendimiento-preguntas.sql`.
+- [ ] Comparar planes antes/después con volumen representativo. La base de prueba actual
+  es pequeña y no permite concluir selectividad o costo productivo de los índices.
+- [ ] Integrar y comprobar manualmente dashboards de preguntas, variantes, grupos y opciones.
+
+No se aplica una etiqueta de “diferencia significativa” entre variantes hasta acordar un
+umbral o método estadístico. El contrato expone diferencia porcentual y tamaño de muestra.
+
+**Siguiente trabajo funcional:** etapa 5, políticas y sesiones de revisión.
 
 ---
 
@@ -301,8 +376,10 @@ no degradar el aislamiento de la suite Jest estándar.
 - [x] Migración idempotente con preparación de respuesta, snapshots e historial.
 - [x] Bloqueo 409 al publicar contenido cuyo runtime corresponde a la etapa 2.
 - [x] Cobertura HTTP focalizada y documentación.
-- [x] Aplicar dos veces `20261013_respuestas_multiples_justificacion.sql` en SQL Server
-  de prueba y ejecutar su verificador de sólo lectura.
+- [ ] Reaplicar dos veces la versión corregida de
+  `20261013_respuestas_multiples_justificacion.sql` en SQL Server de prueba y ejecutar
+  su verificador. La primera aplicación dejó vigente `CHK_Pregunta_Tipo` y un check
+  autogenerado de `BancoPregunta` que todavía bloqueaban `multiple`.
 - [x] Etapa 2 backend: render inmutable, guardado atómico/revisionado, entrega y
   corrección del nuevo modelo, con compatibilidad legacy y cobertura HTTP.
 - [ ] Aplicar dos veces `20261014_runtime_respuestas_multiples.sql` en SQL Server de
@@ -495,7 +572,7 @@ evaluaciones, además del detalle por publicación. No implementado en esta entr
 
 ### Evidencia de validación local
 
-- Suite completa actual: **21 suites / 418 pruebas aprobadas**, también con
+- Suite completa actual: **23 suites / 459 pruebas aprobadas**, también con
   `--runInBand --detectOpenHandles`. Jest finaliza naturalmente sin `--forceExit`.
 - Suite del banco: **66 pruebas aprobadas**; incluye integración HTTP de copias
   durante creación/edición, rollback, conflictos y aislamiento.

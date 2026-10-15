@@ -6,6 +6,12 @@ import type {
   ReporteRendimientoListado,
   ReporteEvaluacionesFiltros,
   ReporteEvaluacionesListado,
+  ReporteGruposFiltros,
+  ReporteGruposListado,
+  ReporteOpcionesFiltros,
+  ReporteOpcionesListado,
+  ReportePreguntasFiltros,
+  ReportePreguntasListado,
 } from "@/types/index";
 
 export const obtenerReporteRendimientoEvaluaciones = (
@@ -27,4 +33,26 @@ export const obtenerDetalleRendimientoAlumno = (
 ): Promise<ReporteRendimientoDetalle> =>
   apiFetch<ReporteRendimientoDetalle>(
     `/reportes/rendimiento${buildQueryString(filtros)}`,
+  );
+
+export const obtenerReporteRendimientoPreguntas = (
+  filtros: ReportePreguntasFiltros,
+): Promise<ReportePreguntasListado> =>
+  apiFetch<ReportePreguntasListado>(
+    `/reportes/rendimiento-preguntas${buildQueryString(filtros)}`,
+  );
+
+export const obtenerReporteRendimientoGrupos = (
+  filtros: ReporteGruposFiltros,
+): Promise<ReporteGruposListado> =>
+  apiFetch<ReporteGruposListado>(
+    `/reportes/rendimiento-grupos${buildQueryString(filtros)}`,
+  );
+
+export const obtenerReporteOpcionesPregunta = (
+  idPregunta: number,
+  filtros: ReporteOpcionesFiltros,
+): Promise<ReporteOpcionesListado> =>
+  apiFetch<ReporteOpcionesListado>(
+    `/reportes/rendimiento-preguntas/${idPregunta}/opciones${buildQueryString(filtros)}`,
   );

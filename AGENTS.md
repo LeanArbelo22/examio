@@ -321,9 +321,15 @@ Respetar `prefers-reduced-motion`; no depender de animación para comunicar esta
 - **Outbox de respuestas:** una confirmación solo puede confirmar la misma versión
   enviada; no eliminar ni sobrescribir una respuesta más nueva por una respuesta
   tardía. La pérdida de red no debe confundirse con expiración de sesión.
-- **Outbox de foco:** la telemetría de `blur/focus` usa una base IndexedDB independiente.
-  Inicio y cierre conservan el mismo UUID; una confirmación tardía del inicio no puede borrar
-  el cierre más nuevo. Sus fallas nunca deben bloquear, finalizar o penalizar el intento.
+- **Outbox temporal:** la telemetría del examen usa una base IndexedDB independiente y uniforme.
+  Cada intento conserva sesión UUID y secuencia creciente; inicio y cierre mantienen el mismo
+  evento. La confirmación de una versión abierta no puede borrar un cierre posterior. El batch
+  procesa hasta 500 elementos y los conflictos terminales permanecen visibles en la cola.
+- **Identidad de pregunta:** `idIntentoPregunta` identifica la instancia sorteada y se usa para
+  `question_active`; `idPregunta` identifica el origen. Nunca inferir ni intercambiar ambos IDs.
+- **Anulación autoritativa:** mientras no exista configuración docente, la primera pérdida de
+  foco o salida de fullscreen congela la interacción, sincroniza respuestas e incidente y solicita
+  la anulación. No finalizar como `entregado`, no calcular nota y no regenerar el UUID ante reintentos.
 - **Credenciales solo server-side:** nunca exponer access/refresh tokens mediante `Session.user`,
   respuestas del BFF, logs, variables públicas o almacenamiento del navegador.
 - **URLs y fetch fuera de la capa:** persisten URL hardcodeada y al menos una llamada directa legacy.
@@ -378,6 +384,10 @@ Respetar `prefers-reduced-motion`; no depender de animación para comunicar esta
 - **Override de nota final:** la nota manual es una excepción auditada que prevalece sobre la
   calculada sin borrarla. No habilitar el override en UI hasta que todas las preguntas posean
   puntaje definitivo; validar siempre contra la escala 10/100 real.
+- **Confirmación y revisión:** una nota completa no equivale a devolución publicada. La corrección
+  docente debe confirmarse sin preguntas pendientes; cualquier modificación posterior la reabre.
+  El alumno sólo puede abrir la revisión cuando `revisionDisponible` es verdadero y la ausencia de
+  claves correctas nunca debe interpretarse como respuesta incorrecta.
 - **Intento académicamente válido:** la selección automática considera sólo el último intento
   `entregado`; un override manual persiste hasta que el docente lo elimine. No ocultar intentos
   anteriores, no permitir elegir estados no entregados y no recalcular esta selección en cliente.
@@ -420,15 +430,20 @@ hooks y pruebas focalizadas del banco. Las rutas y editores independientes, borr
 selector, guardado individual y publicación transaccional están integrados. La gestión
 completa de estados/etiquetas y los conflictos 409 continúan en la Fase 12 de `PLAN.md`.
 
-Los reportes por alumno y por publicación de evaluación están integrados en
+Los reportes por alumno, publicación, pregunta y grupo están integrados en
 `/profesor/reportes`. Comparten layout, filtros, KPIs, tabla, skeleton y tarjetas
-de gráficos; cada reporte conserva sus gráficos y reglas de dominio. Las series
+de gráficos; cada reporte conserva sus gráficos y reglas de dominio. Preguntas y grupos
+consumen agregados server-side normalizados por porcentaje del puntaje máximo; el detalle
+de una pregunta cerrada muestra opciones y distractores desde snapshots históricos. Las series
 del reporte por evaluación son agregaciones globales del backend. Las del reporte
 por alumno todavía representan sólo la página visible y deben describirse como tales.
 Los filtros permiten alternar métricas académicas entre todos los intentos y el intento
 válido; los contadores operativos siempre incluyen todos. Los promedios globales entre
 escalas 10/100 se interpretan sobre 10, mientras cada publicación conserva escala y umbral.
 No se reemplazó la navegación completa del docente ni se creó un sidebar global.
+La identidad transversal del reporte de preguntas es `ContenidoHashSnapshot`: agrupa contenido
+idéntico, pero no debe interpretarse como linaje vivo de copias que luego fueron modificadas.
+El contrato actual no expone filtro por tipo de pregunta; no simularlo sobre la página visible.
 
 El inicio `/profesor` agrupa las actividades por `idMateria` y mantiene la barra de
 gestión visible. Materias, comisiones y actividades cambian como vistas internas del
@@ -459,10 +474,15 @@ autocorrecciones, muestra el desglose de notas y confirma el override final audi
 de una evaluación, el docente puede consultar todos los intentos de cada alumno, elegir uno entregado
 como resultado académico y restaurar la selección automática. `/alumno/resultados` consume el historial
 propio server-side, con resumen, filtros, orden y paginación sincronizados con la URL.
-Durante el examen se registran pérdidas de foco mediante una outbox IndexedDB separada:
-el mismo UUID conserva inicio/cierre, se sincroniza al recuperar conectividad y nunca altera
-estado, nota o validez. La corrección docente muestra resumen y cronología como información,
-no como determinación automática de fraude.
+Durante el examen una outbox temporal IndexedDB registra tiempos por pregunta, foco, fullscreen,
+conectividad, reanudaciones, recargas y fallos operativos mediante sesión/secuencia estables. Los
+intervalos conservan el mismo UUID al cerrarse y se sincronizan por lotes al recuperar conectividad;
+nunca alteran estado, nota o validez por sí solos. Con la política temporal actual, la primera pérdida de foco o
+salida de fullscreen congela el examen y encola una anulación autoritativa después de sincronizar
+respuestas e incidente; la solicitud sobrevive a la falta de conexión. La corrección docente muestra
+un resumen funcional y la cronología de interrupciones; los intervalos `question_active` quedan detrás
+de “Más detalles”. Las duraciones `BIGINT` se normalizan en el servicio antes de agregarse y la apertura
+del examen se registra una sola vez por documento, diferenciando inicio de reanudaciones reales.
 
 La selección múltiple y justificación está integrada de punta a punta. `QuestionContentEditor`
 diferencia selección única (`mc`) de selección múltiple (`multiple`), conserva configuración en
@@ -472,8 +492,10 @@ preguntas cerradas y, al entregar, registra `"Sin respuesta"` en las justificaci
 vacías antes de sincronizar y finalizar. La publicación ya no
 posee el bloqueo temporal de Etapa 1. La corrección docente presenta la justificación y diferencia el
 puntaje sugerido por opciones de la corrección definitiva cuando se requiere revisión manual.
-Mientras el backend no habilite una revisión autoritativa, la vista del alumno trata la ausencia de
-`esCorrecta` como información no disponible y nunca como una respuesta incorrecta.
+La vista del alumno trata la ausencia de `esCorrecta` como información no disponible y nunca como
+una respuesta incorrecta. La corrección
+manual incorpora una confirmación explícita y el historial sólo ofrece la revisión cuando el backend
+devuelve `revisionDisponible: true`; una edición posterior vuelve a abrir la corrección.
 
 Playwright usa `.next-e2e` mediante `EXAMIO_NEXT_DIST_DIR`, por lo que los E2E y builds
 de validación pueden ejecutarse sin finalizar un `next dev` activo sobre `.next`.

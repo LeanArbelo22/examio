@@ -20,6 +20,9 @@ interface AnswerDraft {
   justification: string;
 }
 
+const preserveTypedText = (value: string): string | null =>
+  value.trim().length > 0 ? value : null;
+
 function createEventId(): string {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
@@ -123,8 +126,8 @@ export default function ActivityPage({
       IdIntento: idIntento,
       IdPregunta: currentQuestion.idPregunta,
       IdOpcionesSeleccionadas: migrated.selectedOptionIds,
-      RtaTexto: migrated.text.trim() || null,
-      Justificacion: migrated.justification.trim() || null,
+      RtaTexto: preserveTypedText(migrated.text),
+      Justificacion: preserveTypedText(migrated.justification),
       RevisionEsperada: currentQuestion.respuesta?.revision ?? 0,
       EventoId: createEventId(),
     };
@@ -171,9 +174,9 @@ export default function ActivityPage({
     IdIntento: idIntento,
     IdPregunta: currentQuestion?.idPregunta ?? 0,
     IdOpcionesSeleccionadas: isClosed ? next.selectedOptionIds : [],
-    RtaTexto: isClosed ? null : next.text.trim() || null,
+    RtaTexto: isClosed ? null : preserveTypedText(next.text),
     Justificacion: supportsJustification
-      ? next.justification.trim() || null
+      ? preserveTypedText(next.justification)
       : null,
     RevisionEsperada: expectedRevision,
     EventoId: createEventId(),
