@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { useGetDetalleEvaluacion, useGetAlumnosInscriptos } from "@/hooks/useEvaluaciones";
 import type { AlumnoIntento } from "@/types/index";
 import { StudentAttemptsModal } from "@/components/evaluaciones/StudentAttemptsModal";
+import { ReviewPolicyPanel } from "@/components/evaluaciones/ReviewPolicyPanel";
 
 const ESTADO_BADGE: Record<string, { label: string; className: string } | undefined> = {
   "en_progreso": { label: "En progreso", className: "bg-amber-50 text-amber-700 border border-amber-200" },
@@ -106,6 +107,8 @@ export default function GestionExamenPage({ params }: { params: Promise<{ idPubl
           </p>
         </div>
       </div>
+
+      <ReviewPolicyPanel idPublicacion={idPub} />
 
       {/* ---- TABLA DE ALUMNOS ---- */}
       <div>

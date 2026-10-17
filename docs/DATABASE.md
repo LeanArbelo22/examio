@@ -776,9 +776,9 @@ fecha. La transacción cambia únicamente el estado/fecha del intento y limpia n
 elimina `Respuesta`, `RespuestaOpcion`, snapshots ni historiales. `IncidenteIntento`
 admite temporalmente `focus_lost` y `fullscreen_exit`; la etapa 3 ampliará el catálogo.
 
-La revisión de alumno está disponible sólo cuando el intento está `entregado` y
-`CorreccionConfirmada=1`. Hasta la política de revisión de la etapa 5, esa condición es
-la única habilitación y permite construir la devolución desde snapshots.
+La revisión de alumno exige que el intento esté `entregado` y
+`CorreccionConfirmada=1`. Desde la etapa 5, esas condiciones son necesarias pero no
+suficientes: además se evalúan política, permiso individual, intento válido y sesión.
 
 ### 9.7 Telemetría temporal confiable — etapa 3
 
@@ -842,6 +842,35 @@ publicación/alumno/estado/fecha, intento/pregunta y fallback de navegación. No
 datos ni contratos. Verificación de sólo lectura:
 `scripts/verificar-indices-rendimiento-preguntas.sql`; además de estructura muestra uso
 y recomendaciones del optimizador para revisar planes con un volumen representativo.
+
+### 9.9 Políticas y sesiones de revisión — etapa 5
+
+DDL: `migrations/20261018_revision_examen.sql`, posterior a las migraciones de intentos
+y corrección. Verificación de sólo lectura: `scripts/verificar-revision-examen.sql`.
+La migración es idempotente, transaccional, usa SQL dinámico para referencias a objetos
+nuevos y no crea ni modifica Stored Procedures.
+
+- `PoliticaRevisionPublicacion` mantiene una política versionada por publicación:
+  `nunca|al_corregir|ventana|manual`, acceso `unico|libre` y fechas sólo para ventana.
+- `PermisoRevisionIntento` mantiene como máximo un override por intento. Su estado
+  `activo|revocado`, revisión, fechas y actor permiten autorización individual y
+  revocación explícita sin alterar la política general.
+- `SesionRevisionIntento` vincula una sesión UUID con intento y usuario, congela modo,
+  acceso, revisión de política y permiso, y registra emisión, expiración y consumos.
+  `UX_SesionRevision_Intento_ActivaUnica` garantiza una sola sesión única activa por
+  intento; el consumo se coordina con bloqueo serializable.
+- `AuditoriaRevisionIntento` registra backfill/cambios de política, concesiones,
+  revocaciones, emisión, reutilización, apertura, consumo y expiración.
+
+El backfill crea `al_corregir + libre` para toda publicación existente y una auditoría
+única, preservando la visibilidad previa bajo una regla explícita. Las publicaciones
+nuevas crean su política dentro de la misma transacción que `Publicacion`.
+
+La confirmación de corrección es una precondición independiente. La política general
+sólo aplica al intento válido actual; un permiso individual se vincula al intento y no
+migra al cambiar esa selección. Una revocación invalida las sesiones emitidas del
+intento. El contenido del alumno se reconstruye desde snapshots y no usa el endpoint
+docente `/intentos/:id/completo`.
 
 ## 10. Modelo de selección múltiple y justificación
 

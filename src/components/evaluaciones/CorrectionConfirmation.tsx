@@ -37,7 +37,7 @@ export function CorrectionConfirmation({
               Corrección confirmada
             </h2>
             <p className="mt-1 text-sm text-emerald-800">
-              La calificación quedó cerrada y el alumno ya puede consultar la revisión.
+              La calificación quedó cerrada. La revisión dependerá de la política configurada para esta evaluación.
             </p>
           </div>
           <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
@@ -58,7 +58,7 @@ export function CorrectionConfirmation({
           <p className="mt-1 max-w-3xl text-sm text-slate-700">
             {pendingCount > 0
               ? `Todavía ${pendingCount === 1 ? "queda una pregunta pendiente" : `quedan ${pendingCount} preguntas pendientes`}.`
-              : "Todas las preguntas están corregidas. Confirmá para cerrar la calificación y habilitar la revisión del alumno."}
+              : "Todas las preguntas están corregidas. Confirmá para cerrar la calificación. La visibilidad de la revisión se administra por separado."}
           </p>
         </div>
         <button
@@ -89,7 +89,7 @@ export function CorrectionConfirmation({
         title="Confirmar corrección"
       >
         <p className="text-sm text-slate-700">
-          La nota actual quedará confirmada y el alumno podrá revisar sus respuestas.
+          La nota actual quedará confirmada. Esto no habilita por sí solo la revisión del alumno.
         </p>
         <p className="mt-3 text-sm text-slate-600">
           Si luego modificás un puntaje o la nota final, tendrás que confirmar nuevamente.
@@ -109,7 +109,7 @@ export function CorrectionConfirmation({
             disabled={mutation.isPending}
             className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
           >
-            {mutation.isPending ? "Confirmando..." : "Confirmar y habilitar revisión"}
+            {mutation.isPending ? "Confirmando..." : "Confirmar corrección"}
           </button>
         </div>
       </Modal>

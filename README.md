@@ -556,6 +556,22 @@ justifican esa abstracción.
 
 Antes de crear un componente nuevo se debe comprobar si existe uno equivalente.
 
+## Revisión de evaluaciones
+
+La confirmación docente cierra la corrección, pero no vuelve visible el examen por sí sola.
+Cada publicación configura una política (`nunca`, `al_corregir`, `ventana` o `manual`), un
+tipo de acceso (`unico` o `libre`) y puede otorgar o revocar permisos por intento.
+
+El alumno no consume `/intentos/:id/completo`. La revisión sigue el flujo:
+
+```text
+disponibilidad → sesión idempotente de 5 minutos → contenido desde snapshots
+```
+
+La emisión usa `Idempotency-Key`; el acceso único sólo se consume después de una acción
+explícita del alumno. Los contratos y query keys viven en `revisiones.api.ts`,
+`useRevisiones.ts` y `revisionKeys`.
+
 ## Estilos
 
 - Tailwind CSS 4 mediante `@import "tailwindcss"`.

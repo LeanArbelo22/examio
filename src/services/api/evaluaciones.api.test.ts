@@ -21,6 +21,16 @@ import {
   guardarEventosTemporalesLote,
   obtenerEventosTemporales,
 } from "./evaluaciones.api";
+import {
+  actualizarPoliticaRevision,
+  emitirSesionRevision,
+  guardarPermisoRevision,
+  obtenerContenidoRevision,
+  obtenerDisponibilidadRevision,
+  obtenerPermisosRevision,
+  obtenerPoliticaRevision,
+  revocarPermisoRevision,
+} from "./revisiones.api";
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
@@ -384,5 +394,42 @@ describe("iniciarIntentoExamen", () => {
     );
     expect(events.items[0].duracionMilisegundos).toBe(31_800);
     expect(events.resumen.tiemposPorPregunta[0].duracionMilisegundos).toBe(31_800);
+  });
+
+  it("usa los contratos de políticas, permisos y sesiones de revisión", async () => {
+    apiFetchMock.mockResolvedValue({});
+    const policy = {
+      Modo: "ventana" as const,
+      Acceso: "unico" as const,
+      VentanaDesde: "2026-10-20T12:00:00.000Z",
+      VentanaHasta: "2026-10-20T13:00:00.000Z",
+      RevisionEsperada: 2,
+    };
+    const permission = {
+      Acceso: "libre" as const,
+      FechaDesde: null,
+      FechaHasta: null,
+      Motivo: "Solicitud del alumno",
+      RevisionEsperada: 0,
+    };
+    const key = "4e096ceb-51fd-49a1-8f80-c3760edaf021";
+
+    await obtenerPoliticaRevision(41);
+    await actualizarPoliticaRevision(41, policy);
+    await obtenerPermisosRevision(41, { estado: "activo", idAlumno: 30500 });
+    await guardarPermisoRevision(73, permission);
+    await revocarPermisoRevision(73);
+    await obtenerDisponibilidadRevision(73);
+    await emitirSesionRevision(73, key);
+    await obtenerContenidoRevision("e9e487d5-ae4f-4e6a-827f-c82348db714d");
+
+    expect(apiFetchMock).toHaveBeenNthCalledWith(1, "/evaluaciones/publicaciones/41/politica-revision");
+    expect(apiFetchMock).toHaveBeenNthCalledWith(2, "/evaluaciones/publicaciones/41/politica-revision", { method: "PUT", body: JSON.stringify(policy) });
+    expect(apiFetchMock).toHaveBeenNthCalledWith(3, "/evaluaciones/publicaciones/41/permisos-revision?estado=activo&idAlumno=30500");
+    expect(apiFetchMock).toHaveBeenNthCalledWith(4, "/intentos/73/permiso-revision", { method: "PUT", body: JSON.stringify(permission) });
+    expect(apiFetchMock).toHaveBeenNthCalledWith(5, "/intentos/73/permiso-revision", { method: "DELETE" });
+    expect(apiFetchMock).toHaveBeenNthCalledWith(6, "/intentos/73/revision-disponible");
+    expect(apiFetchMock).toHaveBeenNthCalledWith(7, "/revisiones/intentos/73/sesiones", { method: "POST", headers: { "Idempotency-Key": key } });
+    expect(apiFetchMock).toHaveBeenNthCalledWith(8, "/revisiones/sesiones/e9e487d5-ae4f-4e6a-827f-c82348db714d/contenido");
   });
 });

@@ -47,7 +47,23 @@ const SAFE_CODE_MESSAGES: Record<string, string> = {
   CORRECTION_INCOMPLETE:
     "Corregí todas las preguntas antes de confirmar la corrección.",
   REVIEW_NOT_AVAILABLE:
-    "La revisión todavía no está disponible. Esperá a que el docente confirme la corrección.",
+    "La revisión no está disponible según la configuración de la evaluación.",
+  REVIEW_SESSION_REQUIRED:
+    "Para consultar la revisión primero tenés que abrir una sesión segura.",
+  REVIEW_SESSION_NOT_FOUND:
+    "La sesión de revisión no existe o ya no está disponible.",
+  REVIEW_SESSION_CONSUMED:
+    "Esta sesión de acceso único ya fue utilizada.",
+  REVIEW_SESSION_EXPIRED:
+    "La sesión de revisión venció. Volvé al historial para abrir una nueva.",
+  REVIEW_SESSION_REVOKED:
+    "El docente revocó esta sesión de revisión.",
+  REVIEW_SCOPE_FORBIDDEN:
+    "No tenés permisos para consultar esta revisión.",
+  REVIEW_POLICY_REVISION_CONFLICT:
+    "La configuración cambió mientras la editabas. Recargala antes de volver a guardar.",
+  REVIEW_PERMISSION_REVISION_CONFLICT:
+    "La autorización cambió mientras la editabas. Recargala antes de volver a guardar.",
   ATTEMPT_ALREADY_CANCELLED:
     "El intento ya fue anulado por un incidente anterior.",
   FOCUS_EVENT_NOT_FOUND:

@@ -651,6 +651,21 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 - [x] Reutilizar en frontend layout, filtros, KPIs, tablas y gráficos para las vistas “Por pregunta” y “Por grupo”, con opciones/distractores en detalle accesible.
 - [ ] Validar manualmente los tres reportes con datos reales, escalas mixtas, intentos válidos, correcciones pendientes y muestras temporales parciales.
 
+### Etapa 5 — Políticas y sesiones de revisión
+
+- [x] Backend: persistir políticas por publicación, permisos individuales, auditoría y sesiones de revisión de cinco minutos construidas desde snapshots.
+- [x] Aplicar la migración `20261018_revision_examen.sql` y su verificador en las bases correspondientes.
+- [x] Sincronizar `docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` con la entrega backend.
+- [x] Incorporar tipos, servicios, query keys y hooks para políticas, permisos, disponibilidad, auditoría, emisión y consumo de sesiones.
+- [x] Configurar desde la gestión docente los modos `nunca`, `al_corregir`, `ventana` y `manual`, el acceso `unico|libre` y consultar el historial funcional de cambios.
+- [x] Permitir autorización, actualización y revocación individual desde la corrección de un intento, respetando confirmación y revisión optimista.
+- [x] Reemplazar en el alumno el acceso directo a `/intentos/:id/completo` por disponibilidad, apertura deliberada, emisión idempotente y consumo de contenido desde snapshots.
+- [x] Separar en la UI “confirmar corrección” de “habilitar revisión”; la visibilidad depende exclusivamente de política, permiso, intento válido y sesión.
+- [x] Agregar mensajes funcionales para sesión requerida, vencida, consumida, revocada y conflictos de revisión.
+- [x] Validar la integración con ESLint focalizado y 22 pruebas Vitest de contratos, política, permiso, confirmación y apertura del alumno.
+- [ ] Validar manualmente contra API y SQL Server real: los cuatro modos, ventana, permiso/revocación, cambio de intento válido, sesión libre, sesión única, expiración y consumo concurrente.
+- [!] `pnpm typecheck` global continúa bloqueado por errores preexistentes en tests y outboxes ajenos a esta etapa; no reportó errores en los archivos nuevos de revisión.
+
 ### Mejora transversal pendiente — Filtros y visualizaciones de reportes
 
 - [ ] Reemplazar en los reportes docentes los catálogos institucionales de materias y comisiones por opciones derivadas exclusivamente de las evaluaciones autorizadas del docente.

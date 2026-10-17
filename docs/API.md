@@ -41,7 +41,7 @@ API REST desarrollada en Express 5 + TypeScript 6 que abstrae la lógica de nego
 | **mssql 12** | Driver TDS para SQL Server. `pool` es singleton. Soporta `sql.Transaction` para operaciones atómicas. |
 | **Zod 4** | Esquemas de validación en cada `POST`/`PUT`. El middleware `validateRequest` rechaza payloads inválidos con `400` + array `errors`. |
 | **jsonwebtoken + bcryptjs** | Autenticación stateless. `bcrypt.compare()` para contraseñas. JWT con payload `{ id, email, role, idAlumno, idDocente }` y expiración de 1 hora. |
-| **ts-jest + supertest** | 459 tests de referencia con mock completo de `mssql`. Sin dependencia de BD real. Supertest importa `src/app.ts` sin abrir un puerto. |
+| **ts-jest + supertest** | 479 tests de referencia con mock completo de `mssql`. Sin dependencia de BD real. Supertest importa `src/app.ts` sin abrir un puerto. |
 
 La construcción de Express está separada del arranque del proceso:
 
@@ -748,6 +748,10 @@ frontend puede agrupar por IDs sin depender de nombres potencialmente repetidos.
 | GET | `/api/evaluaciones/publicaciones/:idPublicacion/alumnos/:matricula/intentos` | — | `alumno`*, `admin`, `docente` |
 | PUT | `/api/evaluaciones/publicaciones/:idPublicacion/alumnos/:matricula/intento-valido` | `SeleccionarIntentoValidoSchema` | `admin`, `docente` |
 | DELETE | `/api/evaluaciones/publicaciones/:idPublicacion/alumnos/:matricula/intento-valido` | — | `admin`, `docente` |
+| GET | `/api/evaluaciones/publicaciones/:idPublicacion/politica-revision` | — | `admin`, `docente` |
+| PUT | `/api/evaluaciones/publicaciones/:idPublicacion/politica-revision` | `PoliticaRevisionSchema` | `admin`, `docente` |
+| GET | `/api/evaluaciones/publicaciones/:idPublicacion/permisos-revision` | query | `admin`, `docente` |
+| GET | `/api/evaluaciones/publicaciones/:idPublicacion/auditoria-revision` | query | `admin`, `docente` |
 | GET | `/api/evaluaciones/:id/detalle` | — | `admin`, `docente` |
 | GET | `/api/evaluaciones/:id/alumnos` | — | `admin`, `docente` |
 
@@ -1134,6 +1138,9 @@ script SQL adicional.
 | GET | `/api/intentos/alumno/:idAlumno/detallados` | — | `alumno`, `admin`, `docente` |
 | GET | `/api/intentos/alumno/:idAlumno/historial-corregido` | — | `alumno`, `admin`, `docente` |
 | GET | `/api/intentos/:idIntento/completo` | — | `admin`, `docente`, `alumno`* |
+| GET | `/api/intentos/:idIntento/revision-disponible` | — | `admin`, `docente`, `alumno` |
+| PUT | `/api/intentos/:idIntento/permiso-revision` | `PermisoRevisionSchema` | `admin`, `docente` |
+| DELETE | `/api/intentos/:idIntento/permiso-revision` | — | `admin`, `docente` |
 | **PUT** | `/api/intentos/:idIntento/calificar` | `CalificarSchema` | `admin`, `docente` |
 | **PUT** | `/api/intentos/:idIntento/preguntas/:idPregunta/corregir` | `CorregirRespuestaSchema` | `docente` |
 | **PUT** | `/api/intentos/:idIntento/confirmar-correccion` | — | `admin`, `docente` |
@@ -1244,9 +1251,10 @@ mantienen sin cambios por compatibilidad.
 >
 > ⚠️ Cada opción lleva `fueSeleccionada: true/false` para que el Frontend pueda pintar directamente cuál fue marcada, sin cruzar arrays.
 >
-> \* `alumno` — sólo puede acceder a su propio intento y cuando la corrección está
-> confirmada. Antes recibe `409 REVIEW_NOT_AVAILABLE`; no se exponen preguntas,
-> respuestas, comentarios ni claves correctas.
+> \* `alumno` — la ruta se conserva por compatibilidad de autorización, pero ya no
+> entrega contenido al alumno. Para un intento propio responde siempre `409
+> REVIEW_SESSION_REQUIRED`; para uno ajeno, `403`. El alumno debe usar una sesión de
+> revisión. Docentes y administradores conservan el acceso histórico completo.
 
 ```json
 {
@@ -2336,6 +2344,132 @@ planes con volumen representativo antes de aceptar índices adicionales.
 
 ---
 
+### 4.17 Políticas, permisos y sesiones de revisión — etapa 5
+
+La corrección confirmada sigue siendo obligatoria, pero ya no habilita por sí sola el
+contenido. La disponibilidad se resuelve con esta precedencia:
+
+1. corrección no confirmada: denegada;
+2. permiso individual revocado: denegada;
+3. permiso individual activo y dentro de sus fechas: autorizada;
+4. sin permiso individual: se aplica la política general;
+5. la política general sólo alcanza al intento válido actual.
+
+Un permiso individual queda ligado al intento concreto y no migra si luego cambia el
+intento válido. Docentes y administradores mantienen acceso histórico por `/completo`.
+
+| Método | Endpoint | Roles |
+|---|---|---|
+| GET | `/api/evaluaciones/publicaciones/:idPublicacion/politica-revision` | `admin`, `docente` |
+| PUT | `/api/evaluaciones/publicaciones/:idPublicacion/politica-revision` | `admin`, `docente` |
+| PUT | `/api/intentos/:idIntento/permiso-revision` | `admin`, `docente` |
+| DELETE | `/api/intentos/:idIntento/permiso-revision` | `admin`, `docente` |
+| GET | `/api/evaluaciones/publicaciones/:idPublicacion/permisos-revision` | `admin`, `docente` |
+| GET | `/api/evaluaciones/publicaciones/:idPublicacion/auditoria-revision` | `admin`, `docente` |
+| GET | `/api/intentos/:idIntento/revision-disponible` | `admin`, `docente`, `alumno` titular |
+| POST | `/api/revisiones/intentos/:idIntento/sesiones` | `alumno` titular |
+| GET | `/api/revisiones/sesiones/:idSesion/contenido` | `alumno` titular |
+
+Modos generales: `nunca`, `al_corregir`, `ventana` y `manual`. El modo `manual` no
+autoriza por sí solo: requiere permiso individual. El acceso puede ser `unico` o
+`libre`. Una política `ventana` exige ambas fechas ISO 8601; los demás modos no las
+admiten. Las escrituras usan revisión optimista.
+
+```http
+PUT /api/evaluaciones/publicaciones/5/politica-revision
+Content-Type: application/json
+
+{
+  "Modo": "ventana",
+  "Acceso": "unico",
+  "VentanaDesde": "2026-10-20T12:00:00.000Z",
+  "VentanaHasta": "2026-10-22T12:00:00.000Z",
+  "RevisionEsperada": 1
+}
+```
+
+```http
+PUT /api/intentos/31/permiso-revision
+Content-Type: application/json
+
+{
+  "Acceso": "libre",
+  "FechaDesde": null,
+  "FechaHasta": "2026-10-25T23:59:59.000Z",
+  "Motivo": "Solicitud individual aprobada",
+  "RevisionEsperada": 0
+}
+```
+
+`DELETE /api/intentos/31/permiso-revision` crea o mantiene una revocación individual
+explícita, que prevalece sobre la política general e invalida sesiones emitidas. Repetir
+la revocación es idempotente. Los docentes sólo pueden operar publicaciones e intentos
+de sus comisiones activas; el administrador tiene alcance institucional.
+
+La disponibilidad no expone contenido:
+
+```json
+{
+  "success": true,
+  "data": {
+    "idIntento": 31,
+    "idPublicacion": 5,
+    "revisionDisponible": true,
+    "motivo": "POLICY_ALLOWED",
+    "acceso": "unico",
+    "origen": "general",
+    "modo": "ventana",
+    "revisionPolitica": 2,
+    "idPermiso": null,
+    "esIntentoValido": true
+  }
+}
+```
+
+La emisión requiere `Idempotency-Key` UUID. Una sesión nueva responde `201`; un replay
+o la reutilización concurrente de la misma sesión única activa responde `200`. La sesión
+expira cinco minutos después de emitirse y conserva snapshots de modo, acceso, revisión
+de política y permiso. Para abrir otra operación después de una expiración conocida, el
+cliente debe usar una clave de idempotencia nueva.
+
+```http
+POST /api/revisiones/intentos/31/sesiones
+Idempotency-Key: 74f530c8-b7e3-4287-a2c9-99cba672291f
+```
+
+```json
+{
+  "success": true,
+  "data": {
+    "idSesion": "fba031e9-8b40-41d0-aec3-bcd405ca29dd",
+    "idIntento": 31,
+    "acceso": "unico",
+    "fechaEmision": "2026-10-17T15:00:00.000Z",
+    "fechaExpiracion": "2026-10-17T15:05:00.000Z",
+    "reutilizada": false
+  }
+}
+```
+
+`GET /api/revisiones/sesiones/:idSesion/contenido` construye la devolución desde
+`IntentoPregunta` y `IntentoPreguntaOpcionSnapshot`, incluyendo selecciones y claves
+correctas sólo dentro de la sesión autorizada. En acceso `unico`, el primer consumo es
+atómico y el segundo devuelve `409 REVIEW_SESSION_CONSUMED`; en acceso `libre`, puede
+consultarse varias veces hasta expirar. Revocación, expiración, emisión, apertura y
+consumo quedan auditados.
+
+Errores estables principales: `REVIEW_NOT_AVAILABLE`, `REVIEW_SESSION_REQUIRED`,
+`REVIEW_SESSION_NOT_FOUND`, `REVIEW_SESSION_CONSUMED`, `REVIEW_SESSION_EXPIRED`,
+`REVIEW_SESSION_REVOKED`, `REVIEW_SCOPE_FORBIDDEN`,
+`REVIEW_POLICY_REVISION_CONFLICT` y `REVIEW_PERMISSION_REVISION_CONFLICT`.
+
+Requiere aplicar manualmente `migrations/20261018_revision_examen.sql`, idealmente dos
+veces en la base de prueba, y luego ejecutar `scripts/verificar-revision-examen.sql`.
+El backfill asigna `al_corregir + libre` a publicaciones existentes para conservar el
+comportamiento previo bajo una política explícita. No crea ni modifica Stored Procedures.
+
+---
+
 ## 5. Esquemas Zod — Detalle Completo
 
 ### 5.1 Tipos de Dato y Obligatoriedad
@@ -2423,6 +2557,14 @@ planes con volumen representativo antes de aceptar índices adicionales.
 | | `Codigo` | `[A-Za-z0-9_.-]+`, máximo 50 | No |
 | | `VersionContrato` | literal `1` | No (default 1) |
 | `LoteEventosTemporalesSchema` | `Eventos` | array de 1 a 500 elementos | Sí |
+| `PoliticaRevisionSchema` | `Modo` | `nunca`, `al_corregir`, `ventana`, `manual` | Sí |
+| | `Acceso` | `unico`, `libre` | Sí |
+| | `VentanaDesde`, `VentanaHasta` | timestamp ISO 8601 nullable | Sólo para `ventana` |
+| | `RevisionEsperada` | entero no negativo | Sí |
+| `PermisoRevisionSchema` | `Acceso` | `unico`, `libre` | Sí |
+| | `FechaDesde`, `FechaHasta` | timestamp ISO 8601 nullable | No |
+| | `Motivo` | texto 1..250 nullable | No |
+| | `RevisionEsperada` | entero no negativo | Sí |
 | `CalificarSchema` | `notaFinal` | `z.number().min(0).max(10).multipleOf(0.01)` | Sí |
 | `CorregirRespuestaSchema` | `esCorrecta` | `z.boolean().nullable()` | No (puede ser null) |
 | | `comentariosDocente` | `z.string().nullable().optional()` | No |
@@ -2490,7 +2632,7 @@ planes con volumen representativo antes de aceptar índices adicionales.
 
 ```bash
 npm install         # Una sola vez
-npm test            # Suite completa (459 tests de referencia actual)
+npm test            # Suite completa; el conteo de referencia está en AGENTS.md
 npx jest --verbose  # Reporte detallado
 npx jest tests/auth.test.ts  # Archivo específico
 npx jest -t "carreras"       # Por patrón de nombre
@@ -2518,6 +2660,7 @@ tests/
 ├── reportes.test.ts        ← Rendimiento por alumno/evaluación + filtros + paginación global
 ├── reportes-calificacion.test.ts ← Escalas, umbrales, alcance válido y pendientes
 ├── reportes-preguntas.test.ts ← Preguntas, grupos, variantes, opciones, tiempos y alcance
+├── revision-examen.test.ts  ← Políticas, permisos, sesiones, consumo y auditoría
 ├── telemetria-focus.test.ts ← Contrato legacy de incidentes, duración, alcance y RBAC
 └── telemetria-temporal.test.ts ← Sesión/secuencia, lote, replay, orden, resumen y seguridad
 ```
@@ -2878,7 +3021,7 @@ al arrancar. Repetirlas y ejecutar `scripts/verificar-banco-preguntas.sql` y
 Los tests Jest usan SQL mockeado y no sustituyen esas pruebas reales.
 
 Validación local de esta entrega: `npm test -- --runInBand` y
-`npx jest --runInBand --detectOpenHandles`, ambos con 23 suites/459 pruebas. El puerto
+`npx jest --runInBand --detectOpenHandles`, ambos con 24 suites/479 pruebas. El puerto
 55803 quedó libre. `npm run build` continúa bloqueado por la configuración TypeScript
 global preexistente (`rootDir` sin `include`, y después la incompatibilidad
 NodeNext/CommonJS/verbatim y tipos de `mssql` ya documentada). No se ejecutó SQL Server

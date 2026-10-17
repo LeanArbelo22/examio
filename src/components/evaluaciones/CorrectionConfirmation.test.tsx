@@ -57,7 +57,7 @@ describe("CorrectionConfirmation", () => {
     await user.click(screen.getByRole("button", { name: "Confirmar corrección" }));
     expect(screen.getByRole("dialog", { name: "Confirmar corrección" })).toBeVisible();
     await user.click(
-      screen.getByRole("button", { name: "Confirmar y habilitar revisión" }),
+      screen.getAllByRole("button", { name: "Confirmar corrección" })[1],
     );
 
     expect(mutateAsync).toHaveBeenCalledOnce();

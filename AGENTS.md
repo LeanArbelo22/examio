@@ -386,8 +386,11 @@ Respetar `prefers-reduced-motion`; no depender de animación para comunicar esta
   puntaje definitivo; validar siempre contra la escala 10/100 real.
 - **Confirmación y revisión:** una nota completa no equivale a devolución publicada. La corrección
   docente debe confirmarse sin preguntas pendientes; cualquier modificación posterior la reabre.
-  El alumno sólo puede abrir la revisión cuando `revisionDisponible` es verdadero y la ausencia de
-  claves correctas nunca debe interpretarse como respuesta incorrecta.
+  Confirmar no habilita por sí solo la revisión: rigen política, permiso individual, intento válido
+  y una sesión de cinco minutos. El alumno debe consultar disponibilidad, emitir la sesión con una
+  `Idempotency-Key` estable y consumir `/revisiones/sesiones/:id/contenido`; nunca debe usar
+  `/intentos/:id/completo`. En acceso único, no consumir automáticamente al montar la ruta ni
+  reintentar el GET a ciegas. La ausencia de claves correctas nunca implica respuesta incorrecta.
 - **Intento académicamente válido:** la selección automática considera sólo el último intento
   `entregado`; un override manual persiste hasta que el docente lo elimine. No ocultar intentos
   anteriores, no permitir elegir estados no entregados y no recalcular esta selección en cliente.
@@ -495,7 +498,10 @@ puntaje sugerido por opciones de la corrección definitiva cuando se requiere re
 La vista del alumno trata la ausencia de `esCorrecta` como información no disponible y nunca como
 una respuesta incorrecta. La corrección
 manual incorpora una confirmación explícita y el historial sólo ofrece la revisión cuando el backend
-devuelve `revisionDisponible: true`; una edición posterior vuelve a abrir la corrección.
+devuelve `revisionDisponible: true`; una edición posterior vuelve a abrir la corrección. La gestión
+docente configura revisión `nunca|al_corregir|ventana|manual`, acceso `unico|libre`, permisos por intento
+y auditoría. El alumno abre deliberadamente una sesión idempotente de cinco minutos y el contenido se
+reconstruye desde snapshots; `/intentos/:id/completo` queda reservado para docente y administrador.
 
 Playwright usa `.next-e2e` mediante `EXAMIO_NEXT_DIST_DIR`, por lo que los E2E y builds
 de validación pueden ejecutarse sin finalizar un `next dev` activo sobre `.next`.

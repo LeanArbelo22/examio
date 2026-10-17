@@ -230,7 +230,33 @@ un elemento rechazado o en conflicto no revierte los elementos válidos.
 No se aplica una etiqueta de “diferencia significativa” entre variantes hasta acordar un
 umbral o método estadístico. El contrato expone diferencia porcentual y tamaño de muestra.
 
-**Siguiente trabajo funcional:** etapa 5, políticas y sesiones de revisión.
+## Evolución — etapa 5: políticas y sesiones de revisión
+
+**Estado: BACKEND IMPLEMENTADO — PENDIENTE MIGRACIÓN, SQL REAL E INTEGRACIÓN FRONTEND**
+
+- [x] Agregar políticas por publicación: `nunca`, `al_corregir`, `ventana` y `manual`.
+- [x] Agregar acceso `unico|libre`, revisión optimista y auditoría de cambios.
+- [x] Incorporar permisos individuales activos/revocados ligados al intento concreto.
+- [x] Aplicar precedencia de corrección, revocación, permiso y política sobre intento válido.
+- [x] Emitir sesiones de cinco minutos con `Idempotency-Key` y snapshot de autorización.
+- [x] Garantizar una sola sesión única activa y consumo atómico con conflicto en el replay.
+- [x] Construir el contenido del alumno desde snapshots, sin reutilizar `/completo`.
+- [x] Reservar `/completo` para docentes/administradores y exigir sesión al alumno.
+- [x] Propagar la política efectiva a `revisionDisponible` en historiales compatibles.
+- [x] Crear migración idempotente, backfill compatible y verificador de sólo lectura.
+- [x] Agregar pruebas focalizadas de modos, ventanas, permisos, revocación, intento válido,
+  sesiones, expiración, consumo, RBAC y auditoría.
+- [ ] Aplicar dos veces `20261018_revision_examen.sql` en SQL Server de prueba y ejecutar
+  `verificar-revision-examen.sql`.
+- [ ] Probar emisión/consumo y revocación concurrentes contra SQL Server real.
+- [ ] Integrar en frontend configuración docente, permisos y revisión por sesión.
+
+El despliegue de backend requiere aplicar primero la migración: la creación de nuevas
+publicaciones ya inserta la política default en la misma transacción. No se modificaron
+Stored Procedures ni datos académicos históricos.
+
+**Siguiente trabajo funcional:** etapa 6, políticas configurables de pantalla completa
+e incidentes.
 
 ---
 
@@ -572,7 +598,7 @@ evaluaciones, además del detalle por publicación. No implementado en esta entr
 
 ### Evidencia de validación local
 
-- Suite completa actual: **23 suites / 459 pruebas aprobadas**, también con
+- Suite completa actual: **24 suites / 479 pruebas aprobadas**, también con
   `--runInBand --detectOpenHandles`. Jest finaliza naturalmente sin `--forceExit`.
 - Suite del banco: **66 pruebas aprobadas**; incluye integración HTTP de copias
   durante creación/edición, rollback, conflictos y aislamiento.

@@ -70,6 +70,20 @@ export const intentoKeys = {
   mios: (filtros: object) => [...intentoKeys.all, "mios", filtros] as const,
 };
 
+export const revisionKeys = {
+  all: ["revisiones"] as const,
+  politica: (idPublicacion: number) =>
+    [...revisionKeys.all, "publicaciones", idPublicacion, "politica"] as const,
+  permisos: (idPublicacion: number, filtros: object = {}) =>
+    [...revisionKeys.all, "publicaciones", idPublicacion, "permisos", filtros] as const,
+  auditoria: (idPublicacion: number, filtros: object = {}) =>
+    [...revisionKeys.all, "publicaciones", idPublicacion, "auditoria", filtros] as const,
+  disponibilidad: (idIntento: number) =>
+    [...revisionKeys.all, "intentos", idIntento, "disponibilidad"] as const,
+  contenido: (idSesion: string) =>
+    [...revisionKeys.all, "sesiones", idSesion, "contenido"] as const,
+};
+
 export const adminKeys = {
   analitica: (filtros: Record<string, string>) => ["admin", "analitica", filtros] as const,
 };
