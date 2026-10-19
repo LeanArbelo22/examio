@@ -72,7 +72,10 @@ export type AccionAuditoriaRevision =
   | "sesion_consumida"
   | "sesion_expirada"
   | "sesion_revocada"
-  | "contenido_consultado";
+  | "contenido_consultado"
+  | "emision_denegada_unico"
+  | "emision_denegada_nunca"
+  | "permiso_denegado_nunca";
 
 export interface AuditoriaRevisionItem {
   id: number;
@@ -102,6 +105,10 @@ export interface DisponibilidadRevision {
   revisionPolitica: number;
   idPermiso: number | null;
   esIntentoValido: boolean;
+  disponibleDesde: string | null;
+  disponibleHasta: string | null;
+  duracionSesionSegundos: number;
+  accesoUnicoConsumido: boolean;
 }
 
 export interface SesionRevision {

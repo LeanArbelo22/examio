@@ -7,6 +7,7 @@ import { QuestionCorrectionCard } from "@/components/evaluaciones/QuestionCorrec
 import { AttemptFocusTelemetry } from "@/components/evaluaciones/AttemptFocusTelemetry";
 import { CorrectionConfirmation } from "@/components/evaluaciones/CorrectionConfirmation";
 import { AttemptReviewPermission } from "@/components/evaluaciones/AttemptReviewPermission";
+import { AttemptSupervisionPanel } from "@/components/evaluaciones/AttemptSupervisionPanel";
 import { FeedbackMessage } from "@/components/ui/FeedbackMessage";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { RequestErrorState } from "@/components/ui/RequestErrorState";
@@ -115,6 +116,7 @@ export default function AttemptCorrectionPage({ params }: { params: Promise<{ id
       )}
 
       <AttemptFocusTelemetry idIntento={attempt.idIntento} />
+      <AttemptSupervisionPanel idIntento={attempt.idIntento} />
 
       <section aria-labelledby="questions-title">
         <div className="mb-3">

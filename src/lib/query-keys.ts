@@ -84,6 +84,24 @@ export const revisionKeys = {
     [...revisionKeys.all, "sesiones", idSesion, "contenido"] as const,
 };
 
+export const supervisionKeys = {
+  all: ["supervision"] as const,
+  politica: (idPublicacion: number) =>
+    [...supervisionKeys.all, "publicaciones", idPublicacion, "politica"] as const,
+  estado: (idIntento: number) =>
+    [...supervisionKeys.all, "intentos", idIntento, "estado"] as const,
+  detalle: (idIntento: number) =>
+    [...supervisionKeys.all, "intentos", idIntento, "detalle"] as const,
+};
+
+export const incidenteKeys = {
+  all: ["incidentes"] as const,
+  publicacionRoot: (idPublicacion: number) =>
+    [...incidenteKeys.all, "publicaciones", idPublicacion] as const,
+  publicacion: (idPublicacion: number, filtros: object) =>
+    [...incidenteKeys.publicacionRoot(idPublicacion), "listado", filtros] as const,
+};
+
 export const adminKeys = {
   analitica: (filtros: Record<string, string>) => ["admin", "analitica", filtros] as const,
 };

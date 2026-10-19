@@ -102,6 +102,10 @@ const evaluationReport: ReporteEvaluacionesListado = {
     alcanceIntentos: "todos",
     escalaPromedio: 10,
     conPendientesCorreccion: null,
+    conIncidentes: null,
+    tipoIncidente: null,
+    severidad: null,
+    soloIncidentesSinRevisar: null,
   },
   kpis: {
     totalEvaluaciones: 2,
@@ -118,6 +122,10 @@ const evaluationReport: ReporteEvaluacionesListado = {
     promedioIntentosCalificados: 7.25,
     promedioIntentosCalificadosBase10: 7.25,
     tasaAprobacionIntentos: 75,
+    intentosAnulados: 1,
+    alumnosConIncidentes: 4,
+    totalIncidentes: 7,
+    incidentesSinRevisar: 2,
   },
   graficos: {
     distribucionResultados: [
@@ -155,6 +163,10 @@ const evaluationReport: ReporteEvaluacionesListado = {
       intentosAprobados: 11,
       intentosDesaprobados: 3,
       porcentajeAprobacionIntentos: 78.57,
+      intentosAnulados: 1,
+      alumnosConIncidentes: 3,
+      totalIncidentes: 5,
+      incidentesSinRevisar: 2,
     },
   ],
   paginacion: { pagina: 2, limite: 20, total: 2, totalPaginas: 2 },
@@ -387,6 +399,49 @@ describe("reportes docentes", () => {
     );
     expect(reportMocks.replace).toHaveBeenCalledWith(
       expect.stringContaining("conPendientesCorreccion=true"),
+      { scroll: false },
+    );
+  });
+
+  it("presenta y filtra los indicadores operativos de incidentes", async () => {
+    const user = userEvent.setup();
+    render(<EvaluacionesReport />);
+
+    expect(screen.getByText("7")).toBeVisible();
+    expect(screen.getByText("4")).toBeVisible();
+    expect(screen.getAllByText("2")).not.toHaveLength(0);
+    expect(screen.getByText("5")).toBeVisible();
+    expect(screen.getByText("2 pendientes")).toBeVisible();
+
+    await user.selectOptions(screen.getByLabelText("Incidentes"), "true");
+    await user.selectOptions(
+      screen.getByLabelText("Tipo de incidente"),
+      "focus_lost",
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Consecuencia"),
+      "anular_intento",
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Revisión de incidentes"),
+      "true",
+    );
+    await user.click(screen.getByRole("button", { name: "Buscar" }));
+
+    expect(reportMocks.replace).toHaveBeenCalledWith(
+      expect.stringContaining("conIncidentes=true"),
+      { scroll: false },
+    );
+    expect(reportMocks.replace).toHaveBeenCalledWith(
+      expect.stringContaining("tipoIncidente=focus_lost"),
+      { scroll: false },
+    );
+    expect(reportMocks.replace).toHaveBeenCalledWith(
+      expect.stringContaining("severidad=anular_intento"),
+      { scroll: false },
+    );
+    expect(reportMocks.replace).toHaveBeenCalledWith(
+      expect.stringContaining("soloIncidentesSinRevisar=true"),
       { scroll: false },
     );
   });

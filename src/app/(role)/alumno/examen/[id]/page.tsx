@@ -148,9 +148,9 @@ export default function ExamStartPage({ params }: { params: Promise<{ id: string
             <div className="mt-6 bg-amber-50/70 border border-amber-200/80 rounded-xl p-4 flex gap-3 text-amber-900 text-sm">
               <span className="text-lg select-none pt-0.5">⚠️</span>
               <div className="space-y-1.5">
-                <p className="font-bold tracking-tight text-amber-900">Mecanismo de Seguridad Obligatorio</p>
+                <p className="font-bold tracking-tight text-amber-900">Supervisión durante el examen</p>
                 <p className="text-amber-800/90 leading-relaxed text-xs">
-                  Al comenzar ingresarás automáticamente en modo <span className="font-semibold">pantalla completa obligatoria</span>. Salir de la pestaña, cambiar de ventana o minimizar el navegador registrará un evento de advertencia y podrá anular la validez institucional de tu evaluación de forma inmediata.
+                  Al comenzar se aplicarán las condiciones configuradas para esta evaluación. Las interrupciones, cambios de ventana, pérdidas de conexión y salidas de pantalla completa se registran; la plataforma aplicará la consecuencia informada por el sistema.
                 </p>
               </div>
             </div>

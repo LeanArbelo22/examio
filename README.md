@@ -462,6 +462,7 @@ Las query keys son arrays serializables. El primer elemento representa el domini
 | Evaluaciones | `["evaluacion", id, "detalle"]`, `["evaluacion", id, "alumnos"]`, `["publicacion", id]` |
 | Examen | `["examen", "sorteo", idIntento]`, `["pregunta", idPregunta, "opciones", idIntento]` |
 | Intentos | `["intento", id, "completo"]`, `["intentos", "alumno", idAlumno]` |
+| Incidentes | `["incidentes", "publicaciones", idPublicacion, "listado", filtros]` |
 | Materias | `["materias"]`, `["comisionesMateria", id]`, `["alumnosMateria", id]` |
 | Reportes | `["reportes", "rendimiento", "listado", filtros]`, `["reportes", "rendimiento", "detalle", matricula, filtros]`, `["reportes", "rendimiento-evaluaciones", "listado", filtros]` |
 | Usuarios | `["usuarios"]` |
@@ -561,16 +562,43 @@ Antes de crear un componente nuevo se debe comprobar si existe uno equivalente.
 La confirmación docente cierra la corrección, pero no vuelve visible el examen por sí sola.
 Cada publicación configura una política (`nunca`, `al_corregir`, `ventana` o `manual`), un
 tipo de acceso (`unico` o `libre`) y puede otorgar o revocar permisos por intento.
+`nunca` impide cualquier revisión, incluso con permisos anteriores. `manual` sólo habilita los
+intentos autorizados individualmente. El acceso único se consume una sola vez por intento.
 
 El alumno no consume `/intentos/:id/completo`. La revisión sigue el flujo:
 
 ```text
-disponibilidad → sesión idempotente de 5 minutos → contenido desde snapshots
+disponibilidad → apertura idempotente → contenido temporal desde snapshots
 ```
 
-La emisión usa `Idempotency-Key`; el acceso único sólo se consume después de una acción
-explícita del alumno. Los contratos y query keys viven en `revisiones.api.ts`,
+La apertura usa `Idempotency-Key`; el acceso único sólo se consume después de una acción
+explícita del alumno. La API devuelve el vencimiento efectivo, limitado por cinco minutos,
+por el fin de la ventana general o por el fin del permiso individual. La interfaz retira el
+contenido al alcanzar ese límite y vuelve a consultar la disponibilidad. Los contratos y query keys viven en `revisiones.api.ts`,
 `useRevisiones.ts` y `revisionKeys`.
+
+## Supervisión durante evaluaciones
+
+Cada publicación dispone de una política versionada de supervisión. El docente puede definir si
+la pantalla completa es obligatoria y crear reglas por tipo de incidente, cantidad o duración,
+con consecuencias de registro, advertencia, bloqueo temporal o anulación.
+
+Al iniciar un intento, la API congela la política. El frontend registra eventos mediante la outbox
+temporal y aplica únicamente la instrucción devuelta por el backend; no decide anulaciones por su
+cuenta. Los bloqueos visuales conservan el guardado y la sincronización de respuestas. La pantalla
+de corrección permite consultar el snapshot y registrar desbloqueos, reconocimientos o descartes
+auditados, excepto sobre intentos ya anulados.
+
+## Visibilidad operativa de incidentes
+
+La gestión de una evaluación muestra únicamente los eventos que la API clasifica como incidentes,
+con resumen global, filtros, paginación y acceso al intento afectado. El docente puede mantenerlos
+pendientes, marcarlos como revisados o descartarlos mediante revisión optimista e idempotente.
+
+Esta revisión es un seguimiento operativo separado de las acciones de supervisión en vivo. No
+modifica notas, estados del intento ni consecuencias, y un incidente pendiente no implica fraude.
+El reporte por evaluación incorpora los mismos agregados y filtros sobre el conjunto completo antes
+de paginar.
 
 ## Estilos
 

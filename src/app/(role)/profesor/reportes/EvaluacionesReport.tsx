@@ -39,6 +39,10 @@ const FILTER_KEYS = [
   "fechaHasta",
   "alcanceIntentos",
   "conPendientesCorreccion",
+  "conIncidentes",
+  "tipoIncidente",
+  "severidad",
+  "soloIncidentesSinRevisar",
 ] as const;
 
 function uniqueOptions<T>(
@@ -87,6 +91,14 @@ export function EvaluacionesReport() {
         searchParams.get("conPendientesCorreccion") === null
           ? ""
           : searchParams.get("conPendientesCorreccion") === "true",
+      conIncidentes:
+        searchParams.get("conIncidentes") === null
+          ? ""
+          : searchParams.get("conIncidentes") === "true",
+      soloIncidentesSinRevisar:
+        searchParams.get("soloIncidentesSinRevisar") === null
+          ? ""
+          : searchParams.get("soloIncidentesSinRevisar") === "true",
       ordenarPor:
         (searchParams.get("ordenarPor") as ReporteEvaluacionesOrden) ||
         "fecha",
@@ -189,6 +201,46 @@ export function EvaluacionesReport() {
           { value: "false", label: "Sin pendientes" },
         ],
       },
+      {
+        key: "conIncidentes",
+        label: "Incidentes",
+        type: "select",
+        options: [
+          { value: "true", label: "Con incidentes" },
+          { value: "false", label: "Sin incidentes" },
+        ],
+      },
+      {
+        key: "tipoIncidente",
+        label: "Tipo de incidente",
+        type: "select",
+        options: [
+          { value: "focus_lost", label: "Pérdida de foco" },
+          { value: "fullscreen_exit", label: "Salida de pantalla completa" },
+          { value: "connectivity_lost", label: "Pérdida de conexión" },
+          { value: "auth_session_unavailable", label: "Sesión no disponible" },
+          { value: "sync_error", label: "Error de sincronización" },
+          { value: "submission_failed", label: "Entrega fallida" },
+        ],
+      },
+      {
+        key: "severidad",
+        label: "Consecuencia",
+        type: "select",
+        options: [
+          { value: "sin_clasificar", label: "Sin clasificación" },
+          { value: "informar", label: "Informativa" },
+          { value: "advertir", label: "Advertencia" },
+          { value: "bloquear_interfaz", label: "Bloqueo temporal" },
+          { value: "anular_intento", label: "Anulación del intento" },
+        ],
+      },
+      {
+        key: "soloIncidentesSinRevisar",
+        label: "Revisión de incidentes",
+        type: "select",
+        options: [{ value: "true", label: "Sólo pendientes" }],
+      },
     ],
     [materias, comisiones, evaluaciones],
   );
@@ -204,6 +256,17 @@ export function EvaluacionesReport() {
       values.fechaDesde > values.fechaHasta
     ) {
       setFilterError("La fecha desde no puede ser posterior a la fecha hasta.");
+      return;
+    }
+    if (
+      values.conIncidentes === "false" &&
+      (values.tipoIncidente ||
+        values.severidad ||
+        values.soloIncidentesSinRevisar === "true")
+    ) {
+      setFilterError(
+        "Para filtrar por tipo, consecuencia o revisión, seleccioná evaluaciones con incidentes.",
+      );
       return;
     }
     setFilterError(null);
@@ -265,6 +328,28 @@ export function EvaluacionesReport() {
           <span className="font-bold text-amber-600">
             {row.intentosPendientesCorreccion}
           </span>
+        ),
+      },
+      {
+        key: "incidentes",
+        header: "Incidentes",
+        align: "center",
+        render: (row) => (
+          <div className="flex flex-col items-center gap-1">
+            <span className="font-black text-slate-800">
+              {row.totalIncidentes}
+            </span>
+            {row.incidentesSinRevisar > 0 && (
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                {row.incidentesSinRevisar} pendientes
+              </span>
+            )}
+            {row.intentosAnulados > 0 && (
+              <span className="text-[10px] font-bold text-red-700">
+                {row.intentosAnulados} anulados
+              </span>
+            )}
+          </div>
         ),
       },
       {
@@ -356,6 +441,34 @@ export function EvaluacionesReport() {
                 value: formatNullable(data.kpis.tasaAprobacionIntentos, "%"),
                 helper: `${data.kpis.intentosPendientesCorreccion.toLocaleString("es-AR")} pendientes · ${data.criterios.alcanceIntentos === "validos" ? "intentos válidos" : "todos los intentos"}`,
                 tone: "emerald",
+              },
+              {
+                id: "incidentes",
+                label: "Incidentes",
+                value: data.kpis.totalIncidentes.toLocaleString("es-AR"),
+                helper: "Eventos operativos registrados",
+                tone: "blue",
+              },
+              {
+                id: "alumnos-con-incidentes",
+                label: "Alumnos con incidentes",
+                value: data.kpis.alumnosConIncidentes.toLocaleString("es-AR"),
+                helper: "Alumnos únicos afectados",
+                tone: "blue",
+              },
+              {
+                id: "incidentes-pendientes",
+                label: "Incidentes pendientes",
+                value: data.kpis.incidentesSinRevisar.toLocaleString("es-AR"),
+                helper: "Pendientes de revisión operativa",
+                tone: "amber",
+              },
+              {
+                id: "intentos-anulados",
+                label: "Intentos anulados",
+                value: data.kpis.intentosAnulados.toLocaleString("es-AR"),
+                helper: "No implica una conclusión de fraude",
+                tone: "amber",
               },
             ]}
           />

@@ -1,5 +1,6 @@
 import type { Alumno } from "./alumnos";
 import type { TipoActividad, TipoPregunta } from "./shared";
+import type { SeveridadIncidente } from "./incidentes";
 
 export type ReporteRendimientoEstado =
   | "entregado"
@@ -36,6 +37,10 @@ export interface ReporteEvaluacionesFiltros {
   fechaHasta?: string;
   alcanceIntentos?: AlcanceIntentosReporte;
   conPendientesCorreccion?: boolean | "";
+  conIncidentes?: boolean | "";
+  tipoIncidente?: string;
+  severidad?: SeveridadIncidente | "";
+  soloIncidentesSinRevisar?: boolean | "";
   ordenarPor?: ReporteEvaluacionesOrden;
   ordenDireccion?: OrdenDireccion;
   pagina?: number;
@@ -57,6 +62,10 @@ export interface ReporteEvaluacionesKpis {
   promedioIntentosCalificados: number | null;
   promedioIntentosCalificadosBase10: number | null;
   tasaAprobacionIntentos: number | null;
+  intentosAnulados: number;
+  alumnosConIncidentes: number;
+  totalIncidentes: number;
+  incidentesSinRevisar: number;
 }
 
 export interface ReporteEvaluacionesDistribucionItem {
@@ -93,6 +102,10 @@ export interface ReporteEvaluacionItem {
   intentosAprobados: number;
   intentosDesaprobados: number;
   porcentajeAprobacionIntentos: number | null;
+  intentosAnulados: number;
+  alumnosConIncidentes: number;
+  totalIncidentes: number;
+  incidentesSinRevisar: number;
 }
 
 export interface ReporteEvaluacionesListado {
@@ -100,6 +113,10 @@ export interface ReporteEvaluacionesListado {
     alcanceIntentos: AlcanceIntentosReporte;
     escalaPromedio: 10;
     conPendientesCorreccion: boolean | null;
+    conIncidentes: boolean | null;
+    tipoIncidente: string | null;
+    severidad: SeveridadIncidente | null;
+    soloIncidentesSinRevisar: boolean | null;
   };
   kpis: ReporteEvaluacionesKpis;
   graficos: {

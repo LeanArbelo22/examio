@@ -100,6 +100,7 @@ describe("QuestionCorrectionCard", () => {
           ...question,
           tipo: "multiple",
           modoJustificacion: "obligatoria",
+          estrategiaCorreccion: "parcial_penalizada",
           tratamientoJustificacion: "revision_manual",
           puntajeAutomaticoOpciones: 1.25,
           respuesta: {
@@ -114,7 +115,31 @@ describe("QuestionCorrectionCard", () => {
     expect(screen.getByText("Selección múltiple")).toBeVisible();
     expect(screen.getByText("Ambas opciones cumplen la condición.")).toBeVisible();
     expect(screen.getByText("Requiere revisión docente")).toBeVisible();
+    expect(screen.getByText("Puntaje parcial con descuento")).toBeVisible();
+    expect(screen.getByText(/requiere revisión docente antes de definir el puntaje/)).toBeVisible();
     expect(screen.getByText(/1.25/)).toBeVisible();
+  });
+
+  it("explica la coincidencia exacta aplicada a una pregunta cerrada", () => {
+    render(
+      <QuestionCorrectionCard
+        idIntento={73}
+        question={{
+          ...question,
+          tipo: "multiple",
+          estrategiaCorreccion: "exacta",
+          puntajeObtenido: 0,
+          origenCorreccion: "automatica",
+          opciones: [
+            { idOpcion: 1, texto: "A", esCorrecta: true, fueSeleccionada: true },
+            { idOpcion: 2, texto: "B", esCorrecta: true, fueSeleccionada: false },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Coincidencia exacta")).toBeVisible();
+    expect(screen.getByText(/debe coincidir completamente/)).toBeVisible();
   });
 
   it("distingue opciones correctas elegidas de correctas no elegidas", () => {

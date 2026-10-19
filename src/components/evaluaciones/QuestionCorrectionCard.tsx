@@ -19,6 +19,21 @@ const TYPE_BADGE: Record<string, { label: string; className: string }> = {
   code: { label: "Código", className: "border-purple-200 bg-purple-50 text-purple-700" },
 };
 
+const CORRECTION_STRATEGY = {
+  exacta: {
+    label: "Coincidencia exacta",
+    help: "La selección debe coincidir completamente con las respuestas correctas.",
+  },
+  parcial_sin_penalizacion: {
+    label: "Puntaje parcial sin descuento",
+    help: "Suma las respuestas correctas elegidas sin descontar las incorrectas.",
+  },
+  parcial_penalizada: {
+    label: "Puntaje parcial con descuento",
+    help: "Suma los aciertos y descuenta las respuestas incorrectas elegidas.",
+  },
+} as const;
+
 function AnswerOptions({ options }: { options: OpcionIntento[] }) {
   if (options.length === 0) {
     return <p className="text-sm italic text-slate-500">Sin respuesta seleccionada.</p>;
@@ -114,6 +129,10 @@ export function QuestionCorrectionCard({
     comment !== initialComment;
   const status = question.puntajeObtenido === null ? "Pendiente" : "Corregida";
   const type = TYPE_BADGE[question.tipo];
+  const requiresManualAnswerCorrection = question.tipo === "abierta" || question.tipo === "code";
+  const correctionStrategy = CORRECTION_STRATEGY[question.estrategiaCorreccion ?? "exacta"];
+  const justificationEnabled =
+    (question.modoJustificacion ?? "sin_justificacion") !== "sin_justificacion";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -187,6 +206,29 @@ export function QuestionCorrectionCard({
               )}
             </p>
           </div>
+        )}
+      </div>
+
+      <div
+        aria-label="Configuración de corrección aplicada"
+        className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-sm text-slate-700"
+      >
+        <p>
+          <span className="font-semibold text-slate-900">Forma de corrección: </span>
+          {requiresManualAnswerCorrection ? "Corrección docente" : correctionStrategy.label}
+        </p>
+        <p className="mt-1 text-xs text-slate-600">
+          {requiresManualAnswerCorrection
+            ? "El puntaje debe ser asignado por el docente."
+            : correctionStrategy.help}
+        </p>
+        {justificationEnabled && (
+          <p className="mt-2 border-t border-indigo-100 pt-2 text-xs text-slate-600">
+            <span className="font-semibold text-slate-800">Uso de la justificación: </span>
+            {question.tratamientoJustificacion === "revision_manual"
+              ? "requiere revisión docente antes de definir el puntaje."
+              : "informativa; no modifica el puntaje automático."}
+          </p>
         )}
       </div>
 

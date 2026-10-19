@@ -64,17 +64,27 @@ vi.mock("@/hooks/useEvaluaciones", () => ({
 vi.mock("@/hooks/useTelemetria", () => ({
   useExamTemporalTelemetry: () => ({
     recordFullscreenExit: vi.fn(),
+    recordFullscreenRestored: vi.fn(),
     recordPointEvent: examMocks.recordPointEvent,
     flushTelemetry: examMocks.flushTelemetry,
     durable: true,
   }),
-  useAttemptCancellation: () => ({
-    status: "idle",
-    lastError: null,
-    isInterrupted: false,
-    durable: true,
-    requestCancellation: vi.fn(),
-    synchronizeCancellation: vi.fn(),
+}));
+
+vi.mock("@/hooks/useSupervision", () => ({
+  useEstadoSupervision: () => ({
+    data: {
+      idIntento: 73,
+      estado: "normal",
+      accion: "informar",
+      interaccionBloqueada: false,
+      intentoAnulado: false,
+      pantallaCompletaObligatoria: true,
+      revision: 1,
+      fechaActualizacion: "2026-10-19T10:00:00.000Z",
+    },
+    isLoading: false,
+    isError: false,
   }),
 }));
 

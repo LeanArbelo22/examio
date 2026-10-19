@@ -298,15 +298,19 @@ export function StudentHistoryWorkspace() {
             />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
-              {data.items.map((attempt) => (
-                <article
-                  key={attempt.idIntento}
-                  className={`rounded-2xl border bg-white p-5 shadow-sm ${
-                    attempt.esIntentoValido
-                      ? "border-indigo-200 ring-1 ring-indigo-100"
-                      : "border-slate-200/80"
-                  }`}
-                >
+              {data.items.map((attempt) => {
+                const isCancelled = attempt.estado === "anulado";
+                const isAcademicResult = attempt.esIntentoValido && !isCancelled;
+
+                return (
+                  <article
+                    key={attempt.idIntento}
+                    className={`rounded-2xl border bg-white p-5 shadow-sm ${
+                      isAcademicResult
+                        ? "border-indigo-200 ring-1 ring-indigo-100"
+                        : "border-slate-200/80"
+                    }`}
+                  >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-indigo-600">
@@ -316,7 +320,7 @@ export function StudentHistoryWorkspace() {
                         {attempt.titulo}
                       </h2>
                     </div>
-                    {attempt.esIntentoValido && (
+                    {isAcademicResult && (
                       <StatusBadge label="Resultado académico" tone="indigo" />
                     )}
                   </div>
@@ -326,53 +330,64 @@ export function StudentHistoryWorkspace() {
                       label={stateLabels[attempt.estado]}
                       tone={stateTones[attempt.estado]}
                     />
-                    <StatusBadge
-                      label={resultLabels[attempt.resultado]}
-                      tone={resultTones[attempt.resultado]}
-                    />
+                    {!isCancelled && (
+                      <StatusBadge
+                        label={resultLabels[attempt.resultado]}
+                        tone={resultTones[attempt.resultado]}
+                      />
+                    )}
                     <StatusBadge
                       label={`Intento ${attempt.numeroIntento}/${attempt.cantidadIntentosMaximos}`}
                     />
                   </div>
 
-                  <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs">
+                  <dl className={`mt-4 grid gap-3 rounded-xl bg-slate-50 p-3 text-xs ${isCancelled ? "grid-cols-1" : "grid-cols-2"}`}>
                     <div>
                       <dt className="font-semibold text-slate-500">Fecha de inicio</dt>
                       <dd className="mt-1 font-bold text-slate-800">
                         {formatDate(attempt.fechaInicio)}
                       </dd>
                     </div>
-                    <div>
-                      <dt className="font-semibold text-slate-500">Nota</dt>
-                      <dd className="mt-1 font-black text-slate-800">
-                        {attempt.notaFinal == null
-                          ? "Pendiente"
-                          : `${attempt.notaFinal.toFixed(2)} / ${attempt.escalaCalificacion}`}
-                      </dd>
-                    </div>
+                    {!isCancelled && (
+                      <div>
+                        <dt className="font-semibold text-slate-500">Nota</dt>
+                        <dd className="mt-1 font-black text-slate-800">
+                          {attempt.notaFinal == null
+                            ? "Pendiente"
+                            : `${attempt.notaFinal.toFixed(2)} / ${attempt.escalaCalificacion}`}
+                        </dd>
+                      </div>
+                    )}
                   </dl>
 
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <p className="text-[11px] text-slate-500">
-                      Aprobación: {attempt.notaAprobacion} / {attempt.escalaCalificacion}
+                  {isCancelled ? (
+                    <p className="mt-4 text-xs font-medium text-slate-600">
+                      Este intento no forma parte de tu resultado académico.
                     </p>
-                    {attempt.revisionDisponible ? (
+                  ) : (
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <p className="text-[11px] text-slate-500">
+                        Aprobación: {attempt.notaAprobacion} / {attempt.escalaCalificacion}
+                      </p>
+                      {attempt.revisionDisponible ? (
                       <Link
                         href={`/alumno/intento/${attempt.idIntento}`}
                         className="text-xs font-bold text-indigo-600 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                       >
                         Revisar examen →
                       </Link>
-                    ) : (
-                      <span className="text-xs font-semibold text-slate-500">
-                        {attempt.correccionPendiente
-                          ? "Corrección en curso"
-                          : "Revisión no disponible"}
-                      </span>
-                    )}
-                  </div>
-                </article>
-              ))}
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-500">
+                          {attempt.correccionPendiente
+                            ? "Corrección en curso"
+                            : "Revisión no disponible"}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  </article>
+                );
+              })}
             </div>
           )}
 

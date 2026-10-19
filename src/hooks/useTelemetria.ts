@@ -1,16 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ApiError } from "@/lib/api";
-import {
-  enqueueAttemptCancellation,
-  failAttemptCancellation,
-  getAttemptCancellation,
-  isAttemptCancellationOutboxDurable,
-  removeAttemptCancellation,
-  subscribeAttemptCancellation,
-} from "@/lib/attempt-cancellation-outbox";
 import {
   acknowledgeTelemetryEvent,
   completeTelemetryEvent,
@@ -24,25 +15,38 @@ import {
 } from "@/lib/telemetry-event-outbox";
 import { intentoKeys, isValidId } from "@/lib/query-keys";
 import {
-  anularIntentoPorIncidente,
   guardarEventosTemporalesLote,
   obtenerEventosTemporales,
 } from "@/services/api/evaluaciones.api";
-import type { TipoEventoTelemetria, TipoIncidenteSeguridad } from "@/types";
+import type {
+  InstruccionSupervision,
+  TipoEventoTelemetria,
+} from "@/types";
 
 const telemetrySyncOperations = new Map<number, Promise<void>>();
 const telemetrySyncReruns = new Set<number>();
+const supervisionSubscribers = new Map<
+  number,
+  Set<(instruction: InstruccionSupervision) => void>
+>();
 
-export interface SecurityViolationEvent {
-  eventoId: string;
-  tipoIncidente: TipoIncidenteSeguridad;
+function publishSupervision(idIntento: number, instruction?: InstruccionSupervision) {
+  if (!instruction) return;
+  supervisionSubscribers.get(idIntento)?.forEach((subscriber) => subscriber(instruction));
 }
 
-export type AttemptCancellationStatus =
-  | "idle"
-  | "pending"
-  | "cancelled"
-  | "failed";
+function subscribeSupervision(
+  idIntento: number,
+  subscriber: (instruction: InstruccionSupervision) => void,
+) {
+  const subscribers = supervisionSubscribers.get(idIntento) ?? new Set();
+  subscribers.add(subscriber);
+  supervisionSubscribers.set(idIntento, subscribers);
+  return () => {
+    subscribers.delete(subscriber);
+    if (subscribers.size === 0) supervisionSubscribers.delete(idIntento);
+  };
+}
 
 export async function synchronizeTemporalEvents(idIntento: number): Promise<void> {
   const current = telemetrySyncOperations.get(idIntento);
@@ -75,6 +79,7 @@ export async function synchronizeTemporalEvents(idIntento: number): Promise<void
       if (!record) continue;
       if (["creado", "actualizado", "replay"].includes(result.resultado)) {
         await acknowledgeTelemetryEvent(record);
+        publishSupervision(idIntento, result.supervision);
       } else {
         await failTelemetryEvent(
           record,
@@ -97,9 +102,10 @@ export function useExamTemporalTelemetry(
   idIntento: number,
   idIntentoPregunta: number | undefined,
   enabled = true,
-  onViolation?: (event: SecurityViolationEvent) => void,
+  onSupervision?: (instruction: InstruccionSupervision) => void,
 ): {
   recordFullscreenExit: () => void;
+  recordFullscreenRestored: () => void;
   recordPointEvent: (tipo: TipoEventoTelemetria, codigo?: string) => Promise<void>;
   flushTelemetry: () => Promise<void>;
   durable: boolean;
@@ -107,9 +113,10 @@ export function useExamTemporalTelemetry(
   const activeFocus = useRef<ActiveTelemetryInterval | null>(null);
   const activeConnectivity = useRef<ActiveTelemetryInterval | null>(null);
   const activeQuestion = useRef<ActiveTelemetryInterval | null>(null);
+  const activeFullscreen = useRef<ActiveTelemetryInterval | null>(null);
 
   const enqueueInterval = useCallback((
-    tipo: "focus_lost" | "connectivity_lost" | "question_active",
+    tipo: "focus_lost" | "fullscreen_exit" | "connectivity_lost" | "question_active",
     questionId?: number,
     eventoId = createTelemetryEventId(),
   ): ActiveTelemetryInterval => {
@@ -138,13 +145,11 @@ export function useExamTemporalTelemetry(
 
   const startIncident = useCallback(() => {
     if (!enabled || !isValidId(idIntento) || activeFocus.current) return;
-    const eventoId = createTelemetryEventId();
-    activeFocus.current = enqueueInterval("focus_lost", undefined, eventoId);
-    onViolation?.({ eventoId, tipoIncidente: "focus_lost" });
+    activeFocus.current = enqueueInterval("focus_lost");
     void activeFocus.current.record
       .then(() => synchronizeTemporalEvents(idIntento))
       .catch(() => undefined);
-  }, [enabled, enqueueInterval, idIntento, onViolation]);
+  }, [enabled, enqueueInterval, idIntento]);
 
   const finishIncident = useCallback(() => {
     const active = activeFocus.current;
@@ -154,19 +159,19 @@ export function useExamTemporalTelemetry(
   }, [closeInterval, enabled, idIntento]);
 
   const recordFullscreenExit = useCallback(() => {
-    if (!enabled || !isValidId(idIntento)) return;
-    const now = new Date().toISOString();
-    const eventoId = createTelemetryEventId();
-    onViolation?.({ eventoId, tipoIncidente: "fullscreen_exit" });
-    void enqueueTelemetryEvent(idIntento, {
-      Tipo: "fullscreen_exit",
-      FechaInicioCliente: now,
-      FechaFinCliente: now,
-      DuracionMilisegundos: 0,
-    }, eventoId)
+    if (!enabled || !isValidId(idIntento) || activeFullscreen.current) return;
+    activeFullscreen.current = enqueueInterval("fullscreen_exit");
+    void activeFullscreen.current.record
       .then(() => synchronizeTemporalEvents(idIntento))
       .catch(() => undefined);
-  }, [enabled, idIntento, onViolation]);
+  }, [enabled, enqueueInterval, idIntento]);
+
+  const recordFullscreenRestored = useCallback(() => {
+    const active = activeFullscreen.current;
+    if (!active || !enabled || !isValidId(idIntento)) return;
+    activeFullscreen.current = null;
+    void closeInterval(active);
+  }, [closeInterval, enabled, idIntento]);
 
   const recordPointEvent = useCallback(async (
     tipo: TipoEventoTelemetria,
@@ -235,10 +240,12 @@ export function useExamTemporalTelemetry(
         activeFocus.current,
         activeConnectivity.current,
         activeQuestion.current,
+        activeFullscreen.current,
       ].filter((active): active is ActiveTelemetryInterval => active !== null);
       activeFocus.current = null;
       activeConnectivity.current = null;
       activeQuestion.current = null;
+      activeFullscreen.current = null;
       intervals.forEach((active) => void closeInterval(active));
     };
 
@@ -287,137 +294,17 @@ export function useExamTemporalTelemetry(
     };
   }, [enabled, idIntento]);
 
+  useEffect(() => {
+    if (!enabled || !isValidId(idIntento) || !onSupervision) return;
+    return subscribeSupervision(idIntento, onSupervision);
+  }, [enabled, idIntento, onSupervision]);
+
   return {
     recordFullscreenExit,
+    recordFullscreenRestored,
     recordPointEvent,
     flushTelemetry: () => synchronizeTemporalEvents(idIntento),
     durable: isTelemetryOutboxDurable(),
-  };
-}
-
-function isRetryableCancellationError(error: unknown): boolean {
-  return error instanceof ApiError && (
-    error.code === "INCIDENT_EVENT_NOT_ELIGIBLE" ||
-    error.statusCode === 0 ||
-    error.statusCode === 404 ||
-    error.statusCode === 408 ||
-    error.statusCode === 429 ||
-    error.statusCode >= 500
-  );
-}
-
-export function useAttemptCancellation(
-  idIntento: number,
-  synchronizeAnswers: () => Promise<unknown>,
-) {
-  const [status, setStatus] = useState<AttemptCancellationStatus>("idle");
-  const [lastError, setLastError] = useState<string | null>(null);
-  const firstViolation = useRef<SecurityViolationEvent | null>(null);
-  const synchronizing = useRef<Promise<void> | null>(null);
-
-  const synchronizeCancellation = useCallback(async () => {
-    if (!isValidId(idIntento)) return;
-    if (synchronizing.current) return synchronizing.current;
-
-    const operation = (async () => {
-      const record = await getAttemptCancellation(idIntento);
-      if (!record || record.state === "failed") return;
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        setStatus("pending");
-        return;
-      }
-
-      setStatus("pending");
-      setLastError(null);
-      try {
-        try {
-          await synchronizeAnswers();
-        } catch {
-          if (typeof navigator !== "undefined" && !navigator.onLine) return;
-          // Un conflicto de una respuesta no puede impedir la anulación autoritativa.
-        }
-        await synchronizeTemporalEvents(idIntento);
-        await anularIntentoPorIncidente(idIntento, record.eventoId);
-        await removeAttemptCancellation(record);
-        setStatus("cancelled");
-      } catch (error) {
-        if (
-          error instanceof ApiError &&
-          error.code === "ATTEMPT_ALREADY_CANCELLED"
-        ) {
-          await removeAttemptCancellation(record);
-          setStatus("cancelled");
-          return;
-        }
-        if (isRetryableCancellationError(error)) {
-          setStatus("pending");
-          setLastError(error instanceof Error ? error.message : null);
-          return;
-        }
-        const message = error instanceof Error
-          ? error.message
-          : "No se pudo anular el intento";
-        await failAttemptCancellation(record, message);
-        setStatus("failed");
-        setLastError(message);
-      }
-    })().finally(() => {
-      synchronizing.current = null;
-    });
-    synchronizing.current = operation;
-    return operation;
-  }, [idIntento, synchronizeAnswers]);
-
-  const requestCancellation = useCallback((event: SecurityViolationEvent) => {
-    if (firstViolation.current || !isValidId(idIntento)) return;
-    firstViolation.current = event;
-    setStatus("pending");
-    void enqueueAttemptCancellation(
-      idIntento,
-      event.eventoId,
-      event.tipoIncidente,
-    ).then(() => synchronizeCancellation());
-  }, [idIntento, synchronizeCancellation]);
-
-  useEffect(() => {
-    if (!isValidId(idIntento)) return;
-    const restore = async () => {
-      const record = await getAttemptCancellation(idIntento);
-      if (!record) return;
-      firstViolation.current = {
-        eventoId: record.eventoId,
-        tipoIncidente: record.tipoIncidente,
-      };
-      setStatus(record.state === "failed" ? "failed" : "pending");
-      setLastError(record.lastError ?? null);
-      if (record.state === "pending") await synchronizeCancellation();
-    };
-    const timer = window.setTimeout(() => void restore(), 0);
-    const unsubscribe = subscribeAttemptCancellation(() => void restore());
-    const onOnline = () => void synchronizeCancellation();
-    window.addEventListener("online", onOnline);
-    return () => {
-      window.clearTimeout(timer);
-      unsubscribe();
-      window.removeEventListener("online", onOnline);
-    };
-  }, [idIntento, synchronizeCancellation]);
-
-  useEffect(() => {
-    if (status !== "pending") return;
-    const interval = window.setInterval(() => {
-      void synchronizeCancellation();
-    }, 5_000);
-    return () => window.clearInterval(interval);
-  }, [status, synchronizeCancellation]);
-
-  return {
-    status,
-    lastError,
-    isInterrupted: status !== "idle",
-    durable: isAttemptCancellationOutboxDurable(),
-    requestCancellation,
-    synchronizeCancellation,
   };
 }
 

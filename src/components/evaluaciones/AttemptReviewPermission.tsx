@@ -7,6 +7,7 @@ import { RequestErrorState } from "@/components/ui/RequestErrorState";
 import {
   useGuardarPermisoRevision,
   usePermisosRevision,
+  usePoliticaRevision,
   useRevocarPermisoRevision,
 } from "@/hooks/useRevisiones";
 import { getUserErrorMessage } from "@/lib/errors";
@@ -19,19 +20,23 @@ function toLocalInput(value: string | null | undefined) {
 }
 
 export function AttemptReviewPermission({ attempt }: { attempt: IntentoCompleto }) {
+  const policyQuery = usePoliticaRevision(attempt.idPublicacion);
   const permissionsQuery = usePermisosRevision(attempt.idPublicacion, { idAlumno: attempt.idAlumno });
   const permission = useMemo(
     () => permissionsQuery.data?.find((item) => item.idIntento === attempt.idIntento) ?? null,
     [attempt.idIntento, permissionsQuery.data],
   );
-  if (permissionsQuery.isLoading) return <LoadingState message="Cargando permiso de revisión..." />;
-  if (permissionsQuery.isError) return <RequestErrorState error={permissionsQuery.error} fallback="No se pudo cargar el permiso de revisión." />;
+  if (permissionsQuery.isLoading || policyQuery.isLoading) return <LoadingState message="Cargando permiso de revisión..." />;
+  if (permissionsQuery.isError || policyQuery.isError || !policyQuery.data) {
+    return <RequestErrorState error={permissionsQuery.error ?? policyQuery.error} fallback="No se pudo cargar el permiso de revisión." />;
+  }
 
   return (
     <AttemptReviewPermissionForm
       key={`${permission?.id ?? "new"}:${permission?.revision ?? 0}`}
       attempt={attempt}
       permission={permission}
+      policyMode={policyQuery.data.modo}
     />
   );
 }
@@ -39,9 +44,11 @@ export function AttemptReviewPermission({ attempt }: { attempt: IntentoCompleto 
 function AttemptReviewPermissionForm({
   attempt,
   permission,
+  policyMode,
 }: {
   attempt: IntentoCompleto;
   permission: PermisoRevision | null;
+  policyMode: "nunca" | "al_corregir" | "ventana" | "manual";
 }) {
   const savePermission = useGuardarPermisoRevision(attempt.idPublicacion, attempt.idIntento);
   const revokePermission = useRevocarPermisoRevision(attempt.idPublicacion, attempt.idIntento);
@@ -69,7 +76,11 @@ function AttemptReviewPermissionForm({
         <div>
           <h2 id="attempt-review-permission-title" className="font-black text-slate-900">Acceso individual a la revisión</h2>
           <p className="mt-1 max-w-3xl text-sm text-slate-700">
-            Esta autorización se aplica sólo a este intento y prevalece sobre la regla general de la evaluación. La corrección debe estar confirmada.
+            {policyMode === "nunca"
+              ? "La revisión está deshabilitada para toda la evaluación. Cambiá primero la configuración general para poder autorizar este intento."
+              : policyMode === "manual"
+                ? "Esta evaluación se gestiona alumno por alumno. La autorización se aplica sólo a este intento y requiere la corrección confirmada."
+                : "Esta autorización se aplica sólo a este intento. La corrección debe estar confirmada."}
           </p>
         </div>
         <span className={`rounded-full px-3 py-1 text-xs font-bold ${permission?.estado === "activo" ? "bg-emerald-100 text-emerald-800" : permission?.estado === "revocado" ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600"}`}>
@@ -77,11 +88,11 @@ function AttemptReviewPermissionForm({
         </span>
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <label className="text-sm font-bold text-slate-800">Tipo de acceso
+      {policyMode !== "nunca" && <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <label className="text-sm font-bold text-slate-800">Cuántas veces puede verla
           <select value={access} onChange={(event) => setAccess(event.target.value as AccesoRevision)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5">
-            <option value="libre">Varias consultas</option>
-            <option value="unico">Una consulta por sesión</option>
+            <option value="libre">Puede volver a verla</option>
+            <option value="unico">Una sola vez</option>
           </select>
         </label>
         <label className="text-sm font-bold text-slate-800">Desde (opcional)
@@ -93,7 +104,7 @@ function AttemptReviewPermissionForm({
         <label className="text-sm font-bold text-slate-800">Motivo (opcional)
           <input value={reason} maxLength={250} onChange={(event) => setReason(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5" placeholder="Ej.: solicitud del alumno" />
         </label>
-      </div>
+      </div>}
       {invalidDates && <p className="mt-3 text-sm font-semibold text-red-600">La fecha de fin debe ser posterior a la de inicio.</p>}
 
       {(savePermission.isError || revokePermission.isError) && (
@@ -107,9 +118,11 @@ function AttemptReviewPermissionForm({
         {permission?.estado === "activo" && (
           <button type="button" onClick={() => void revokePermission.mutateAsync()} disabled={busy} className="rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50">Revocar acceso</button>
         )}
-        <button type="button" onClick={() => void save()} disabled={busy || invalidDates || !attempt.correccionConfirmada} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">
-          {savePermission.isPending ? "Guardando..." : permission?.estado === "activo" ? "Actualizar autorización" : "Autorizar revisión"}
-        </button>
+        {policyMode !== "nunca" && (
+          <button type="button" onClick={() => void save()} disabled={busy || invalidDates || !attempt.correccionConfirmada} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">
+            {savePermission.isPending ? "Guardando..." : permission?.estado === "activo" ? "Actualizar autorización" : "Autorizar revisión"}
+          </button>
+        )}
       </div>
       {!attempt.correccionConfirmada && <p className="mt-3 text-right text-xs font-semibold text-amber-700">Confirmá primero la corrección para habilitar cualquier revisión.</p>}
     </section>

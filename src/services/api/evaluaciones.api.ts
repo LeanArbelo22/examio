@@ -37,7 +37,7 @@ import {
   EventoTemporalLoteItem,
   RespuestaLoteEventosTemporales,
   ListaEventosTemporales,
-  EventoTemporal,
+  ResultadoGuardadoEventoTemporal,
 } from "@/types/index";
 import { ApiError, apiFetch } from "@/lib/api";
 import { buildQueryString } from "@/lib/query-string";
@@ -281,8 +281,8 @@ export const guardarEventoTemporal = (
   idIntento: number,
   eventoId: string,
   payload: EventoTemporalPayload,
-): Promise<EventoTemporal & { resultado: "creado" | "actualizado" | "replay" }> =>
-  apiFetch<EventoTemporal & { resultado: "creado" | "actualizado" | "replay" }>(
+): Promise<ResultadoGuardadoEventoTemporal> =>
+  apiFetch<ResultadoGuardadoEventoTemporal>(
     `/telemetria/intentos/${idIntento}/eventos/${eventoId}`,
     { method: "PUT", body: JSON.stringify(payload) },
   );

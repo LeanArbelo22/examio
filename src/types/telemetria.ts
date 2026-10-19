@@ -77,6 +77,7 @@ export interface ResultadoEventoTemporalLote {
   resultado: ResultadoEventoTemporal;
   codigo?: string;
   message?: string;
+  supervision?: import("./supervision").InstruccionSupervision;
 }
 
 export interface RespuestaLoteEventosTemporales {
@@ -102,6 +103,11 @@ export interface EventoTemporal {
   esIntervalo: boolean;
   esIncidente: boolean;
 }
+
+export type ResultadoGuardadoEventoTemporal = EventoTemporal & {
+  resultado: "creado" | "actualizado" | "replay";
+  supervision: import("./supervision").InstruccionSupervision;
+};
 
 export interface DuracionEventoTemporal {
   tipo: TipoEventoTelemetria;

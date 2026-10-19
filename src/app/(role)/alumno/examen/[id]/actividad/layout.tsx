@@ -12,10 +12,10 @@ import {
 import { Button } from "@/components/ui/Button";
 import { ApiError } from "@/lib/api";
 import {
-  useAttemptCancellation,
   useExamTemporalTelemetry,
-  type SecurityViolationEvent,
 } from "@/hooks/useTelemetria";
+import { useEstadoSupervision } from "@/hooks/useSupervision";
+import type { InstruccionSupervision } from "@/types";
 
 type ExamDocument = Document & { isExitingLegitimately?: boolean };
 
@@ -40,7 +40,13 @@ export default function ActivityLayout({
   const autoSubmittedRef = useRef(false);
   const deliveryRunningRef = useRef(false);
   const lastAutomaticSyncRevisionRef = useRef(0);
+  const lastSupervisionRevisionRef = useRef<number | null>(null);
   const securityInterruptedRef = useRef(false);
+  const [liveSupervision, setLiveSupervision] = useState<{
+    instruction: InstruccionSupervision;
+    sequence: number;
+  } | null>(null);
+  const [warningDecisionId, setWarningDecisionId] = useState<number | null>(null);
 
   const { data: preguntas, isLoading } = useGetExamenSorteado(idIntento);
   usePrecargarOpcionesExamen(idIntento, preguntas);
@@ -57,23 +63,26 @@ export default function ActivityLayout({
     cancelFinalization,
     clearOutbox,
   } = useExamAnswerSync(idIntento);
-  const {
-    status: cancellationStatus,
-    lastError: cancellationError,
-    isInterrupted,
-    durable: cancellationDurable,
-    requestCancellation,
-  } = useAttemptCancellation(idIntento, syncNow);
-  const handleSecurityViolation = useCallback(
-    (event: SecurityViolationEvent) => {
-      securityInterruptedRef.current = true;
-      requestCancellation(event);
-    },
-    [requestCancellation],
-  );
+  const supervisionQuery = useEstadoSupervision(idIntento);
+  const refetchSupervision = supervisionQuery.refetch;
+  const handleSupervision = useCallback((instruction: InstruccionSupervision) => {
+    setLiveSupervision((current) => ({
+      instruction,
+      sequence: (current?.sequence ?? 0) + 1,
+    }));
+    if (
+      instruction.accion === "advertir" &&
+      instruction.decisionId !== null
+    ) {
+      setWarningDecisionId(instruction.decisionId);
+    }
+    if (instruction.intentoAnulado) securityInterruptedRef.current = true;
+    void refetchSupervision();
+  }, [refetchSupervision]);
   const currentQuestion = preguntas?.[currentActivityId - 1];
   const {
     recordFullscreenExit,
+    recordFullscreenRestored,
     recordPointEvent,
     flushTelemetry,
     durable: telemetryDurable,
@@ -81,8 +90,29 @@ export default function ActivityLayout({
     idIntento,
     currentQuestion?.idIntentoPregunta,
     Number.isInteger(idIntento) && idIntento > 0,
-    handleSecurityViolation,
+    handleSupervision,
   );
+
+  const supervision = supervisionQuery.data
+    ? {
+        ...supervisionQuery.data,
+        ...(liveSupervision?.instruction ?? {}),
+        revision: supervisionQuery.data.revision + (liveSupervision?.sequence ?? 0),
+      }
+    : null;
+
+  useEffect(() => {
+    const serverRevision = supervisionQuery.data?.revision;
+    if (serverRevision === undefined) return;
+    if (lastSupervisionRevisionRef.current === null) {
+      lastSupervisionRevisionRef.current = serverRevision;
+      return;
+    }
+    if (lastSupervisionRevisionRef.current !== serverRevision) {
+      lastSupervisionRevisionRef.current = serverRevision;
+      setLiveSupervision(null);
+    }
+  }, [supervisionQuery.data?.revision]);
 
   const totalQuestions = preguntas?.length || 0;
   const isDelivering = finalizando || isSyncing || isPreparingDelivery;
@@ -103,7 +133,7 @@ export default function ActivityLayout({
     if (
       deliveryRunningRef.current ||
       securityInterruptedRef.current ||
-      isInterrupted
+      supervision?.intentoAnulado
     ) return;
     deliveryRunningRef.current = true;
     setIsPreparingDelivery(true);
@@ -198,14 +228,14 @@ export default function ActivityLayout({
     requestFinalization,
     router,
     syncNow,
-    isInterrupted,
+    supervision?.intentoAnulado,
     flushTelemetry,
     recordPointEvent,
   ]);
 
   useEffect(() => {
-    if (isInterrupted) securityInterruptedRef.current = true;
-  }, [isInterrupted]);
+    if (supervision?.intentoAnulado) securityInterruptedRef.current = true;
+  }, [supervision?.intentoAnulado]);
 
   useEffect(() => {
     if (
@@ -276,14 +306,30 @@ export default function ActivityLayout({
     );
   }
 
+  if (supervisionQuery.isError) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50 p-6 text-center text-sm font-bold text-red-700">
+        No pudimos confirmar las condiciones de supervisión. Recargá la página antes de continuar.
+      </div>
+    );
+  }
+
+  if (supervisionQuery.isLoading || !supervision) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50 text-sm font-bold text-slate-500">
+        Preparando las condiciones de supervisión…
+      </div>
+    );
+  }
+
   return (
     <FullscreenWrapper
       idIntento={idIntento}
-      interruptionStatus={cancellationStatus}
-      interruptionError={cancellationError}
-      cancellationDurable={cancellationDurable}
+      supervision={supervision}
+      warningDecisionId={warningDecisionId}
       telemetryDurable={telemetryDurable}
       onFullscreenViolation={recordFullscreenExit}
+      onFullscreenRestored={recordFullscreenRestored}
     >
       <div className="flex flex-col h-screen max-h-screen w-full bg-slate-50 text-slate-900 select-none overflow-hidden">
         {/* Header */}

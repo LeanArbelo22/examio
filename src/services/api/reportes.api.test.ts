@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiFetch } from "@/lib/api";
 import {
+  obtenerReporteRendimientoEvaluaciones,
   obtenerReporteOpcionesPregunta,
   obtenerReporteRendimientoGrupos,
   obtenerReporteRendimientoPreguntas,
@@ -33,6 +34,21 @@ describe("servicios de rendimiento por contenido", () => {
 
     expect(apiFetchMock).toHaveBeenCalledWith(
       "/reportes/rendimiento-preguntas?idMateria=3&idGrupoPregunta=8&idPregunta=12&alcanceIntentos=validos&estadoCorreccion=confirmada&pagina=2&limite=20&ordenarPor=tasaAcierto&ordenDireccion=asc",
+    );
+  });
+
+  it("serializa los filtros operativos del reporte por evaluación", async () => {
+    await obtenerReporteRendimientoEvaluaciones({
+      conIncidentes: true,
+      tipoIncidente: "focus_lost",
+      severidad: "anular_intento",
+      soloIncidentesSinRevisar: true,
+      pagina: 1,
+      limite: 20,
+    });
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      "/reportes/rendimiento-evaluaciones?conIncidentes=true&tipoIncidente=focus_lost&severidad=anular_intento&soloIncidentesSinRevisar=true&pagina=1&limite=20",
     );
   });
 

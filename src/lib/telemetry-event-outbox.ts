@@ -259,6 +259,7 @@ export async function acknowledgeTelemetryEvent(
   const keepOpen = record.payload.FechaFinCliente === undefined && [
     "question_active",
     "focus_lost",
+    "fullscreen_exit",
     "connectivity_lost",
     "auth_session_unavailable",
   ].includes(record.payload.Tipo);

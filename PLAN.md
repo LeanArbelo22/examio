@@ -548,6 +548,9 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 - [x] Incorporar tipos, servicio, query key y hook del historial propio sin enviar matrícula desde el navegador.
 - [x] Rehacer `/alumno/resultados` con resumen académico, filtros combinables sincronizados con URL, ordenamiento, paginación, loading, error y empty state.
 - [x] Mostrar escala, umbral, estado, resultado e intento académico sin volver a calcular aprobación en cliente.
+- [x] Tratar defensivamente los intentos anulados en el historial: mostrar su existencia y fecha, pero ocultar nota, aprobado/desaprobado, umbral y revisión porque no participan del resultado académico.
+- [x] Reorganizar el inicio del alumno alrededor de acciones pendientes, resumen y resultados académicos recientes; retirar el listado legacy de “Exámenes entregados” que mezclaba estados no académicos y duplicaba el historial.
+- [ ] Backend: no devolver `resultado=aprobado|desaprobado` para intentos `anulado`, `vencido` o `en_progreso`; representar el resultado académico como no aplicable sin reutilizar una nota cargada durante una corrección informativa.
 - [x] Reutilizar `ReportFilterPanel`, `ReportKpiGrid`, `Pagination`, estados comunes y catálogos actuales de materias/comisiones.
 - [x] Validar la etapa: ESLint focalizado sin errores, 144 tests Vitest, 11 escenarios E2E y build de producción con TypeScript completado.
 - [!] Backend pendiente de validación manual de filtros combinados y plan de ejecución con volumen representativo.
@@ -608,7 +611,9 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 - [ ] Completar la comprobación manual contra la API y SQL Server reales: publicación, recarga, offline/replay, conflicto entre pestañas, entrega y revisión manual.
 - [x] Evitar que el cleanup de navegación vuelva a encolar un `EventoId` ya confirmado y genere conflictos falsos de revisión al regresar a una pregunta.
 - [x] Diferenciar en la corrección docente opciones correctas elegidas/no elegidas y mostrar cuántas respuestas correctas fueron efectivamente seleccionadas.
+- [x] Mostrar en cada pregunta el criterio congelado que se aplicó: coincidencia exacta, puntaje parcial con/sin descuento, corrección docente y uso informativo/manual de la justificación.
 - [x] Presentar de forma neutral la revisión del alumno cuando el backend omite `esCorrecta`; no inferir una respuesta incorrecta desde un campo ausente.
+- [ ] Simplificar visualmente las opciones en la revisión: distinguir de forma inmediata lo que eligió el alumno de las respuestas correctas, sin depender únicamente de leyendas casi idénticas ni aplicar el mismo tratamiento visual a ambos estados.
 
 ### Etapa 2.1 — Anulación, confirmación y revisión segura
 
@@ -622,7 +627,9 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 - [x] Persistir la solicitud de anulación en una outbox IndexedDB independiente para conservar la intención sin conexión y evitar duplicados.
 - [x] Agregar pruebas focalizadas de contratos, confirmación, visibilidad de revisión, outbox y orden de sincronización.
 - [ ] Validar manualmente contra API y SQL Server reales: pérdida de foco online/offline, replay, intento anulado sin nota, confirmación, reapertura posterior y revisión del alumno.
-- [!] La política temporal sigue siendo estricta: la primera pérdida detectada anula. Debe sustituirse por configuración de evaluación cuando el backend entregue políticas de fullscreen e incidentes.
+- [ ] Backend: definir una resolución docente explícita y auditada para un intento anulado que se considere académicamente aceptable. Corregir o confirmar no debe cambiarlo silenciosamente a `entregado`; la operación debe conservar el incidente, registrar actor/motivo y decidir su participación como intento válido, historial y reportes.
+- [ ] Frontend posterior: presentar por separado el estado operativo `anulado`, el estado de corrección y la eventual resolución académica; no usar “corregido” como reemplazo del estado del intento porque actualmente no forma parte de `EstadoIntento`.
+- [x] Sustituir la política temporal y la solicitud local de anulación por las instrucciones autoritativas de la Etapa 6. La outbox de anulación queda fuera del runtime activo; se conserva sólo como compatibilidad histórica hasta su limpieza específica.
 
 ### Etapa 3 — Telemetría temporal confiable
 
@@ -634,6 +641,7 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 - [x] Reemplazar la cola específica de foco en el runtime por una outbox temporal uniforme con sesión y secuencia persistentes.
 - [x] Registrar tiempos por pregunta, foco, fullscreen, conectividad, recarga/reanudación, errores de entrega y finalización.
 - [x] Conservar la anulación en una outbox independiente y ordenar respuestas → telemetría → anulación.
+- [x] Reemplazar posteriormente esa consecuencia local por evaluación backend después de persistir cada evento; la outbox temporal continúa siendo la única cola activa de supervisión.
 - [x] Rehacer el panel docente para mostrar cronología paginada, intervalos abiertos y tiempos por pregunta.
 - [x] Simplificar el panel docente: retirar métricas técnicas, ocultar `question_active` detrás de “Más detalles” y normalizar duraciones `BIGINT` antes de agregarlas.
 - [x] Registrar una sola apertura por documento y distinguir “Examen iniciado” de reanudaciones por recarga, reconexión o retorno al intento.
@@ -655,6 +663,7 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 
 - [x] Backend: persistir políticas por publicación, permisos individuales, auditoría y sesiones de revisión de cinco minutos construidas desde snapshots.
 - [x] Aplicar la migración `20261018_revision_examen.sql` y su verificador en las bases correspondientes.
+- [x] Aplicar la migración correctiva `20261019_semantica_revision_unica.sql` y su verificador para persistir el consumo único por intento y limitar la expiración por ventana o permiso.
 - [x] Sincronizar `docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` con la entrega backend.
 - [x] Incorporar tipos, servicios, query keys y hooks para políticas, permisos, disponibilidad, auditoría, emisión y consumo de sesiones.
 - [x] Configurar desde la gestión docente los modos `nunca`, `al_corregir`, `ventana` y `manual`, el acceso `unico|libre` y consultar el historial funcional de cambios.
@@ -662,9 +671,50 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 - [x] Reemplazar en el alumno el acceso directo a `/intentos/:id/completo` por disponibilidad, apertura deliberada, emisión idempotente y consumo de contenido desde snapshots.
 - [x] Separar en la UI “confirmar corrección” de “habilitar revisión”; la visibilidad depende exclusivamente de política, permiso, intento válido y sesión.
 - [x] Agregar mensajes funcionales para sesión requerida, vencida, consumida, revocada y conflictos de revisión.
+- [x] Alinear la interfaz con la semántica definitiva: `nunca` absoluto, `manual` sólo individual, acceso único persistente por intento y retiro automático del contenido al alcanzar `fechaExpiracion`.
+- [x] Simplificar la configuración docente: ocultar la cantidad de accesos cuando no aplica y reemplazar términos internos de sesiones por opciones funcionales.
 - [x] Validar la integración con ESLint focalizado y 22 pruebas Vitest de contratos, política, permiso, confirmación y apertura del alumno.
 - [ ] Validar manualmente contra API y SQL Server real: los cuatro modos, ventana, permiso/revocación, cambio de intento válido, sesión libre, sesión única, expiración y consumo concurrente.
 - [!] `pnpm typecheck` global continúa bloqueado por errores preexistentes en tests y outboxes ajenos a esta etapa; no reportó errores en los archivos nuevos de revisión.
+
+### Etapa 6 — Políticas configurables de supervisión
+
+- [x] Backend: persistir políticas versionadas, snapshots por intento, decisiones, estado operativo y overrides auditados.
+- [x] Aplicar dos veces `20261019_politicas_supervision.sql` y ejecutar su verificador en las bases correspondientes.
+- [x] Sincronizar `docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` con la entrega backend.
+- [x] Incorporar tipos, servicio, query keys y hooks para política, estado del alumno, detalle docente y overrides.
+- [x] Agregar a la gestión de la evaluación un editor funcional de pantalla completa, incidentes, tolerancia, ventana y consecuencia, con revisión optimista.
+- [x] Congelar la configuración sólo en backend: comunicar al docente que los cambios afectan intentos futuros y consultar el snapshot real al corregir.
+- [x] Eliminar del runtime la decisión local “primer incidente anula” y obedecer exclusivamente `informar|advertir|bloquear_interfaz|anular_intento` devuelto por la telemetría.
+- [x] Modelar la salida y recuperación de pantalla completa como un mismo intervalo temporal y permitir que el backend libere bloqueos al cerrarlo.
+- [x] Corregir la outbox para conservar también `fullscreen_exit` después de sincronizar su apertura, enviar el cierre con el mismo UUID/secuencia y reconciliar periódicamente el estado autoritativo aunque se pierda una respuesta HTTP.
+- [x] Asociar el aviso del alumno al `decisionId` real para que descartarlo no vuelva a mostrarlo ante navegación, respuestas o revisiones informativas posteriores.
+- [x] Mantener el guardado y la sincronización de respuestas durante bloqueos visuales sin ofrecer interacción académica hasta la recuperación.
+- [x] Mostrar al docente estado, decisiones y acciones auditadas de desbloqueo, reconocimiento y descarte; nunca reabrir intentos anulados.
+- [x] Priorizar en el panel docente advertencias, bloqueos y anulaciones; omitir de la interfaz las decisiones técnicas `informar` hasta que el backend pueda describirlas funcionalmente.
+- [x] Plegar la cronología bajo “Ver eventos registrados”, en paralelo con los tiempos por pregunta, y retirar también la etiqueta interna “Sin revisar” de las consecuencias pendientes.
+- [ ] Rediseñar “Más detalles” de actividad como navegación consolidada por pregunta: sumar tiempos, contar visitas reales, fusionar intervalos consecutivos y omitir aperturas técnicas de duración despreciable; no presentar por defecto una fila con timestamp por cada `question_active`.
+- [ ] Evaluar una vista compacta opcional del recorrido (`P1 → P2 → P1`) para mostrar regresos y saltos sin convertir la telemetría cruda en una tabla técnica; mantener los horarios exactos sólo cuando ayuden a relacionar una navegación con un incidente.
+- [ ] Corregir en origen el intervalo inicial de 0 ms generado por el ciclo de montaje de desarrollo, evitando persistir el `question_active` de prueba sin perder visitas reales.
+- [ ] Analizar la fusión de “Actividad durante el examen” y “Supervisión del intento” en una sola sección con resumen temporal, incidentes relevantes, consecuencias y detalles progresivos, sin duplicar información.
+- [x] Validar con ESLint focalizado y 10 pruebas Vitest de contratos, editor, override, telemetría autoritativa y finalización.
+- [ ] Validar manualmente: pantalla completa opcional/obligatoria, cada consecuencia, recuperación de bloqueo, replay, offline y override docente contra API y SQL Server reales.
+- [ ] Backend: diagnosticar el `TELEMETRY_PERSISTENCE_ERROR` observado durante una anulación, registrando de forma segura el error SQL real; comprobar que ninguna transacción o conexión quede retenida y que el detalle docente continúe disponible sin reiniciar la API.
+- [ ] Retirar en una limpieza aprobada el archivo y tests de la antigua outbox de anulación, que ya no participa del runtime.
+
+### Etapa 7 — Visibilidad operativa de incidentes
+
+- [x] Backend: entregar historial append-only, revisión optimista e idempotente y listado paginado por publicación.
+- [x] Aplicar `20261020_visibilidad_incidentes.sql` y su verificador en la base correspondiente.
+- [x] Sincronizar `docs/API.md`, `docs/DATABASE.md` y `docs/PLAN_API.md` con la entrega backend.
+- [x] Incorporar tipos, servicio, query keys y hooks para listado y revisión operativa de incidentes.
+- [x] Agregar a la gestión de la evaluación un resumen con incidentes, alumnos afectados, intentos anulados y pendientes de revisión.
+- [x] Permitir filtrar, paginar, navegar al intento y cambiar el estado `pendiente|revisado|descartado` con comentario opcional.
+- [x] Mantener separadas la revisión operativa de la Etapa 7 y las intervenciones de supervisión de la Etapa 6.
+- [x] Integrar en rendimiento por evaluación los filtros y agregados de incidentes calculados antes de paginar.
+- [x] Traducir conflictos de revisión, alcance e idempotencia a mensajes funcionales sin inferir fraude.
+- [x] Validar contratos, hooks, panel y reporte mediante pruebas Vitest focalizadas y ESLint de archivos modificados.
+- [ ] Validar manualmente con API real: filtros, paginación, revisión, descarte, conflicto concurrente y actualización del reporte.
 
 ### Mejora transversal pendiente — Filtros y visualizaciones de reportes
 

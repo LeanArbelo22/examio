@@ -327,9 +327,16 @@ Respetar `prefers-reduced-motion`; no depender de animación para comunicar esta
   procesa hasta 500 elementos y los conflictos terminales permanecen visibles en la cola.
 - **Identidad de pregunta:** `idIntentoPregunta` identifica la instancia sorteada y se usa para
   `question_active`; `idPregunta` identifica el origen. Nunca inferir ni intercambiar ambos IDs.
-- **Anulación autoritativa:** mientras no exista configuración docente, la primera pérdida de
-  foco o salida de fullscreen congela la interacción, sincroniza respuestas e incidente y solicita
-  la anulación. No finalizar como `entregado`, no calcular nota y no regenerar el UUID ante reintentos.
+- **Supervisión autoritativa:** el frontend nunca decide por sí mismo que una pérdida de foco o salida
+  de fullscreen anula. Cada intento usa el snapshot congelado por backend y la respuesta de telemetría
+  ordena `informar|advertir|bloquear_interfaz|anular_intento`. Un bloqueo visual no impide sincronizar
+  respuestas; una anulación no se revierte. Inicio y cierre de un intervalo conservan UUID y secuencia,
+  y los replays no deben duplicar decisiones ni consecuencias.
+- **Revisión operativa de incidentes:** sólo se presentan eventos clasificados por backend como
+  incidentes. `pendiente|revisado|descartado` describe seguimiento docente y no implica fraude ni
+  modifica nota, intento o consecuencia. La revisión usa `RevisionEsperada` e `Idempotency-Key`;
+  ante conflicto se conserva el comentario local y se exige reconciliación explícita. No confundir
+  este historial append-only con los overrides de supervisión usados para intervenir en vivo.
 - **Credenciales solo server-side:** nunca exponer access/refresh tokens mediante `Session.user`,
   respuestas del BFF, logs, variables públicas o almacenamiento del navegador.
 - **URLs y fetch fuera de la capa:** persisten URL hardcodeada y al menos una llamada directa legacy.
@@ -387,10 +394,14 @@ Respetar `prefers-reduced-motion`; no depender de animación para comunicar esta
 - **Confirmación y revisión:** una nota completa no equivale a devolución publicada. La corrección
   docente debe confirmarse sin preguntas pendientes; cualquier modificación posterior la reabre.
   Confirmar no habilita por sí solo la revisión: rigen política, permiso individual, intento válido
-  y una sesión de cinco minutos. El alumno debe consultar disponibilidad, emitir la sesión con una
+  y un acceso temporal de hasta cinco minutos. `nunca` bloquea también permisos anteriores y `manual`
+  sólo autoriza mediante un permiso individual vigente. El acceso `unico` se consume de forma persistente
+  por intento; cambiar temporalmente a `libre` no elimina ese consumo. El alumno debe consultar disponibilidad, emitir la sesión con una
   `Idempotency-Key` estable y consumir `/revisiones/sesiones/:id/contenido`; nunca debe usar
-  `/intentos/:id/completo`. En acceso único, no consumir automáticamente al montar la ruta ni
-  reintentar el GET a ciegas. La ausencia de claves correctas nunca implica respuesta incorrecta.
+  `/intentos/:id/completo`. `fechaExpiracion` es el límite autoritativo calculado por el backend como
+  el mínimo entre cinco minutos, la ventana general y el permiso individual; la UI debe retirar el
+  contenido al alcanzarlo y revalidar disponibilidad. En acceso único, no consumir automáticamente al
+  montar la ruta ni reintentar el GET a ciegas. La ausencia de claves correctas nunca implica respuesta incorrecta.
 - **Intento académicamente válido:** la selección automática considera sólo el último intento
   `entregado`; un override manual persiste hasta que el docente lo elimine. No ocultar intentos
   anteriores, no permitir elegir estados no entregados y no recalcular esta selección en cliente.
@@ -467,7 +478,7 @@ del banco sin exigir persistir antes la evaluación. Publicar usa exclusivamente
 `publicar-completo`, con `GuardarTodoEnBanco` desmarcado por defecto y una clave idempotente
 estable. `useIdempotencyKey` conserva la misma clave para el mismo payload tras un resultado incierto.
 
-Las primeras seis etapas de calificación, intentos, reportes y telemetría están integradas en el frontend. El editor permite
+Las primeras siete etapas de calificación, intentos, reportes y telemetría están integradas en el frontend. El editor permite
 escala 10/100, nota de aprobación, reparto igual o personalizado por grupo, visibilidad del puntaje
 y activación de corrección automática de cerradas. Cambiar la escala convierte proporcionalmente
 los valores existentes y lo comunica al docente. El detalle docente siempre presenta la configuración;
@@ -480,11 +491,12 @@ propio server-side, con resumen, filtros, orden y paginación sincronizados con 
 Durante el examen una outbox temporal IndexedDB registra tiempos por pregunta, foco, fullscreen,
 conectividad, reanudaciones, recargas y fallos operativos mediante sesión/secuencia estables. Los
 intervalos conservan el mismo UUID al cerrarse y se sincronizan por lotes al recuperar conectividad;
-nunca alteran estado, nota o validez por sí solos. Con la política temporal actual, la primera pérdida de foco o
-salida de fullscreen congela el examen y encola una anulación autoritativa después de sincronizar
-respuestas e incidente; la solicitud sobrevive a la falta de conexión. La corrección docente muestra
+nunca alteran estado, nota o validez por sí solos sin la evaluación autoritativa del backend. Cada intento
+congela la política de supervisión al iniciar; la telemetría devuelve la instrucción efectiva y el frontend
+informa, advierte, bloquea o presenta la anulación según corresponda. La pantalla completa puede ser
+opcional u obligatoria. Las respuestas continúan sincronizándose durante bloqueos visuales. La corrección docente muestra
 un resumen funcional y la cronología de interrupciones; los intervalos `question_active` quedan detrás
-de “Más detalles”. Las duraciones `BIGINT` se normalizan en el servicio antes de agregarse y la apertura
+de “Más detalles”, junto con el snapshot de supervisión, sus decisiones y overrides auditados. Las duraciones `BIGINT` se normalizan en el servicio antes de agregarse y la apertura
 del examen se registra una sola vez por documento, diferenciando inicio de reanudaciones reales.
 
 La selección múltiple y justificación está integrada de punta a punta. `QuestionContentEditor`
@@ -500,8 +512,10 @@ una respuesta incorrecta. La corrección
 manual incorpora una confirmación explícita y el historial sólo ofrece la revisión cuando el backend
 devuelve `revisionDisponible: true`; una edición posterior vuelve a abrir la corrección. La gestión
 docente configura revisión `nunca|al_corregir|ventana|manual`, acceso `unico|libre`, permisos por intento
-y auditoría. El alumno abre deliberadamente una sesión idempotente de cinco minutos y el contenido se
-reconstruye desde snapshots; `/intentos/:id/completo` queda reservado para docente y administrador.
+y auditoría. `nunca` es absoluto, `manual` se gestiona sólo por intento y el acceso único queda consumido
+para ese intento después de mostrar el contenido. El alumno abre deliberadamente una revisión idempotente
+de hasta cinco minutos; el frontend la oculta al vencer el límite efectivo informado por la API y el contenido
+se reconstruye desde snapshots. `/intentos/:id/completo` queda reservado para docente y administrador.
 
 Playwright usa `.next-e2e` mediante `EXAMIO_NEXT_DIST_DIR`, por lo que los E2E y builds
 de validación pueden ejecutarse sin finalizar un `next dev` activo sobre `.next`.

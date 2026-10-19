@@ -54,4 +54,18 @@ describe("ReviewPolicyPanel", () => {
       VentanaHasta: expect.stringContaining("2026-10-20"),
     }));
   });
+
+  it("oculta la cantidad de accesos cuando la revisión está deshabilitada o es individual", async () => {
+    const user = userEvent.setup();
+    render(<ReviewPolicyPanel idPublicacion={41} />);
+
+    expect(screen.getByLabelText(/Cuántas veces puede verla/)).toBeVisible();
+    await user.selectOptions(screen.getByLabelText(/Cuándo se permite/), "nunca");
+    expect(screen.queryByLabelText(/Cuántas veces puede verla/)).not.toBeInTheDocument();
+    expect(screen.getByText(/aunque tenga una autorización anterior/)).toBeVisible();
+
+    await user.selectOptions(screen.getByLabelText(/Cuándo se permite/), "manual");
+    expect(screen.queryByLabelText(/Cuántas veces puede verla/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Autorizá cada intento desde su pantalla de corrección/)).toBeVisible();
+  });
 });

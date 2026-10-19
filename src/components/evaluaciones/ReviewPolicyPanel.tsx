@@ -14,10 +14,10 @@ import { getUserErrorMessage } from "@/lib/errors";
 import type { AccesoRevision, ModoRevision, PoliticaRevision } from "@/types";
 
 const modeHelp: Record<ModoRevision, string> = {
-  nunca: "Ningún alumno podrá abrir la revisión, aunque la corrección esté confirmada.",
+  nunca: "Ningún alumno podrá ver la revisión, aunque tenga una autorización anterior.",
   al_corregir: "El intento válido podrá revisarse después de confirmar su corrección.",
   ventana: "El intento válido podrá revisarse únicamente durante el período indicado.",
-  manual: "Sólo podrán revisar los intentos autorizados individualmente.",
+  manual: "Autorizá cada intento desde su pantalla de corrección. No se aplica una regla general de cantidad de accesos.",
 };
 
 function toLocalInput(value: string | null) {
@@ -37,13 +37,16 @@ const auditLabels: Record<string, string> = {
   permiso_otorgado: "Acceso individual otorgado",
   permiso_reactivado: "Acceso individual reactivado",
   permiso_revocado: "Acceso individual revocado",
-  sesion_emitida: "Sesión de revisión emitida",
-  sesion_reutilizada: "Sesión de revisión reutilizada",
+  sesion_emitida: "Revisión preparada",
+  sesion_reutilizada: "Revisión abierta nuevamente",
   sesion_abierta: "Revisión abierta",
   sesion_consumida: "Acceso único utilizado",
-  sesion_expirada: "Sesión vencida",
-  sesion_revocada: "Sesión revocada",
+  sesion_expirada: "Tiempo de revisión vencido",
+  sesion_revocada: "Acceso a la revisión revocado",
   contenido_consultado: "Contenido consultado",
+  emision_denegada_unico: "Acceso denegado: revisión única ya utilizada",
+  emision_denegada_nunca: "Acceso denegado por la configuración general",
+  permiso_denegado_nunca: "Autorización individual rechazada por la configuración general",
 };
 
 export function ReviewPolicyPanel({ idPublicacion }: { idPublicacion: number }) {
@@ -106,7 +109,7 @@ function ReviewPolicyEditor({
         <div>
           <h3 id="review-policy-title" className="text-base font-black text-slate-900">Revisión para alumnos</h3>
           <p className="mt-1 max-w-3xl text-sm text-slate-600">
-            Definí cuándo podrán consultar las respuestas y si cada sesión admite una o varias aperturas.
+            Definí cuándo podrán consultar sus respuestas, correcciones y devoluciones.
           </p>
         </div>
         <button
@@ -127,28 +130,32 @@ function ReviewPolicyEditor({
             onChange={(event) => setMode(event.target.value as ModoRevision)}
             className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-medium"
           >
-            <option value="nunca">No permitir revisiones</option>
-            <option value="al_corregir">Al confirmar la corrección</option>
-            <option value="ventana">Durante un período</option>
-            <option value="manual">Sólo con autorización individual</option>
+            <option value="nunca">No mostrar la revisión</option>
+            <option value="al_corregir">Mostrarla después de confirmar la corrección</option>
+            <option value="ventana">Mostrarla durante un período</option>
+            <option value="manual">Autorizar alumno por alumno</option>
           </select>
           <span className="mt-2 block text-xs font-normal leading-5 text-slate-600">{modeHelp[mode]}</span>
         </label>
 
-        <label className="text-sm font-bold text-slate-800">
-          Tipo de acceso
-          <select
-            value={access}
-            onChange={(event) => setAccess(event.target.value as AccesoRevision)}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-medium"
-          >
-            <option value="libre">Varias consultas durante la disponibilidad</option>
-            <option value="unico">Una consulta por sesión emitida</option>
-          </select>
-          <span className="mt-2 block text-xs font-normal leading-5 text-slate-600">
-            Cada sesión dura cinco minutos. El acceso único se consume al abrir el contenido.
-          </span>
-        </label>
+        {(mode === "al_corregir" || mode === "ventana") && (
+          <label className="text-sm font-bold text-slate-800">
+            Cuántas veces puede verla
+            <select
+              value={access}
+              onChange={(event) => setAccess(event.target.value as AccesoRevision)}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-medium"
+            >
+              <option value="libre">Puede volver a verla mientras esté habilitada</option>
+              <option value="unico">Puede verla una sola vez</option>
+            </select>
+            <span className="mt-2 block text-xs font-normal leading-5 text-slate-600">
+              {access === "unico"
+                ? "Al abrirla tendrá hasta cinco minutos para consultarla. Después no podrá volver a verla."
+                : "Podrá volver a abrirla mientras siga habilitada. Cada vez tendrá hasta cinco minutos para consultarla."}
+            </span>
+          </label>
+        )}
       </div>
 
       {mode === "ventana" && (

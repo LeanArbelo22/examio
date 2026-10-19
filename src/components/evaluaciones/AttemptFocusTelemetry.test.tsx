@@ -88,6 +88,7 @@ describe("AttemptFocusTelemetry", () => {
     expect(screen.getByText("2 de 2")).toBeVisible();
     expect(screen.queryByText("Intervalos abiertos")).not.toBeInTheDocument();
     expect(screen.getAllByText("Examen iniciado")).toHaveLength(1);
+    expect(screen.getByText("Ver eventos registrados")).toBeVisible();
     expect(screen.queryByText("Examen reanudado")).not.toBeInTheDocument();
     expect(screen.getByText("Más detalles")).toBeVisible();
     expect(screen.queryByText("Pregunta activa")).not.toBeInTheDocument();

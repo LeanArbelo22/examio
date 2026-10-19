@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -91,6 +91,67 @@ describe("StudentHistoryWorkspace", () => {
     expect(screen.getByText("Resultado académico")).toBeInTheDocument();
     expect(screen.getByText("2 intentos encontrados")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Revisar examen/ })).toBeVisible();
+  });
+
+  it("no presenta nota ni resultado académico para un intento anulado", () => {
+    vi.mocked(useMisIntentos).mockReturnValue({
+      data: {
+        items: [
+          {
+            idIntento: 14,
+            idActividad: 8,
+            idPublicacion: 12,
+            titulo: "Parcial SQL",
+            tipo: "evaluacion",
+            idMateria: 4,
+            materia: "Bases de Datos",
+            idMateriaDivision: 9,
+            division: "2A",
+            numeroIntento: 1,
+            cantidadIntentosMaximos: 3,
+            estado: "anulado",
+            fechaInicio: "2026-10-01T09:00:00.000Z",
+            fechaFin: "2026-10-01T09:30:00.000Z",
+            notaAutomatica: null,
+            notaFinal: 8,
+            escalaCalificacion: 10,
+            notaAprobacion: 4,
+            resultado: "aprobado",
+            estadoCorreccion: "completa",
+            correccionPendiente: false,
+            correccionConfirmada: true,
+            revisionDisponible: true,
+            esIntentoValido: false,
+            seleccionIntentoValido: null,
+          },
+        ],
+        resumen: {
+          totalIntentos: 1,
+          totalEvaluaciones: 0,
+          evaluacionesAprobadas: 0,
+          evaluacionesDesaprobadas: 0,
+          evaluacionesPendientes: 0,
+        },
+        paginacion: { pagina: 1, limite: 10, total: 1, totalPaginas: 1 },
+      },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as never);
+
+    render(<StudentHistoryWorkspace />);
+
+    const attemptCard = screen.getByRole("heading", { name: "Parcial SQL" }).closest("article");
+    expect(attemptCard).not.toBeNull();
+    const card = within(attemptCard!);
+    expect(card.getByText("Anulado")).toBeVisible();
+    expect(card.getByText("Este intento no forma parte de tu resultado académico.")).toBeVisible();
+    expect(card.queryByText("Aprobado")).not.toBeInTheDocument();
+    expect(card.queryByText("8.00 / 10")).not.toBeInTheDocument();
+    expect(card.queryByText(/Aprobación:/)).not.toBeInTheDocument();
+    expect(card.queryByRole("link", { name: /Revisar examen/ })).not.toBeInTheDocument();
   });
 
   it("valida el rango de fechas antes de actualizar la URL", async () => {

@@ -48,16 +48,20 @@ const SAFE_CODE_MESSAGES: Record<string, string> = {
     "Corregí todas las preguntas antes de confirmar la corrección.",
   REVIEW_NOT_AVAILABLE:
     "La revisión no está disponible según la configuración de la evaluación.",
+  REVIEW_POLICY_NEVER:
+    "La revisión está deshabilitada para esta evaluación.",
+  REVIEW_ACCESS_ALREADY_CONSUMED:
+    "Ya utilizaste la única revisión disponible para este intento.",
   REVIEW_SESSION_REQUIRED:
-    "Para consultar la revisión primero tenés que abrir una sesión segura.",
+    "Para consultar la revisión primero tenés que abrirla desde tu historial.",
   REVIEW_SESSION_NOT_FOUND:
-    "La sesión de revisión no existe o ya no está disponible.",
+    "La revisión solicitada no existe o ya no está disponible.",
   REVIEW_SESSION_CONSUMED:
-    "Esta sesión de acceso único ya fue utilizada.",
+    "Este acceso de una sola vez ya fue utilizado.",
   REVIEW_SESSION_EXPIRED:
-    "La sesión de revisión venció. Volvé al historial para abrir una nueva.",
+    "El tiempo disponible para esta revisión terminó. Volvé al historial para consultar si podés abrirla nuevamente.",
   REVIEW_SESSION_REVOKED:
-    "El docente revocó esta sesión de revisión.",
+    "El docente revocó el acceso a esta revisión.",
   REVIEW_SCOPE_FORBIDDEN:
     "No tenés permisos para consultar esta revisión.",
   REVIEW_POLICY_REVISION_CONFLICT:
@@ -78,6 +82,34 @@ const SAFE_CODE_MESSAGES: Record<string, string> = {
     "No pudimos asociar el tiempo con la pregunta actual.",
   TELEMETRY_SYNC_WINDOW_EXPIRED:
     "Venció el plazo para sincronizar este evento del examen.",
+  SUPERVISION_POLICY_NOT_FOUND:
+    "No se encontró la configuración de supervisión de esta evaluación.",
+  SUPERVISION_POLICY_REVISION_CONFLICT:
+    "La configuración de supervisión cambió. Recargala antes de volver a guardar.",
+  SUPERVISION_RULE_INVALID:
+    "Una de las reglas de supervisión no es válida.",
+  SUPERVISION_SNAPSHOT_MISSING:
+    "El intento no tiene condiciones de supervisión disponibles.",
+  SUPERVISION_SCOPE_FORBIDDEN:
+    "No tenés permisos para consultar o modificar esta supervisión.",
+  SUPERVISION_REVISION_CONFLICT:
+    "El estado de supervisión cambió. Recargalo antes de intervenir.",
+  SUPERVISION_DECISION_NOT_FOUND:
+    "La decisión seleccionada ya no está disponible.",
+  SUPERVISION_CANCELLED_IMMUTABLE:
+    "La anulación es definitiva y no puede revertirse desde Supervisión.",
+  INCIDENT_NOT_FOUND:
+    "El incidente seleccionado ya no está disponible.",
+  EVENT_NOT_INCIDENT:
+    "El evento seleccionado no requiere revisión operativa.",
+  INCIDENT_SCOPE_FORBIDDEN:
+    "No tenés permisos para revisar este incidente.",
+  INCIDENT_REVISION_CONFLICT:
+    "La revisión del incidente cambió. Conservamos tu comentario para que puedas recargar y decidir nuevamente.",
+  IDEMPOTENCY_KEY_REUSED:
+    "La operación ya fue utilizada con otros datos. Revisá el estado actual antes de volver a intentar.",
+  IDEMPOTENCY_OPERATION_IN_PROGRESS:
+    "La revisión todavía se está procesando. Esperá un momento antes de volver a intentar.",
 };
 
 export function getErrorCategory(error: unknown): ErrorCategory {

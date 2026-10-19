@@ -143,7 +143,10 @@ export function AttemptFocusTelemetry({ idIntento }: { idIntento: number }) {
           )}
 
           {displayedEvents.length > 0 ? (
-            <EventTable events={displayedEvents} firstResumeId={firstResumeId} />
+            <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+              <summary className="cursor-pointer text-sm font-bold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Ver eventos registrados</summary>
+              <EventTable events={displayedEvents} firstResumeId={firstResumeId} />
+            </details>
           ) : (
             <p className="mt-4 rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">No se registraron interrupciones ni eventos relevantes para mostrar.</p>
           )}
@@ -182,7 +185,7 @@ export function AttemptFocusTelemetry({ idIntento }: { idIntento: number }) {
 
 function EventTable({ events, firstResumeId }: { events: EventoTemporal[]; firstResumeId?: string }) {
   return (
-    <div className="mt-4 overflow-x-auto">
+    <div className="mt-3 overflow-x-auto">
       <table className="min-w-[620px] w-full text-left text-xs">
         <thead className="text-slate-500"><tr><th className="pb-2">Evento</th><th className="pb-2">Momento</th><th className="pb-2 text-right">Duración</th></tr></thead>
         <tbody className="divide-y divide-slate-200">

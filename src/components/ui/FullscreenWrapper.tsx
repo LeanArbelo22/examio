@@ -1,147 +1,89 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import {
-  useRegistrarAlerta,
-} from "@/hooks/useEvaluaciones";
-import type { AttemptCancellationStatus } from "@/hooks/useTelemetria";
+import { useRegistrarAlerta } from "@/hooks/useEvaluaciones";
+import type { EstadoSupervisionIntento } from "@/types";
 
 interface FullscreenWrapperProps {
   children: React.ReactNode;
   idIntento: number;
-  interruptionStatus: AttemptCancellationStatus;
-  interruptionError?: string | null;
-  cancellationDurable: boolean;
+  supervision: EstadoSupervisionIntento;
+  warningDecisionId: number | null;
   telemetryDurable: boolean;
   onFullscreenViolation: () => void;
+  onFullscreenRestored: () => void;
 }
 
 type ExamDocument = Document & { isExitingLegitimately?: boolean };
 
-export function FullscreenWrapper({
-  children,
-  idIntento,
-  interruptionStatus,
-  interruptionError,
-  cancellationDurable,
-  telemetryDurable,
-  onFullscreenViolation,
-}: FullscreenWrapperProps) {
+export function FullscreenWrapper({ children, idIntento, supervision, warningDecisionId, telemetryDurable, onFullscreenViolation, onFullscreenRestored }: FullscreenWrapperProps) {
   const router = useRouter();
   const resumeMarker = `examio_exam_entered_${idIntento}`;
-  const [isResuming] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      sessionStorage.getItem(resumeMarker) === "true",
-  );
+  const [isResuming] = useState(() => typeof window !== "undefined" && sessionStorage.getItem(resumeMarker) === "true");
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(true);
-  const [localInterruption, setLocalInterruption] = useState(false);
-
-  // Invocamos los hooks analíticos reales
+  const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(isResuming);
+  const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(supervision.pantallaCompletaObligatoria);
+  const [dismissedWarningDecisionId, setDismissedWarningDecisionId] = useState<number | null>(null);
   const { mutate: enviarAlerta } = useRegistrarAlerta();
-  const isFinalizingRef = useRef(false);
+  const requestingFullscreen = useRef(false);
 
-  // Función centralizada para ejecutar la penalización antifraude de EXAMIO
-  const triggerFraudePenalty = useCallback(
-    async () => {
-      if (isFinalizingRef.current) return;
-      isFinalizingRef.current = true;
+  const requestFullscreen = useCallback(async () => {
+    try {
+      requestingFullscreen.current = true;
+      (document as ExamDocument).isExitingLegitimately = false;
+      await document.documentElement.requestFullscreen();
+      sessionStorage.setItem(resumeMarker, "true");
+      setIsFullscreen(true);
+      setHasEnteredFullscreen(true);
+      setShowFullscreenPrompt(false);
+      onFullscreenRestored();
+    } catch (error) {
+      alert(`Debes permitir pantalla completa para continuar: ${String(error)}`);
+    } finally {
+      requestingFullscreen.current = false;
+    }
+  }, [onFullscreenRestored, resumeMarker]);
 
-      if (document.fullscreenElement) {
-        try {
-          await document.exitFullscreen();
-        } catch (err) {
-          console.error("Error al intentar salir de fullscreen:", err);
-        }
-      }
-
-      setIsFullscreen(false);
-      setLocalInterruption(true);
-      onFullscreenViolation();
-    },
-    [onFullscreenViolation],
-  );
-
-  // Detectar salida manual de pantalla completa (Tecla ESC)
   useEffect(() => {
-    // Listener de cambio de pantalla completa
     const handleFullscreenChange = () => {
       const doc = document as ExamDocument;
-      if (doc.isExitingLegitimately) return; // ESCUDO ACTIVO
-
-      if (!document.fullscreenElement && isFullscreen) {
-        triggerFraudePenalty();
+      if (document.fullscreenElement) {
+        setIsFullscreen(true);
+        setShowFullscreenPrompt(false);
+        if (!requestingFullscreen.current) onFullscreenRestored();
+        return;
+      }
+      setIsFullscreen(false);
+      if (doc.isExitingLegitimately) return;
+      if (supervision.pantallaCompletaObligatoria) {
+        setShowFullscreenPrompt(true);
+        onFullscreenViolation();
       }
     };
-
     document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, [onFullscreenRestored, onFullscreenViolation, supervision.pantallaCompletaObligatoria]);
 
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
-  }, [isFullscreen, triggerFraudePenalty]);
-
-  useEffect(() => {
-    if (interruptionStatus === "idle") return;
-    isFinalizingRef.current = true;
-    const doc = document as ExamDocument;
-    doc.isExitingLegitimately = true;
-    if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => undefined);
-    }
-  }, [interruptionStatus]);
-
-  // Bloqueo estricto de Portapapeles e Inspección de código
   useEffect(() => {
     if (!isFullscreen) return;
-
-    const blockClipboard = (e: Event) => {
-      e.preventDefault();
-      // Logueamos de forma silenciosa a la DB el intento de copia/pega sin congelar la pantalla
-      enviarAlerta({
-        IdIntento: idIntento,
-        TipoIncidente: "clipboard_block",
-        Detalle:
-          "Intento de interacción con el portapapeles (Copy/Cut/Paste) bloqueado.",
-      });
-    };
-
-    const blockContextMenu = (event: MouseEvent) => {
+    const report = (tipo: string, detalle: string) => enviarAlerta({ IdIntento: idIntento, TipoIncidente: tipo, Detalle: detalle });
+    const blockClipboard = (event: Event) => { event.preventDefault(); report("clipboard_block", "Intento de interacción con el portapapeles bloqueado."); };
+    const blockContextMenu = (event: MouseEvent) => { event.preventDefault(); report("context_menu_block", "Intento de abrir el menú contextual durante el examen."); };
+    const blockShortcuts = (event: KeyboardEvent) => {
+      const blocked = event.key === "F12"
+        || ((event.ctrlKey || event.metaKey) && event.shiftKey && ["I", "J"].includes(event.key))
+        || ((event.ctrlKey || event.metaKey) && event.key === "u");
+      if (!blocked) return;
       event.preventDefault();
-      enviarAlerta({
-        IdIntento: idIntento,
-        TipoIncidente: "context_menu_block",
-        Detalle: "Intento de abrir el menú contextual durante el examen.",
-      });
+      report("inspector_block", "Intento de abrir herramientas de desarrollo bloqueado.");
     };
-
-    const blockShortcuts = (e: KeyboardEvent) => {
-      if (
-        e.key === "F12" ||
-        ((e.ctrlKey || e.metaKey) &&
-          e.shiftKey &&
-          (e.key === "I" || e.key === "J")) ||
-        ((e.ctrlKey || e.metaKey) && e.key === "u")
-      ) {
-        e.preventDefault();
-        enviarAlerta({
-          IdIntento: idIntento,
-          TipoIncidente: "inspector_block",
-          Detalle:
-            "Intento de apertura de las herramientas de desarrollador (F12/Inspect) bloqueado.",
-        });
-      }
-    };
-
     document.addEventListener("copy", blockClipboard);
     document.addEventListener("cut", blockClipboard);
     document.addEventListener("paste", blockClipboard);
     document.addEventListener("contextmenu", blockContextMenu);
     document.addEventListener("keydown", blockShortcuts);
-
     return () => {
       document.removeEventListener("copy", blockClipboard);
       document.removeEventListener("cut", blockClipboard);
@@ -151,144 +93,67 @@ export function FullscreenWrapper({
     };
   }, [enviarAlerta, idIntento, isFullscreen]);
 
-  const requestFullscreen = async () => {
-    try {
-      (document as ExamDocument).isExitingLegitimately = false;
-      await document.documentElement.requestFullscreen();
-      sessionStorage.setItem(resumeMarker, "true");
-      setIsFullscreen(true);
-      setShowFullscreenPrompt(false);
-    } catch (err) {
-      alert("Debes permitir pantalla completa para continuar: " + err);
-    }
-  };
-
-  const handleExitRedirect = () => {
-    router.replace("/alumno");
-  };
-
-  const showWarningModal = localInterruption || interruptionStatus !== "idle";
+  const isCancelled = supervision.intentoAnulado;
+  const isBlocked = supervision.interaccionBloqueada && !isCancelled;
+  const showWarning = warningDecisionId !== null
+    && dismissedWarningDecisionId !== warningDecisionId;
+  const requiresFullscreenPrompt = supervision.pantallaCompletaObligatoria
+    && (showFullscreenPrompt || !isFullscreen);
+  const fullscreenPromptTitle = supervision.accion === "advertir"
+    ? "Se registró una salida de pantalla completa"
+    : hasEnteredFullscreen
+      ? "Volvé a pantalla completa"
+      : isResuming
+      ? "Reanudar evaluación"
+      : "Pantalla completa requerida";
+  const fullscreenPromptDescription = supervision.accion === "advertir"
+    ? "El incidente quedó registrado. Volvé a pantalla completa para continuar con el examen."
+    : hasEnteredFullscreen
+      ? "La salida se está registrando. Volvé al entorno del examen mientras la plataforma verifica la consecuencia configurada."
+      : "Esta evaluación requiere pantalla completa. Las salidas se registran y la plataforma aplica la consecuencia configurada por el docente.";
 
   return (
     <>
-      {showFullscreenPrompt && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xl p-7 max-w-md w-full">
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 mb-4">
-                <svg
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                  />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-                {isResuming
-                  ? "Reanudar evaluación"
-                  : "Bloqueo de Seguridad Activo"}
-              </h2>
-              <p className="mt-2 text-sm text-slate-500 leading-relaxed">
-                {isResuming
-                  ? "Restauramos tus preguntas y respuestas guardadas. El temporizador continúa desde el plazo original."
-                  : "Para garantizar la validez de tu examen, la plataforma iniciará el entorno controlado institucional."}
-              </p>
-              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-left mt-5 space-y-3">
-                <div className="flex items-start gap-2.5 text-xs text-slate-600 font-medium">
-                  <span className="text-emerald-500 text-sm select-none leading-none">
-                    ✓
-                  </span>
-                  <span>Se forzará el modo pantalla completa obligatoria.</span>
-                </div>
-                <div className="flex items-start gap-2.5 text-xs text-slate-600 font-medium">
-                  <span className="text-emerald-500 text-sm select-none leading-none">
-                    ✓
-                  </span>
-                  <span>
-                    Cambiar de pestaña o minimizar enviará y congelará el examen
-                    de inmediato.
-                  </span>
-                </div>
-              </div>
-              <div className="mt-6">
-                <Button
-                  onClick={requestFullscreen}
-                  className="w-full bg-indigo-600 text-white py-3 px-4 text-sm font-bold rounded-xl hover:bg-indigo-700 shadow-sm transition-all"
-                >
-                  {isResuming ? "Continuar examen" : "Confirmar e Ingresar"}
-                </Button>
-              </div>
-            </div>
+      {requiresFullscreenPrompt && !isCancelled && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200/80 bg-white p-7 shadow-xl">
+            <h2 className="text-center text-xl font-bold text-slate-900">{fullscreenPromptTitle}</h2>
+            <p className="mt-2 text-center text-sm leading-relaxed text-slate-600">{fullscreenPromptDescription}</p>
+            <Button onClick={requestFullscreen} className="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700">{hasEnteredFullscreen ? "Volver a pantalla completa" : "Ingresar al examen"}</Button>
           </div>
         </div>
       )}
 
-      {showWarningModal && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-red-100 rounded-2xl shadow-2xl p-7 max-w-md w-full">
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-50 border border-red-100 text-red-600 mb-4">
-                <svg
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-                Evaluación Interrumpida
-              </h2>
-              <p className="mt-2 text-sm text-slate-500 leading-relaxed">
-                {interruptionStatus === "cancelled"
-                  ? "El intento fue anulado. Tus respuestas anteriores se conservaron para consulta institucional."
-                  : interruptionStatus === "failed"
-                    ? "El intento quedó bloqueado, pero no pudimos confirmar la anulación. Comunicate con el docente antes de continuar."
-                    : "Detectamos una salida del entorno seguro o pérdida de foco. La interacción quedó bloqueada mientras protegemos tus respuestas y registramos la anulación."}
-              </p>
-              {interruptionStatus === "pending" && (
-                <p className="mt-3 text-xs font-semibold text-amber-700" role="status">
-                  {cancellationDurable && telemetryDurable
-                    ? "La solicitud quedó guardada y se enviará automáticamente, incluso si perdés la conexión."
-                    : "Mantené esta pantalla abierta mientras se completa la anulación."}
-                </p>
-              )}
-              {interruptionError && interruptionStatus === "failed" && (
-                <p className="mt-3 text-xs text-red-700">{interruptionError}</p>
-              )}
-              <div className="mt-6">
-                <Button
-                  onClick={handleExitRedirect}
-                  className="w-full bg-red-600 text-white py-3 px-4 text-sm font-bold rounded-xl hover:bg-red-700 shadow-sm transition-all"
-                >
-                  Entendido, salir
-                </Button>
-              </div>
-            </div>
+      {showWarning && !requiresFullscreenPrompt && !isBlocked && !isCancelled && (
+        <div role="alert" className="fixed left-1/2 top-4 z-[60] w-[min(92vw,40rem)] -translate-x-1/2 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-lg">
+          <p className="font-bold">Se registró una interrupción durante el examen</p>
+          <p className="mt-1">Podés continuar, pero el evento quedará disponible para el docente.</p>
+          <button type="button" onClick={() => setDismissedWarningDecisionId(warningDecisionId)} className="mt-2 font-bold underline underline-offset-2">Entendido</button>
+        </div>
+      )}
+
+      {(isBlocked || isCancelled) && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/70 p-4 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-2xl border border-red-100 bg-white p-7 text-center shadow-2xl">
+            <h2 className="text-xl font-bold text-slate-900">{isCancelled ? "Intento anulado" : "Interacción temporalmente bloqueada"}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              {isCancelled
+                ? "La política de supervisión anuló el intento. Las respuestas sincronizadas se conservaron para consulta institucional."
+                : "La plataforma registró un incidente. Tus respuestas siguen protegidas y pueden continuar sincronizándose mientras se valida la recuperación."}
+            </p>
+            {!telemetryDurable && !isCancelled && <p className="mt-3 text-xs font-semibold text-amber-700">Mantené esta pantalla abierta mientras se sincroniza el incidente.</p>}
+            {isCancelled ? (
+              <Button onClick={() => router.replace("/alumno")} className="mt-6 w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-700">Salir</Button>
+            ) : supervision.pantallaCompletaObligatoria && !isFullscreen ? (
+              <Button onClick={requestFullscreen} className="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700">Volver a pantalla completa</Button>
+            ) : (
+              <p className="mt-5 text-xs font-semibold text-slate-500" role="status">Esperando confirmación de recuperación…</p>
+            )}
           </div>
         </div>
       )}
 
-      <div
-        className={
-          isFullscreen ? "fixed inset-0 bg-slate-50 z-30 overflow-y-auto" : ""
-        }
-      >
-        {children}
-      </div>
+      <div className={isFullscreen ? "fixed inset-0 z-30 overflow-y-auto bg-slate-50" : ""}>{children}</div>
     </>
   );
 }
