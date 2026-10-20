@@ -718,18 +718,37 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 
 ### Mejora transversal pendiente — Filtros y visualizaciones de reportes
 
-- [ ] Reemplazar en los reportes docentes los catálogos institucionales de materias y comisiones por opciones derivadas exclusivamente de las evaluaciones autorizadas del docente.
-- [ ] Implementar filtros dependientes `materia → comisión → actividad → publicación`, limpiando valores inferiores incompatibles y deshabilitando selects sin opciones.
+#### Entrega 1 completada — Análisis docente por publicación
+
+- [x] Agregar en `/profesor/reportes` el recorrido publicación → resultados oficiales → preguntas → evidencia histórica y variantes.
+- [x] Seleccionar publicaciones desde el listado completo autorizado del docente, con filtros dependientes propios y `idPublicacion` como unidad.
+- [x] Separar resultados oficiales, pendientes operativos superpuestos y distribución legacy no oficial.
+- [x] Consumir la regla y el ranking server-side de bajo rendimiento sin recalcular hallazgos en cliente, distinguiendo falta de datos, muestra insuficiente y ausencia/presencia de hallazgos.
+- [x] Consultar opciones por `claveContenido`, aislar errores de evidencia histórica en su panel y presentar variantes sólo como comparación descriptiva.
+- [x] Mantener los reportes anteriores disponibles y conservar en URL los filtros de retorno sin trasladar fechas al análisis de preguntas.
+- [ ] Validar el recorrido completo contra API y SQL Server reales con un dataset controlado; backend todavía no confirmó compilación, consistencia ni planes de las consultas nuevas en SQL Server real.
+
+La entrega institucional continúa fuera de alcance y no debe presentarse como disponible.
+
+- [ ] Al finalizar la mejora de reportes, revisar todas las pantallas de los tres roles y retirar textos técnicos que describan API, servidor, frontend, contratos, caché, paginación interna, snapshots o procesos; conservar sólo criterios funcionales, significado de los datos y acciones útiles para cada usuario.
+
+- [x] Reemplazar en los reportes docentes los catálogos institucionales de materias y comisiones por opciones derivadas exclusivamente de las evaluaciones autorizadas del docente.
+- [x] Implementar filtros dependientes `materia → comisión → actividad → publicación`, limpiando valores inferiores incompatibles al aplicar la búsqueda.
 - [ ] Solicitar al backend un catálogo de filtros del historial del alumno, obtenido desde su JWT y su historial completo, con `idMateria` e `idMateriaDivision`; no construirlo desde la página visible ni desde catálogos globales.
 - [ ] Sustituir los inputs técnicos de ID de grupo/pregunta por opciones con nombres cuando exista un catálogo autorizado para ese nivel.
 - [ ] Ampliar `ReportFilterPanel` con opciones dependientes, estados de carga/vacío, resumen de filtros aplicados y sección de filtros avanzados.
-- [ ] Eliminar gráficos de barras derivados de la página actual cuando puedan interpretarse como una visión global.
+- [x] Eliminar gráficos derivados de la página actual cuando puedan interpretarse como una visión global.
 - [ ] En rendimiento por alumno, reemplazar las series visibles por un ranking server-side acotado y claramente identificado como Top N; conservar KPIs globales.
-- [ ] En rendimiento por evaluación, mantener la distribución global e incorporar una visualización de participación: alcanzados, iniciaron y entregaron.
-- [ ] En rendimiento por pregunta, presentar rankings server-side de menor rendimiento y mayor tiempo mediano, independientes de la paginación de la tabla.
+- [x] En el análisis de una publicación, mantener la distribución global e incorporar una visualización de participación: alcanzados, iniciaron y entregaron.
+- [x] En rendimiento por pregunta, presentar rankings server-side de menor rendimiento y mayor tiempo promedio, independientes de la paginación de la tabla.
 - [ ] Identificar preguntas y grupos en los gráficos mediante referencias cortas (`P1`, `G1`) acompañadas por una leyenda accesible con el texto completo, muestra y valor exacto.
 - [ ] En rendimiento por grupo, agregar detalle de variantes y solicitar al backend ordenamiento por diferencia entre variantes antes de presentar un ranking global de esa métrica.
+- [x] En rendimiento por grupo, presentar rankings server-side de menor rendimiento y mayor tiempo promedio, independientes de la paginación de la tabla.
 - [ ] Mantener el gráfico de opciones/distractores únicamente en el detalle de preguntas cerradas, donde el conjunto es finito y se acompaña con tabla textual.
+- [x] Reemplazar los gráficos paginados de preguntas y grupos por distribuciones globales de corrección y respuesta ya provistas por sus KPIs.
+- [x] Diferenciar “Comparar evaluaciones” del análisis individual de una publicación mediante propósito y textos propios, sin duplicar el recorrido detallado.
+- [x] En “Comparar evaluaciones”, contrastar participación y resultados oficiales entre las publicaciones visibles, con referencias estables y alcance de página explícito.
+- [!] Agrupar el reporte por alumno y la comparación de evaluaciones primero por materia y comisión requiere agregados o navegación server-side que conserven totales fuera de la página visible; no reconstruir esos grupos desde una página paginada.
 - [ ] Indicar en toda visualización si los datos son globales, Top N o pertenecen a una página; mostrar tamaño de muestra, cobertura temporal y diferenciar cero de “Sin datos”.
 - [ ] Mantener puntajes de preguntas/grupos como porcentajes normalizados y tratar diferencias entre variantes como descriptivas, sin afirmar significancia estadística.
 - [ ] Agregar pruebas focalizadas de alcance por rol, limpieza de filtros dependientes, URLs con IDs ajenos, rankings server-side y equivalentes textuales accesibles.

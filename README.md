@@ -539,11 +539,29 @@ del alumno conserva manejo local para no desmontar una evaluación activa.
 - `ReportCharts`
 - `EvaluationReportCharts`
 - `StudentReportDetail`
+- `QuestionOptionsDetail`
 
 Los reportes por alumno y por publicación de evaluación comparten esta familia.
-Los gráficos permanecen específicos de cada dominio: el reporte por evaluación
-consume agregaciones globales del backend; los gráficos por alumno representan
-explícitamente la página visible, aunque sus KPIs son globales.
+Los gráficos permanecen específicos de cada dominio: **Comparar evaluaciones** contrasta
+participación y resultados oficiales entre las publicaciones visibles, indicando expresamente
+ese alcance; el análisis individual conserva la distribución global. El reporte por alumno
+mantiene sus KPIs globales y no grafica la página visible. Preguntas y grupos usan distribuciones
+globales de corrección y respuesta, además de rankings server-side de menor puntaje promedio y
+mayor tiempo promedio. Sus tablas continúan paginadas y no se usan para calcular esos rankings.
+
+Los filtros docentes de materia, comisión, actividad y publicación se construyen desde
+las evaluaciones autorizadas del docente. Al aplicar una combinación incompatible se
+limpian los niveles inferiores en lugar de consultar IDs ajenos a ese alcance.
+
+La pestaña **Analizar evaluación** de `/profesor/reportes` implementa el recorrido
+docente por publicación. El selector se construye desde el listado completo autorizado
+del docente y encadena materia, comisión y evaluación sin inferir alcance desde una
+página de reporte. El resumen separa resultados oficiales de pendientes operativos y
+mantiene la distribución legacy en un bloque identificado como no oficial. El segundo
+paso consulta preguntas con `alcanceIntentos=validos` y
+`estadoCorreccion=confirmada`, presenta el ranking server-side de hallazgos y permite
+abrir opciones históricas por `claveContenido` junto con las variantes descriptivas del
+grupo. Las fechas del listado no se trasladan a este análisis.
 
 ### Administración
 

@@ -2094,6 +2094,19 @@ conjunto de evaluaciones filtradas.
 Un listado vacío devuelve `200`, `evaluaciones: []`, `total: 0`,
 `totalPaginas: 0`, `distribucionResultados: []`; promedio y tasa son `null`.
 
+#### Resultados oficiales por publicación
+
+Cada KPI y fila agrega dos bloques paralelos que no modifican las métricas legacy:
+
+- `resultadosOficiales`: resuelve primero el intento válido y sólo considera entregas
+  con corrección confirmada y nota final. Expone considerados, pendientes, aprobados,
+  desaprobados, porcentaje de aprobación y cobertura confirmada.
+- `pendientesOperativos`: incluye todos los intentos entregados alcanzados. Sus
+  subcategorías pueden superponerse y no deben sumarse.
+
+La distribución existente conserva su población histórica y no representa por sí sola
+los resultados oficiales. La unidad del análisis docente es siempre `idPublicacion`.
+
 #### Errores
 
 | HTTP | `code` | Motivo |
@@ -2270,6 +2283,8 @@ Todos son opcionales y se combinan con AND: `idMateria`, `idMateriaDivision`,
 `estadoIntento`, `alcanceIntentos`, `estadoCorreccion`, `pagina`, `limite`,
 `ordenarPor` y `ordenDireccion`. `rendimiento-preguntas` admite además `idPregunta`;
 el detalle de opciones recibe ese ID exclusivamente en el path.
+`rendimiento-preguntas` también acepta `soloHallazgosBajoRendimiento`; opciones acepta
+`claveContenido` para seleccionar la identidad histórica exacta.
 
 - `estadoIntento`: `en_progreso|entregado|vencido|anulado`.
 - `alcanceIntentos`: `todos` (default) o `validos`. El segundo usa el override manual
@@ -2308,6 +2323,18 @@ devuelve `403 REPORT_SCOPE_FORBIDDEN` sin revelar si el recurso existe para otro
 No se etiqueta una diferencia entre variantes como estadísticamente significativa: se
 devuelve `diferenciaVariantesPuntosPorcentuales` y el tamaño de muestra para que producto
 defina posteriormente un criterio académico explícito.
+
+Con alcance `validos + confirmada`, preguntas y grupos agregan
+`presentacionesOficiales`, `muestrasConfirmadas` y exclusiones disjuntas por puntaje nulo
+o máximo no positivo. Una omisión con puntaje definitivo cero integra la muestra. El
+filtro de hallazgos exige el alcance oficial (o lo aplica si se omite), devuelve
+`reglaHallazgo`, `resumenFiltro` y `hallazgoBajoRendimiento`, y se evalúa con el decimal
+sin redondear. El frontend no debe reconstruir esa decisión.
+
+En opciones, `claveContenido` reúne las copias históricas equivalentes dentro del mismo
+alcance. Un contenido inexistente devuelve `404 QUESTION_CONTENT_NOT_FOUND`; snapshots
+de opciones incompatibles devuelven `409 QUESTION_OPTION_EVIDENCE_INCONSISTENT`. Ambos
+errores afectan sólo ese panel de evidencia.
 
 #### Response de preguntas y grupos
 

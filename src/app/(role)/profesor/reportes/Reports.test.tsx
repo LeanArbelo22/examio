@@ -11,6 +11,8 @@ import type {
 import { ContentPerformanceReport } from "./ContentPerformanceReport";
 import { EvaluacionesReport } from "./EvaluacionesReport";
 import { RendimientoReport } from "./RendimientoReport";
+import { TeacherPublicationAnalysis } from "./TeacherPublicationAnalysis";
+import { ApiError } from "@/lib/api";
 
 const reportMocks = vi.hoisted(() => ({
   pathname: "/profesor/reportes",
@@ -54,12 +56,47 @@ vi.mock("@/hooks/useEvaluaciones", () => ({
       {
         idActividad: 10,
         idPublicacion: 47,
+        idMateria: 3,
+        idMateriaDivision: 44,
         titulo: "Primer parcial",
+        tipo: "evaluacion",
+        materia: "Programación",
+        carrera: "Tecnicatura",
         division: "1A",
+        fechaInicio: "2026-08-01T12:00:00.000Z",
+        fechaFin: "2026-08-01T14:00:00.000Z",
+        duracionMinutos: 120,
+        cantidadIntentosMaximos: 2,
+        recursosPermitidos: null,
+        estado: "publicada",
+        alumnosInscriptos: 20,
+        totalIntentos: 18,
       },
     ],
   }),
 }));
+
+const resultadosOficiales = {
+  intentosValidosEntregados: 16,
+  resultadosConsiderados: 14,
+  resultadosPendientes: 2,
+  intentosPendientesConfirmacion: 2,
+  intentosConfirmadosSinNota: 0,
+  intentosConPreguntasSinPuntaje: 2,
+  preguntasSinPuntaje: 3,
+  aprobados: 11,
+  desaprobados: 3,
+  porcentajeAprobacion: 78.57,
+  porcentajeCoberturaConfirmada: 87.5,
+};
+
+const pendientesOperativos = {
+  intentosEntregadosPendientes: 3,
+  intentosPendientesConfirmacion: 2,
+  intentosSinNotaFinal: 2,
+  intentosConPreguntasSinPuntaje: 2,
+  preguntasSinPuntaje: 4,
+};
 
 vi.mock("@/hooks/useReportes", () => ({
   useReporteRendimientoEvaluaciones: (...args: unknown[]) =>
@@ -126,6 +163,8 @@ const evaluationReport: ReporteEvaluacionesListado = {
     alumnosConIncidentes: 4,
     totalIncidentes: 7,
     incidentesSinRevisar: 2,
+    resultadosOficiales,
+    pendientesOperativos,
   },
   graficos: {
     distribucionResultados: [
@@ -167,6 +206,8 @@ const evaluationReport: ReporteEvaluacionesListado = {
       alumnosConIncidentes: 3,
       totalIncidentes: 5,
       incidentesSinRevisar: 2,
+      resultadosOficiales,
+      pendientesOperativos,
     },
   ],
   paginacion: { pagina: 2, limite: 20, total: 2, totalPaginas: 2 },
@@ -219,6 +260,10 @@ const contentKpis = {
   coberturaTemporal: 0.75,
   tiempoPromedioMilisegundos: 32500,
   tiempoMaximoMilisegundos: 90000,
+  presentacionesOficiales: 42,
+  muestrasConfirmadas: 40,
+  presentacionesExcluidasSinPuntaje: 1,
+  presentacionesExcluidasSinMaximoPositivo: 1,
 };
 
 const contentCriteria = {
@@ -263,7 +308,54 @@ const questionsReport: ReportePreguntasListado = {
     tiempoPromedioMilisegundos: 32500,
     tiempoMedianaMilisegundos: 30000,
     tiempoMaximoMilisegundos: 90000,
+    presentacionesOficiales: 42,
+    muestrasConfirmadas: 40,
+    presentacionesExcluidasSinPuntaje: 1,
+    presentacionesExcluidasSinMaximoPositivo: 1,
+    hallazgoBajoRendimiento: {
+      detectado: false,
+      codigo: "pregunta_bajo_rendimiento",
+      version: 1,
+    },
   }],
+};
+
+const findingsReport: ReportePreguntasListado = {
+  ...questionsReport,
+  criterios: {
+    ...contentCriteria,
+    alcanceIntentos: "validos",
+    estadoCorreccion: "confirmada",
+    soloHallazgosBajoRendimiento: true,
+    alcanceIntentosAplicadoPorHallazgo: true,
+    estadoCorreccionAplicadoPorHallazgo: true,
+  },
+  reglaHallazgo: {
+    codigo: "pregunta_bajo_rendimiento",
+    version: 1,
+    porcentajePuntajeMaximoExclusivo: 30,
+    muestrasConfirmadasMinimas: 10,
+  },
+  resumenFiltro: {
+    preguntasEnCoberturaGeneral: 3,
+    preguntasConMuestraSuficiente: 2,
+    preguntasConMuestraInsuficiente: 1,
+    preguntasCoincidentes: 1,
+    presentacionesCoincidentes: 18,
+    muestrasConfirmadasCoincidentes: 17,
+  },
+  items: [
+    {
+      ...questionsReport.items[0],
+      porcentajePuntajePromedio: 30,
+      muestrasConfirmadas: 17,
+      hallazgoBajoRendimiento: {
+        detectado: true,
+        codigo: "pregunta_bajo_rendimiento",
+        version: 1,
+      },
+    },
+  ],
 };
 
 const groupsReport: ReporteGruposListado = {
@@ -295,6 +387,10 @@ const groupsReport: ReporteGruposListado = {
     tiempoPromedioMilisegundos: 32500,
     tiempoMedianaMilisegundos: 30000,
     tiempoMaximoMilisegundos: 90000,
+    presentacionesOficiales: 42,
+    muestrasConfirmadas: 40,
+    presentacionesExcluidasSinPuntaje: 1,
+    presentacionesExcluidasSinMaximoPositivo: 1,
   }],
 };
 
@@ -329,6 +425,17 @@ function successfulQuery(data: unknown) {
     isFetching: false,
     isError: false,
     error: null,
+    refetch: vi.fn(),
+  };
+}
+
+function failedQuery(error: Error) {
+  return {
+    data: undefined,
+    isLoading: false,
+    isFetching: false,
+    isError: true,
+    error,
     refetch: vi.fn(),
   };
 }
@@ -446,12 +553,12 @@ describe("reportes docentes", () => {
     );
   });
 
-  it("presenta KPIs globales pero gráficos y tabla de la página del reporte por alumno", async () => {
+  it("presenta KPIs globales y evita gráficos construidos desde la página del reporte por alumno", async () => {
     const user = userEvent.setup();
     render(<RendimientoReport />);
 
     expect(screen.getByText("30")).toBeVisible();
-    expect(screen.getByText("Gráficos de página: 1")).toBeVisible();
+    expect(screen.queryByText("Gráficos de página: 1")).not.toBeInTheDocument();
     expect(screen.getByText("Lovelace, Ada")).toBeVisible();
 
     await user.click(screen.getByText("Lovelace, Ada"));
@@ -476,17 +583,205 @@ describe("reportes docentes", () => {
     reportMocks.search = "reporte=preguntas";
     render(<ContentPerformanceReport kind="preguntas" />);
 
-    expect(screen.getByText("¿Qué protocolo garantiza la entrega?")).toBeVisible();
-    expect(screen.getByText("75.0%")).toBeVisible();
+    expect(screen.getAllByText("¿Qué protocolo garantiza la entrega?")[0]).toBeVisible();
+    expect(screen.getAllByText("75.0%")[0]).toBeVisible();
     expect(screen.getByText("Gráficos de preguntas")).toBeVisible();
+    expect(screen.getByText("Rankings de preguntas")).toBeVisible();
+    expect(screen.getByText("Menor puntaje promedio")).toBeVisible();
+    expect(screen.getByText("Mayor tiempo promedio")).toBeVisible();
+    expect(reportMocks.preguntasHook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pagina: 1,
+        limite: 5,
+        ordenarPor: "porcentajePuntaje",
+        ordenDireccion: "asc",
+      }),
+      true,
+    );
+    expect(reportMocks.preguntasHook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pagina: 1,
+        limite: 5,
+        ordenarPor: "tiempoPromedio",
+        ordenDireccion: "desc",
+      }),
+      true,
+    );
 
     await user.click(screen.getByRole("button", { name: "Ver opciones" }));
-    expect(screen.getByRole("dialog", { name: "Opciones y distractores" })).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "Detalle de la pregunta" })).toBeVisible();
     expect(screen.getByText("TCP")).toBeVisible();
     expect(reportMocks.opcionesHook).toHaveBeenCalledWith(
       10,
-      expect.objectContaining({ limite: 100, ordenarPor: "posicion" }),
+      expect.objectContaining({
+        claveContenido: "hash-tcp",
+        limite: 100,
+        ordenarPor: "posicion",
+      }),
     );
+  });
+
+  it.each([
+    {
+      code: "QUESTION_CONTENT_NOT_FOUND",
+      status: 404,
+      message: /No se encontró evidencia histórica para este contenido/,
+    },
+    {
+      code: "QUESTION_OPTION_EVIDENCE_INCONSISTENT",
+      status: 409,
+      message: /Las versiones históricas de las opciones no pueden compararse/,
+    },
+  ])(
+    "mantiene $code dentro del panel de opciones",
+    async ({ code, status, message }) => {
+      const user = userEvent.setup();
+      reportMocks.search = "reporte=preguntas";
+      reportMocks.opcionesHook.mockReturnValue(
+        failedQuery(new ApiError("Evidencia no disponible", status, code)),
+      );
+
+      render(<ContentPerformanceReport kind="preguntas" />);
+      await user.click(screen.getByRole("button", { name: "Ver opciones" }));
+
+      expect(screen.getByText(message)).toBeVisible();
+      expect(
+        screen.getAllByText("¿Qué protocolo garantiza la entrega?").length,
+      ).toBeGreaterThanOrEqual(2);
+    },
+  );
+
+  it("selecciona una publicación desde catálogos autorizados y conserva el retorno", async () => {
+    const user = userEvent.setup();
+    reportMocks.search = "reporte=analisis";
+    render(<TeacherPublicationAnalysis />);
+
+    expect(screen.getAllByText("Programación · 1A")).not.toHaveLength(0);
+    expect(screen.getAllByText("Primer parcial")).not.toHaveLength(0);
+    expect(screen.getByText("1 resultado")).toBeVisible();
+    expect(screen.getByText("120 min")).toBeVisible();
+    expect(screen.getByText("20 estudiantes")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Ver análisis" }));
+
+    const target = reportMocks.replace.mock.calls[0]?.[0] as string;
+    expect(target).toContain("reporte=analisis");
+    expect(target).toContain("analisisMateria=3");
+    expect(target).toContain("analisisComision=44");
+    expect(target).toContain("analisisActividad=10");
+    expect(target).toContain("idPublicacion=47");
+  });
+
+  it("separa resultados oficiales de pendientes operativos", () => {
+    reportMocks.search = "reporte=analisis&idPublicacion=47";
+    render(<TeacherPublicationAnalysis />);
+
+    expect(screen.getByRole("heading", { name: "Resultados oficiales" })).toBeVisible();
+    expect(screen.getByText("Resultados considerados")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Pendientes operativos" })).toBeVisible();
+    expect(screen.getByText(/Las subcategorías se superponen y no deben sumarse/)).toBeVisible();
+    expect(screen.getByText(/puede diferir de los resultados oficiales/)).toBeInTheDocument();
+  });
+
+  it("presenta hallazgos e insuficiencia con lenguaje orientado al docente", () => {
+    reportMocks.search =
+      "reporte=analisis&idPublicacion=47&analisisPaso=preguntas&fechaDesde=2026-01-01&fechaHasta=2026-12-31";
+    reportMocks.preguntasHook.mockImplementation((filters) =>
+      successfulQuery(
+        (filters as { soloHallazgosBajoRendimiento?: boolean })
+          .soloHallazgosBajoRendimiento
+          ? findingsReport
+          : questionsReport,
+      ),
+    );
+
+    render(<TeacherPublicationAnalysis />);
+
+    expect(screen.getByText(/1 pregunta\(s\) tienen evidencia insuficiente/)).toBeVisible();
+    expect(screen.getByText(/Se detectaron 1 pregunta\(s\)/)).toBeVisible();
+    expect(screen.getByText(/un 30,00% visible puede estar apenas por debajo del límite/)).toBeVisible();
+    expect(screen.getByText("Preguntas prioritarias para revisar")).toBeVisible();
+    expect(screen.getByText("Todas las preguntas con evidencia oficial")).toBeVisible();
+
+    expect(reportMocks.preguntasHook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idPublicacion: "47",
+        alcanceIntentos: "validos",
+        estadoCorreccion: "confirmada",
+        soloHallazgosBajoRendimiento: true,
+        pagina: 1,
+        limite: 10,
+      }),
+      true,
+    );
+    expect(reportMocks.preguntasHook).not.toHaveBeenCalledWith(
+      expect.objectContaining({ fechaDesde: expect.anything() }),
+      expect.anything(),
+    );
+  });
+
+  it("distingue ausencia de datos de ausencia de hallazgos evaluables", () => {
+    reportMocks.search =
+      "reporte=analisis&idPublicacion=47&analisisPaso=preguntas";
+    reportMocks.preguntasHook.mockImplementation((filters) => {
+      const isRanking = (filters as { soloHallazgosBajoRendimiento?: boolean })
+        .soloHallazgosBajoRendimiento;
+      return successfulQuery(
+        isRanking
+          ? {
+              ...findingsReport,
+              resumenFiltro: {
+                ...findingsReport.resumenFiltro!,
+                preguntasEnCoberturaGeneral: 0,
+                preguntasConMuestraSuficiente: 0,
+                preguntasConMuestraInsuficiente: 0,
+                preguntasCoincidentes: 0,
+              },
+              items: [],
+            }
+          : { ...questionsReport, items: [], pagination: { ...questionsReport.pagination, total: 0 } },
+      );
+    });
+
+    render(<TeacherPublicationAnalysis />);
+
+    expect(
+      screen.getByText("No hay presentaciones oficiales para analizar en esta publicación."),
+    ).toBeVisible();
+    expect(
+      screen.queryByText(/No se detectaron hallazgos entre las preguntas/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("comunica ausencia de hallazgos sin ocultar preguntas con muestra insuficiente", () => {
+    reportMocks.search =
+      "reporte=analisis&idPublicacion=47&analisisPaso=preguntas";
+    reportMocks.preguntasHook.mockImplementation((filters) => {
+      const isRanking = (filters as { soloHallazgosBajoRendimiento?: boolean })
+        .soloHallazgosBajoRendimiento;
+      return successfulQuery(
+        isRanking
+          ? {
+              ...findingsReport,
+              resumenFiltro: {
+                ...findingsReport.resumenFiltro!,
+                preguntasCoincidentes: 0,
+                presentacionesCoincidentes: 0,
+                muestrasConfirmadasCoincidentes: 0,
+              },
+              items: [],
+            }
+          : questionsReport,
+      );
+    });
+
+    render(<TeacherPublicationAnalysis />);
+
+    expect(screen.getByText(/1 pregunta\(s\) tienen evidencia insuficiente/)).toBeVisible();
+    expect(
+      screen.getByText(
+        "No se detectaron hallazgos entre las preguntas con evidencia suficiente.",
+      ),
+    ).toBeVisible();
   });
 
   it("muestra variantes y sincroniza filtros del reporte por grupo", async () => {
@@ -494,8 +789,18 @@ describe("reportes docentes", () => {
     reportMocks.search = "reporte=grupos";
     render(<ContentPerformanceReport kind="grupos" />);
 
-    expect(screen.getByText("Protocolos")).toBeVisible();
+    expect(screen.getAllByText("Protocolos")[0]).toBeVisible();
     expect(screen.getByText("2 variantes")).toBeVisible();
+    expect(screen.getByText("Rankings de grupos")).toBeVisible();
+    expect(reportMocks.gruposHook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pagina: 1,
+        limite: 5,
+        ordenarPor: "porcentajePuntaje",
+        ordenDireccion: "asc",
+      }),
+      true,
+    );
     await user.selectOptions(screen.getByLabelText("Intentos académicos"), "validos");
     await user.click(screen.getByRole("button", { name: "Buscar" }));
 

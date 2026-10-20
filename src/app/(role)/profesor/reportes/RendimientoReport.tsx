@@ -10,14 +10,12 @@ import { ReportLayout } from "@/components/reports/ReportLayout";
 import { ReportFilterPanel, type ReportFilterDefinition } from "@/components/reports/ReportFilterPanel";
 import { ReportKpiGrid } from "@/components/reports/ReportKpiGrid";
 import { ReportTable, type ReportColumn } from "@/components/reports/ReportTable";
-import { ReportCharts } from "@/components/reports/ReportCharts";
 import { ReportSkeleton } from "@/components/reports/ReportSkeleton";
 import { StudentReportDetail } from "@/components/reports/StudentReportDetail";
-import { useGetMaterias } from "@/hooks/useMaterias";
-import { useGetComisiones } from "@/hooks/useComisiones";
 import { useGetEvaluacionesDocente } from "@/hooks/useEvaluaciones";
 import { useReporteRendimiento } from "@/hooks/useReportes";
 import type { OrdenDireccion, ReporteRendimientoAlumno, ReporteRendimientoFiltros, ReporteRendimientoOrden } from "@/types/index";
+import { normalizeAuthorizedReportFilters } from "./report-filter-options";
 
 const FILTER_KEYS = ["matricula", "idMateria", "idMateriaDivision", "idActividad", "estado", "fechaDesde", "fechaHasta", "promedioMin", "promedioMax", "alcanceIntentos"] as const;
 
@@ -58,8 +56,6 @@ export function RendimientoReport() {
     limite: 20,
   }), [searchParams]);
   const { data, isLoading, isFetching, isError, error, refetch } = useReporteRendimiento(filters);
-  const { materias = [] } = useGetMaterias();
-  const { comisiones = [] } = useGetComisiones();
   const legajo = Number(session?.user?.identificadorInstitucional) || 0;
   const { data: evaluaciones = [] } = useGetEvaluacionesDocente(legajo);
 
@@ -76,9 +72,9 @@ export function RendimientoReport() {
       label: "Materia",
       type: "select",
       options: uniqueFilterOptions(
-        materias,
-        (item) => (item as typeof item & { idMateria?: number }).idMateria ?? item.id,
-        (item) => item.nombre,
+        evaluaciones,
+        (item) => item.idMateria,
+        (item) => item.materia,
       ),
     },
     {
@@ -86,10 +82,10 @@ export function RendimientoReport() {
       label: "Materia / División",
       type: "select",
       options: uniqueFilterOptions(
-        comisiones,
-        (item) =>
-          item.idMateriaDivision ??
-          (item as typeof item & { idComision?: number }).idComision,
+        evaluaciones.filter(
+          (item) => !filters.idMateria || item.idMateria === Number(filters.idMateria),
+        ),
+        (item) => item.idMateriaDivision,
         (item) => `${item.materia} / ${item.division}`,
       ),
     },
@@ -98,7 +94,12 @@ export function RendimientoReport() {
       label: "Actividad",
       type: "select",
       options: uniqueFilterOptions(
-        evaluaciones,
+        evaluaciones.filter(
+          (item) =>
+            (!filters.idMateria || item.idMateria === Number(filters.idMateria)) &&
+            (!filters.idMateriaDivision ||
+              item.idMateriaDivision === Number(filters.idMateriaDivision)),
+        ),
         (item) => item.idActividad,
         (item) => item.titulo,
       ),
@@ -107,23 +108,24 @@ export function RendimientoReport() {
     { key: "fechaDesde", label: "Fecha desde", type: "date" }, { key: "fechaHasta", label: "Fecha hasta", type: "date" },
     { key: "promedioMin", label: "Promedio mínimo", type: "number", min: 0, max: 10, step: 0.01 }, { key: "promedioMax", label: "Promedio máximo", type: "number", min: 0, max: 10, step: 0.01 },
     { key: "alcanceIntentos", label: "Resultados académicos", type: "select", options: [{ value: "validos", label: "Sólo intento válido" }] },
-  ], [materias, comisiones, evaluaciones]);
+  ], [evaluaciones, filters.idMateria, filters.idMateriaDivision]);
   const visibleFilters = Object.fromEntries(FILTER_KEYS.map((key) => [key, String(filters[key] ?? "")]));
   const search = (values: Record<string, string>) => {
-    if (values.idActividad && !values.matricula) {
+    const normalizedValues = normalizeAuthorizedReportFilters(values, evaluaciones);
+    if (normalizedValues.idActividad && !normalizedValues.matricula) {
       setFilterValidationError("El filtro Actividad requiere una matrícula porque el endpoint solo lo admite en modo detalle.");
       return;
     }
-    if (values.fechaDesde && values.fechaHasta && values.fechaDesde > values.fechaHasta) {
+    if (normalizedValues.fechaDesde && normalizedValues.fechaHasta && normalizedValues.fechaDesde > normalizedValues.fechaHasta) {
       setFilterValidationError("La fecha desde no puede ser posterior a la fecha hasta.");
       return;
     }
-    if (values.promedioMin && values.promedioMax && Number(values.promedioMin) > Number(values.promedioMax)) {
+    if (normalizedValues.promedioMin && normalizedValues.promedioMax && Number(normalizedValues.promedioMin) > Number(normalizedValues.promedioMax)) {
       setFilterValidationError("El promedio mínimo no puede superar al promedio máximo.");
       return;
     }
     setFilterValidationError(null);
-    updateUrl({ ...values, pagina: 1 });
+    updateUrl({ ...normalizedValues, pagina: 1 });
   };
   const columns = useMemo<ReportColumn<ReporteRendimientoAlumno, ReporteRendimientoOrden>[]>(() => [
     { key: "alumno", header: "Alumno", sortKey: "alumno", render: (row) => <div><p className="font-bold text-slate-800">{row.apellido}, {row.nombre}</p><p className="mt-0.5 text-[10px] text-slate-400">Ver detalle</p></div> },
@@ -148,7 +150,6 @@ export function RendimientoReport() {
     )}
     {data && <div className={`space-y-6 transition-opacity ${isFetching ? "opacity-60" : "opacity-100"}`} aria-busy={isFetching}>
       <ReportKpiGrid items={[{ label: "Promedio general", value: data.kpis.promedioGeneral.toFixed(2), helper: `Sobre 10 · ${data.kpis.alcanceIntentos === "validos" ? "intentos válidos" : "todos los intentos"}`, tone: "indigo" }, { label: "Total de alumnos", value: data.kpis.totalAlumnos.toLocaleString("es-AR"), helper: `${data.kpis.conIntentos} con intentos`, tone: "blue" }, { label: "Total de intentos", value: data.kpis.totalIntentos.toLocaleString("es-AR"), helper: `${data.kpis.intentosAlcanceAcademico} en el cálculo académico`, tone: "amber" }, { label: "Tasa de aprobación", value: `${data.kpis.tasaAprobacion.toFixed(1)}%`, tone: "emerald" }]} />
-      {data.alumnos.length > 0 && <ReportCharts alumnos={data.alumnos} />}
       <ReportTable columns={columns} rows={data.alumnos} rowKey={(row) => row.matricula} sortBy={filters.ordenarPor ?? "alumno"} sortDirection={filters.ordenDireccion ?? "asc"} onSort={(ordenarPor, ordenDireccion) => updateUrl({ ordenarPor, ordenDireccion, pagina: 1 })} onRowClick={(row) => setSelectedStudent(row.matricula)} page={data.paginacion.pagina} totalPages={data.paginacion.totalPaginas} total={data.paginacion.total} itemLabel="alumnos" onPageChange={(pagina) => updateUrl({ pagina })} />
     </div>}
     <StudentReportDetail matricula={selectedStudent} filters={filters} onClose={() => setSelectedStudent(null)} />

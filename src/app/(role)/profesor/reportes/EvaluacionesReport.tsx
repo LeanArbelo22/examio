@@ -18,9 +18,7 @@ import {
   ReportTable,
   type ReportColumn,
 } from "@/components/reports/ReportTable";
-import { useGetComisiones } from "@/hooks/useComisiones";
 import { useGetEvaluacionesDocente } from "@/hooks/useEvaluaciones";
-import { useGetMaterias } from "@/hooks/useMaterias";
 import { useReporteRendimientoEvaluaciones } from "@/hooks/useReportes";
 import type {
   OrdenDireccion,
@@ -28,6 +26,7 @@ import type {
   ReporteEvaluacionesFiltros,
   ReporteEvaluacionesOrden,
 } from "@/types/index";
+import { normalizeAuthorizedReportFilters } from "./report-filter-options";
 
 const FILTER_KEYS = [
   "idMateria",
@@ -112,8 +111,6 @@ export function EvaluacionesReport() {
 
   const { data, isLoading, isFetching, isError, error, refetch } =
     useReporteRendimientoEvaluaciones(filters);
-  const { materias = [] } = useGetMaterias();
-  const { comisiones = [] } = useGetComisiones();
   const legajo = Number(session?.user?.identificadorInstitucional) || 0;
   const { data: evaluaciones = [] } = useGetEvaluacionesDocente(legajo);
 
@@ -136,10 +133,9 @@ export function EvaluacionesReport() {
         label: "Materia",
         type: "select",
         options: uniqueOptions(
-          materias,
-          (item) =>
-            (item as typeof item & { idMateria?: number }).idMateria ?? item.id,
-          (item) => item.nombre,
+          evaluaciones,
+          (item) => item.idMateria,
+          (item) => item.materia,
         ),
       },
       {
@@ -147,10 +143,10 @@ export function EvaluacionesReport() {
         label: "Materia / División",
         type: "select",
         options: uniqueOptions(
-          comisiones,
-          (item) =>
-            item.idMateriaDivision ??
-            (item as typeof item & { idComision?: number }).idComision,
+          evaluaciones.filter(
+            (item) => !filters.idMateria || item.idMateria === Number(filters.idMateria),
+          ),
+          (item) => item.idMateriaDivision,
           (item) => `${item.materia} / ${item.division}`,
         ),
       },
@@ -159,7 +155,12 @@ export function EvaluacionesReport() {
         label: "Actividad base",
         type: "select",
         options: uniqueOptions(
-          evaluaciones,
+          evaluaciones.filter(
+            (item) =>
+              (!filters.idMateria || item.idMateria === Number(filters.idMateria)) &&
+              (!filters.idMateriaDivision ||
+                item.idMateriaDivision === Number(filters.idMateriaDivision)),
+          ),
           (item) => item.idActividad,
           (item) => item.titulo,
         ),
@@ -169,7 +170,13 @@ export function EvaluacionesReport() {
         label: "Publicación",
         type: "select",
         options: uniqueOptions(
-          evaluaciones,
+          evaluaciones.filter(
+            (item) =>
+              (!filters.idMateria || item.idMateria === Number(filters.idMateria)) &&
+              (!filters.idMateriaDivision ||
+                item.idMateriaDivision === Number(filters.idMateriaDivision)) &&
+              (!filters.idActividad || item.idActividad === Number(filters.idActividad)),
+          ),
           (item) => item.idPublicacion,
           (item) => `${item.titulo} / ${item.division}`,
         ),
@@ -242,7 +249,7 @@ export function EvaluacionesReport() {
         options: [{ value: "true", label: "Sólo pendientes" }],
       },
     ],
-    [materias, comisiones, evaluaciones],
+    [evaluaciones, filters.idActividad, filters.idMateria, filters.idMateriaDivision],
   );
 
   const visibleFilters = Object.fromEntries(
@@ -250,19 +257,20 @@ export function EvaluacionesReport() {
   );
 
   const search = (values: Record<string, string>) => {
+    const normalizedValues = normalizeAuthorizedReportFilters(values, evaluaciones);
     if (
-      values.fechaDesde &&
-      values.fechaHasta &&
-      values.fechaDesde > values.fechaHasta
+      normalizedValues.fechaDesde &&
+      normalizedValues.fechaHasta &&
+      normalizedValues.fechaDesde > normalizedValues.fechaHasta
     ) {
       setFilterError("La fecha desde no puede ser posterior a la fecha hasta.");
       return;
     }
     if (
-      values.conIncidentes === "false" &&
-      (values.tipoIncidente ||
-        values.severidad ||
-        values.soloIncidentesSinRevisar === "true")
+      normalizedValues.conIncidentes === "false" &&
+      (normalizedValues.tipoIncidente ||
+        normalizedValues.severidad ||
+        normalizedValues.soloIncidentesSinRevisar === "true")
     ) {
       setFilterError(
         "Para filtrar por tipo, consecuencia o revisión, seleccioná evaluaciones con incidentes.",
@@ -270,7 +278,7 @@ export function EvaluacionesReport() {
       return;
     }
     setFilterError(null);
-    updateUrl({ ...values, pagina: 1 });
+    updateUrl({ ...normalizedValues, pagina: 1 });
   };
 
   const columns = useMemo<
@@ -377,8 +385,8 @@ export function EvaluacionesReport() {
 
   return (
     <ReportLayout
-      title="Rendimiento por evaluación"
-      description="Compará entregas, correcciones y resultados de cada publicación dentro de tus materias y comisiones."
+      title="Comparación de evaluaciones"
+      description="Compará participación, correcciones, resultados e incidentes entre publicaciones. Para profundizar en una evaluación, usá Analizar evaluación."
       actions={
         <Button
           onClick={() => router.push("/profesor")}
@@ -446,7 +454,7 @@ export function EvaluacionesReport() {
                 id: "incidentes",
                 label: "Incidentes",
                 value: data.kpis.totalIncidentes.toLocaleString("es-AR"),
-                helper: "Eventos operativos registrados",
+                helper: "Incidentes registrados",
                 tone: "blue",
               },
               {
@@ -474,6 +482,7 @@ export function EvaluacionesReport() {
           />
           <EvaluationReportCharts
             distribution={data.graficos.distribucionResultados}
+            comparisons={data.evaluaciones}
           />
           <ReportTable
             columns={columns}

@@ -37,10 +37,53 @@ describe("alternativas accesibles de gráficos", () => {
           { categoria: "Aprobados", cantidad: 12 },
           { categoria: "Pendientes de corrección", cantidad: 3 },
         ]}
+        participation={{ alcanzados: 20, iniciaron: 18, entregaron: 16 }}
       />,
     );
 
     expect(screen.getByText("Aprobados: 12")).toBeInTheDocument();
     expect(screen.getByText("Pendientes de corrección: 3")).toBeInTheDocument();
+    expect(screen.getByText("Estudiantes alcanzados")).toBeInTheDocument();
+    expect(screen.getByText("Iniciaron")).toBeInTheDocument();
+    expect(screen.getByText("Entregaron")).toBeInTheDocument();
+  });
+
+  it("compara participación y resultados entre las evaluaciones visibles", () => {
+    render(
+      <EvaluationReportCharts
+        distribution={[]}
+        comparisons={[
+          {
+            titulo: "Primer parcial",
+            materia: "Programación",
+            division: "1A",
+            alumnosAlcanzados: 20,
+            alumnosQueIniciaron: 18,
+            entregados: 16,
+            resultadosOficiales: {
+              aprobados: 10,
+              desaprobados: 4,
+              resultadosPendientes: 2,
+            },
+          } as never,
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Participación por evaluación")).toBeInTheDocument();
+    expect(screen.getByText("Resultados por evaluación")).toBeInTheDocument();
+    expect(
+      screen.getByText(/20 alcanzados, 18 iniciaron y 16 entregaron/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/10 aprobados, 4 desaprobados y 2 pendientes/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText(
+        (_, element) =>
+          element?.tagName === "LI" &&
+          Boolean(element.textContent?.includes("Primer parcial · Programación · 1A")),
+      ),
+    ).not.toHaveLength(0);
   });
 });

@@ -26,6 +26,7 @@ describe("servicios de rendimiento por contenido", () => {
       idPregunta: "12",
       alcanceIntentos: "validos",
       estadoCorreccion: "confirmada",
+      soloHallazgosBajoRendimiento: true,
       pagina: 2,
       limite: 20,
       ordenarPor: "tasaAcierto",
@@ -33,7 +34,7 @@ describe("servicios de rendimiento por contenido", () => {
     });
 
     expect(apiFetchMock).toHaveBeenCalledWith(
-      "/reportes/rendimiento-preguntas?idMateria=3&idGrupoPregunta=8&idPregunta=12&alcanceIntentos=validos&estadoCorreccion=confirmada&pagina=2&limite=20&ordenarPor=tasaAcierto&ordenDireccion=asc",
+      "/reportes/rendimiento-preguntas?idMateria=3&idGrupoPregunta=8&idPregunta=12&alcanceIntentos=validos&estadoCorreccion=confirmada&soloHallazgosBajoRendimiento=true&pagina=2&limite=20&ordenarPor=tasaAcierto&ordenDireccion=asc",
     );
   });
 
@@ -67,6 +68,7 @@ describe("servicios de rendimiento por contenido", () => {
   it("mantiene el identificador de pregunta en el path del detalle de opciones", async () => {
     await obtenerReporteOpcionesPregunta(12, {
       idMateriaDivision: "4",
+      claveContenido: "hash-historico",
       pagina: 1,
       limite: 100,
       ordenarPor: "posicion",
@@ -74,7 +76,7 @@ describe("servicios de rendimiento por contenido", () => {
     });
 
     expect(apiFetchMock).toHaveBeenCalledWith(
-      "/reportes/rendimiento-preguntas/12/opciones?idMateriaDivision=4&pagina=1&limite=100&ordenarPor=posicion&ordenDireccion=asc",
+      "/reportes/rendimiento-preguntas/12/opciones?idMateriaDivision=4&claveContenido=hash-historico&pagina=1&limite=100&ordenarPor=posicion&ordenDireccion=asc",
     );
   });
 });

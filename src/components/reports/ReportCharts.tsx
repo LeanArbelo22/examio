@@ -18,6 +18,7 @@ import type { ReporteRendimientoAlumno } from "@/types/index";
 
 export function ReportCharts({ alumnos }: { alumnos: ReporteRendimientoAlumno[] }) {
   const promedios = alumnos.map((alumno) => ({
+    id: alumno.matricula,
     alumno: `${alumno.nombre.charAt(0)}. ${alumno.apellido}`,
     promedio: alumno.promedio,
   }));
@@ -32,7 +33,7 @@ export function ReportCharts({ alumnos }: { alumnos: ReporteRendimientoAlumno[] 
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <ChartCard title="Promedio por alumno" description="Comparación de los alumnos visibles en la página actual.">
         <ul className="sr-only">
-          {promedios.map((item) => <li key={item.alumno}>{item.alumno}: promedio {item.promedio.toFixed(2)}</li>)}
+          {promedios.map((item) => <li key={item.id}>{item.alumno}: promedio {item.promedio.toFixed(2)}</li>)}
         </ul>
         <div aria-hidden="true" className="h-full w-full"><ResponsiveContainer width="100%" height="100%">
           <BarChart data={promedios} margin={{ top: 8, right: 8, left: -16, bottom: 20 }}>

@@ -306,6 +306,12 @@ restauración de foco y bloqueo de scroll. Los modales críticos del examen son 
 especializados y no deben sustituirse sin preservar sus restricciones funcionales.
 Los estados asíncronos deben distinguir `status`/`aria-live="polite"` de errores
 urgentes con `alert`; evitar anunciar cada transición intermedia de un autoguardado.
+Los textos visibles para alumnos, docentes y administradores deben explicar qué significa
+la información o qué acción pueden realizar. No describir arquitectura, contratos, API,
+servidor, frontend, caché, paginación interna, snapshots, versiones técnicas ni procesos
+de implementación salvo que ese concepto sea imprescindible para una decisión del usuario.
+Traducir las reglas de negocio a criterios claros —por ejemplo, porcentaje y tamaño de
+muestra— sin narrar qué capa las calcula.
 Todo gráfico debe conservar una alternativa textual con los mismos datos relevantes.
 Las tablas anchas deben permitir scroll horizontal sin comprimir columnas hasta volverlas ilegibles.
 El bloqueo del menú contextual pertenece exclusivamente al entorno fullscreen del examen.
@@ -448,9 +454,13 @@ Los reportes por alumno, publicación, pregunta y grupo están integrados en
 `/profesor/reportes`. Comparten layout, filtros, KPIs, tabla, skeleton y tarjetas
 de gráficos; cada reporte conserva sus gráficos y reglas de dominio. Preguntas y grupos
 consumen agregados server-side normalizados por porcentaje del puntaje máximo; el detalle
-de una pregunta cerrada muestra opciones y distractores desde snapshots históricos. Las series
-del reporte por evaluación son agregaciones globales del backend. Las del reporte
-por alumno todavía representan sólo la página visible y deben describirse como tales.
+de una pregunta cerrada muestra opciones y distractores desde snapshots históricos. “Comparar
+evaluaciones” contrasta participación y resultados entre las publicaciones visibles y declara ese
+alcance; la distribución global se conserva en el análisis individual. Se retiraron los gráficos por
+alumno derivados de la página visible para no presentarlos como una visión global. Preguntas y
+grupos muestran distribuciones globales disponibles en sus KPIs y rankings server-side de menor
+puntaje y mayor tiempo; no construyen rankings desde la página paginada. Los filtros docentes usan exclusivamente las evaluaciones autorizadas y
+limpian selecciones inferiores incompatibles al aplicar la búsqueda.
 Los filtros permiten alternar métricas académicas entre todos los intentos y el intento
 válido; los contadores operativos siempre incluyen todos. Los promedios globales entre
 escalas 10/100 se interpretan sobre 10, mientras cada publicación conserva escala y umbral.
@@ -458,6 +468,14 @@ No se reemplazó la navegación completa del docente ni se creó un sidebar glob
 La identidad transversal del reporte de preguntas es `ContenidoHashSnapshot`: agrupa contenido
 idéntico, pero no debe interpretarse como linaje vivo de copias que luego fueron modificadas.
 El contrato actual no expone filtro por tipo de pregunta; no simularlo sobre la página visible.
+La pestaña `analisis` agrega el recorrido docente por una publicación concreta. Usa el
+listado completo autorizado para sus filtros dependientes y separa resultados oficiales
+de pendientes operativos y gráficos legacy. Las preguntas siempre se consultan con
+`validos + confirmada`; el ranking de bajo rendimiento, su regla y los estados de
+evidencia vienen del backend. El detalle de opciones debe enviar `claveContenido`, y una
+incompatibilidad de snapshots se resuelve localmente sin bloquear el resto del análisis.
+No trasladar fechas del listado a las preguntas ni presentar la entrega institucional
+como implementada.
 
 El inicio `/profesor` agrupa las actividades por `idMateria` y mantiene la barra de
 gestión visible. Materias, comisiones y actividades cambian como vistas internas del

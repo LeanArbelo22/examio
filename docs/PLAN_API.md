@@ -227,6 +227,19 @@ un elemento rechazado o en conflicto no revierte los elementos válidos.
   es pequeña y no permite concluir selectividad o costo productivo de los índices.
 - [ ] Integrar y comprobar manualmente dashboards de preguntas, variantes, grupos y opciones.
 
+### Entrega 1 — análisis docente por publicación
+
+**Estado: BACKEND Y FRONTEND IMPLEMENTADOS — PENDIENTE SQL SERVER REAL**
+
+- [x] Ampliar publicaciones con `resultadosOficiales` y `pendientesOperativos` sin alterar bloques legacy.
+- [x] Exponer población oficial, exclusiones disjuntas, muestras confirmadas, regla versionada y `resumenFiltro` en preguntas.
+- [x] Permitir evidencia exacta de opciones por `claveContenido` y detectar snapshots incompatibles.
+- [x] Agregar muestras oficiales a grupos y variantes, manteniendo diferencias descriptivas.
+- [x] Integrar en frontend selección autorizada, resumen oficial, ranking server-side, estados de evidencia y detalle histórico.
+- [ ] Ejecutar las consultas nuevas contra SQL Server real con dataset controlado y revisar consistencia y planes con volumen representativo.
+
+No se implementó el resumen institucional ni una cola administrativa de correcciones.
+
 No se aplica una etiqueta de “diferencia significativa” entre variantes hasta acordar un
 umbral o método estadístico. El contrato expone diferencia porcentual y tamaño de muestra.
 

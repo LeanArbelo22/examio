@@ -46,10 +46,12 @@ export const useReporteRendimiento = (filtros: ReporteRendimientoFiltros) =>
 
 export const useReporteRendimientoEvaluaciones = (
   filtros: ReporteEvaluacionesFiltros,
+  enabled = true,
 ) =>
   useQuery({
     queryKey: reporteKeys.evaluaciones(filtros),
     queryFn: () => obtenerReporteRendimientoEvaluaciones(filtros),
+    enabled,
     placeholderData: (previousData) => previousData,
   });
 

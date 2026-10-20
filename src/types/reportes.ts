@@ -47,6 +47,28 @@ export interface ReporteEvaluacionesFiltros {
   limite?: number;
 }
 
+export interface ResultadosOficiales {
+  intentosValidosEntregados: number;
+  resultadosConsiderados: number;
+  resultadosPendientes: number;
+  intentosPendientesConfirmacion: number;
+  intentosConfirmadosSinNota: number;
+  intentosConPreguntasSinPuntaje: number;
+  preguntasSinPuntaje: number;
+  aprobados: number;
+  desaprobados: number;
+  porcentajeAprobacion: number | null;
+  porcentajeCoberturaConfirmada: number | null;
+}
+
+export interface PendientesOperativos {
+  intentosEntregadosPendientes: number;
+  intentosPendientesConfirmacion: number;
+  intentosSinNotaFinal: number;
+  intentosConPreguntasSinPuntaje: number;
+  preguntasSinPuntaje: number;
+}
+
 export interface ReporteEvaluacionesKpis {
   totalEvaluaciones: number;
   totalAlumnosAlcanzados: number;
@@ -66,6 +88,8 @@ export interface ReporteEvaluacionesKpis {
   alumnosConIncidentes: number;
   totalIncidentes: number;
   incidentesSinRevisar: number;
+  resultadosOficiales: ResultadosOficiales;
+  pendientesOperativos: PendientesOperativos;
 }
 
 export interface ReporteEvaluacionesDistribucionItem {
@@ -106,6 +130,8 @@ export interface ReporteEvaluacionItem {
   alumnosConIncidentes: number;
   totalIncidentes: number;
   incidentesSinRevisar: number;
+  resultadosOficiales: ResultadosOficiales;
+  pendientesOperativos: PendientesOperativos;
 }
 
 export interface ReporteEvaluacionesListado {
@@ -265,6 +291,7 @@ export interface ReporteContenidoFiltrosBase {
 
 export interface ReportePreguntasFiltros extends ReporteContenidoFiltrosBase {
   idPregunta?: string;
+  soloHallazgosBajoRendimiento?: boolean;
   ordenarPor?: ReportePreguntasOrden;
 }
 
@@ -273,6 +300,7 @@ export interface ReporteGruposFiltros extends ReporteContenidoFiltrosBase {
 }
 
 export interface ReporteOpcionesFiltros extends ReporteContenidoFiltrosBase {
+  claveContenido?: string;
   ordenarPor?: ReporteOpcionesOrden;
 }
 
@@ -281,9 +309,19 @@ export interface ReporteContenidoCriterios {
   estadoCorreccion: EstadoCorreccionReporteContenido;
   normalizacionPuntaje: "porcentaje_puntaje_maximo";
   identidadContenido: "contenidoHashSnapshot";
+  soloHallazgosBajoRendimiento?: boolean;
+  alcanceIntentosAplicadoPorHallazgo?: boolean;
+  estadoCorreccionAplicadoPorHallazgo?: boolean;
 }
 
-export interface ReporteContenidoKpis {
+export interface ReporteMetricasOficialesPregunta {
+  presentacionesOficiales: number;
+  muestrasConfirmadas: number;
+  presentacionesExcluidasSinPuntaje: number;
+  presentacionesExcluidasSinMaximoPositivo: number;
+}
+
+export interface ReporteContenidoKpis extends ReporteMetricasOficialesPregunta {
   presentadas: number;
   respondidas: number;
   omitidas: number;
@@ -302,7 +340,7 @@ export interface ReporteContenidoKpis {
   tiempoMaximoMilisegundos: number | null;
 }
 
-export interface ReporteContenidoMetricas {
+export interface ReporteContenidoMetricas extends ReporteMetricasOficialesPregunta {
   presentadas: number;
   respondidas: number;
   omitidas: number;
@@ -336,6 +374,11 @@ export interface ReportePreguntaItem extends ReporteContenidoMetricas {
   incluyeSnapshotReconstruido: boolean;
   justificacionesEntregadas: number;
   puntajePromedioObtenido: number | null;
+  hallazgoBajoRendimiento: {
+    detectado: boolean;
+    codigo: "pregunta_bajo_rendimiento";
+    version: number;
+  };
 }
 
 export interface ReporteGrupoVariante extends ReporteContenidoMetricas {
@@ -365,8 +408,26 @@ export interface ReporteContenidoPaginacion {
   totalPages: number;
 }
 
+export interface ReporteReglaHallazgo {
+  codigo: "pregunta_bajo_rendimiento";
+  version: number;
+  porcentajePuntajeMaximoExclusivo: number;
+  muestrasConfirmadasMinimas: number;
+}
+
+export interface ReporteResumenFiltroHallazgo {
+  preguntasEnCoberturaGeneral: number;
+  preguntasConMuestraSuficiente: number;
+  preguntasConMuestraInsuficiente: number;
+  preguntasCoincidentes: number;
+  presentacionesCoincidentes: number;
+  muestrasConfirmadasCoincidentes: number;
+}
+
 export interface ReportePreguntasListado {
   criterios: ReporteContenidoCriterios;
+  reglaHallazgo?: ReporteReglaHallazgo;
+  resumenFiltro?: ReporteResumenFiltroHallazgo;
   kpis: ReporteContenidoKpis;
   items: ReportePreguntaItem[];
   pagination: ReporteContenidoPaginacion;
@@ -401,7 +462,10 @@ export interface ReporteOpcionesKpis {
 }
 
 export interface ReporteOpcionesListado {
-  criterios: ReporteContenidoCriterios & { idPregunta: number };
+  criterios: ReporteContenidoCriterios & {
+    idPregunta: number;
+    claveContenido?: string;
+  };
   kpis: ReporteOpcionesKpis;
   items: ReporteOpcionItem[];
   pagination: ReporteContenidoPaginacion;

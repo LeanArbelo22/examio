@@ -15,6 +15,12 @@ const SAFE_CODE_MESSAGES: Record<string, string> = {
   FORBIDDEN: "No tenés permisos para realizar esta acción.",
   REPORT_SCOPE_FORBIDDEN:
     "Los filtros seleccionados están fuera de tu alcance docente.",
+  REPORT_OFFICIAL_SCOPE_REQUIRED:
+    "Este análisis requiere el intento válido y una corrección confirmada.",
+  QUESTION_CONTENT_NOT_FOUND:
+    "No se encontró evidencia histórica para este contenido.",
+  QUESTION_OPTION_EVIDENCE_INCONSISTENT:
+    "Las versiones históricas de las opciones no pueden compararse.",
   STUDENT_NOT_FOUND: "No existe un alumno con esa matrícula.",
   MATERIA_DIVISION_NOT_FOUND: "La comisión seleccionada no existe.",
   STUDENT_INACTIVE: "El alumno no está habilitado para inscribirse.",

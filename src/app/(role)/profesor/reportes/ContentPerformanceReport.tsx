@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { RequestErrorState } from "@/components/ui/RequestErrorState";
 import { ContentPerformanceCharts } from "@/components/reports/ContentPerformanceCharts";
+import { ContentPerformanceRankings } from "@/components/reports/ContentPerformanceRankings";
 import {
   ReportFilterPanel,
   type ReportFilterDefinition,
@@ -19,9 +20,7 @@ import {
   type ReportColumn,
 } from "@/components/reports/ReportTable";
 import { QuestionOptionsDetail } from "@/components/reports/QuestionOptionsDetail";
-import { useGetComisiones } from "@/hooks/useComisiones";
 import { useGetEvaluacionesDocente } from "@/hooks/useEvaluaciones";
-import { useGetMaterias } from "@/hooks/useMaterias";
 import {
   useReporteRendimientoGrupos,
   useReporteRendimientoPreguntas,
@@ -37,6 +36,7 @@ import type {
   ReportePreguntasFiltros,
   ReportePreguntasOrden,
 } from "@/types";
+import { normalizeAuthorizedReportFilters } from "./report-filter-options";
 
 const COMMON_FILTER_KEYS = [
   "idMateria",
@@ -147,9 +147,51 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
     kind === "preguntas",
   );
   const groupsQuery = useReporteRendimientoGrupos(groupFilters, kind === "grupos");
+  const lowestQuestionsQuery = useReporteRendimientoPreguntas(
+    {
+      ...questionFilters,
+      pagina: 1,
+      limite: 5,
+      ordenarPor: "porcentajePuntaje",
+      ordenDireccion: "asc",
+    },
+    kind === "preguntas",
+  );
+  const longestQuestionsQuery = useReporteRendimientoPreguntas(
+    {
+      ...questionFilters,
+      pagina: 1,
+      limite: 5,
+      ordenarPor: "tiempoPromedio",
+      ordenDireccion: "desc",
+    },
+    kind === "preguntas",
+  );
+  const lowestGroupsQuery = useReporteRendimientoGrupos(
+    {
+      ...groupFilters,
+      pagina: 1,
+      limite: 5,
+      ordenarPor: "porcentajePuntaje",
+      ordenDireccion: "asc",
+    },
+    kind === "grupos",
+  );
+  const longestGroupsQuery = useReporteRendimientoGrupos(
+    {
+      ...groupFilters,
+      pagina: 1,
+      limite: 5,
+      ordenarPor: "tiempoPromedio",
+      ordenDireccion: "desc",
+    },
+    kind === "grupos",
+  );
   const query = kind === "preguntas" ? questionsQuery : groupsQuery;
-  const { materias = [] } = useGetMaterias();
-  const { comisiones = [] } = useGetComisiones();
+  const lowestRankingQuery =
+    kind === "preguntas" ? lowestQuestionsQuery : lowestGroupsQuery;
+  const longestRankingQuery =
+    kind === "preguntas" ? longestQuestionsQuery : longestGroupsQuery;
   const legajo = Number(session?.user?.identificadorInstitucional) || 0;
   const { data: evaluaciones = [] } = useGetEvaluacionesDocente(legajo);
 
@@ -170,9 +212,9 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
         label: "Materia",
         type: "select",
         options: uniqueOptions(
-          materias,
-          (item) => (item as typeof item & { idMateria?: number }).idMateria ?? item.id,
-          (item) => item.nombre,
+          evaluaciones,
+          (item) => item.idMateria,
+          (item) => item.materia,
         ),
       },
       {
@@ -180,8 +222,10 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
         label: "Materia / División",
         type: "select",
         options: uniqueOptions(
-          comisiones,
-          (item) => item.idMateriaDivision ?? (item as typeof item & { idComision?: number }).idComision,
+          evaluaciones.filter(
+            (item) => !baseFilters.idMateria || item.idMateria === Number(baseFilters.idMateria),
+          ),
+          (item) => item.idMateriaDivision,
           (item) => `${item.materia} / ${item.division}`,
         ),
       },
@@ -189,14 +233,29 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
         key: "idActividad",
         label: "Actividad",
         type: "select",
-        options: uniqueOptions(evaluaciones, (item) => item.idActividad, (item) => item.titulo),
+        options: uniqueOptions(
+          evaluaciones.filter(
+            (item) =>
+              (!baseFilters.idMateria || item.idMateria === Number(baseFilters.idMateria)) &&
+              (!baseFilters.idMateriaDivision ||
+                item.idMateriaDivision === Number(baseFilters.idMateriaDivision)),
+          ),
+          (item) => item.idActividad,
+          (item) => item.titulo,
+        ),
       },
       {
         key: "idPublicacion",
         label: "Publicación",
         type: "select",
         options: uniqueOptions(
-          evaluaciones,
+          evaluaciones.filter(
+            (item) =>
+              (!baseFilters.idMateria || item.idMateria === Number(baseFilters.idMateria)) &&
+              (!baseFilters.idMateriaDivision ||
+                item.idMateriaDivision === Number(baseFilters.idMateriaDivision)) &&
+              (!baseFilters.idActividad || item.idActividad === Number(baseFilters.idActividad)),
+          ),
           (item) => item.idPublicacion,
           (item) => `${item.titulo} / ${item.division}`,
         ),
@@ -238,7 +297,13 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
         ],
       },
     ],
-    [comisiones, evaluaciones, kind, materias],
+    [
+      baseFilters.idActividad,
+      baseFilters.idMateria,
+      baseFilters.idMateriaDivision,
+      evaluaciones,
+      kind,
+    ],
   );
 
   const visibleFilters = Object.fromEntries([
@@ -247,18 +312,19 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
   ]);
 
   const search = (values: Record<string, string>) => {
-    if (values.fechaDesde && values.fechaHasta && values.fechaDesde > values.fechaHasta) {
+    const normalizedValues = normalizeAuthorizedReportFilters(values, evaluaciones);
+    if (normalizedValues.fechaDesde && normalizedValues.fechaHasta && normalizedValues.fechaDesde > normalizedValues.fechaHasta) {
       setFilterError("La fecha desde no puede ser posterior a la fecha hasta.");
       return;
     }
     for (const key of ["idGrupoPregunta", "idPregunta"] as const) {
-      if (values[key] && (!Number.isInteger(Number(values[key])) || Number(values[key]) <= 0)) {
+      if (normalizedValues[key] && (!Number.isInteger(Number(normalizedValues[key])) || Number(normalizedValues[key]) <= 0)) {
         setFilterError("Los identificadores deben ser números enteros mayores que cero.");
         return;
       }
     }
     setFilterError(null);
-    updateUrl({ ...values, pagina: 1 });
+    updateUrl({ ...normalizedValues, pagina: 1 });
   };
 
   const questionColumns = useMemo<
@@ -282,8 +348,8 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
       { key: "respondidas", header: "Respondidas", align: "center", sortKey: "respondidas", render: (row) => Number(row.respondidas).toLocaleString("es-AR") },
       { key: "omitidas", header: "Omitidas", align: "center", sortKey: "omitidas", render: (row) => Number(row.omitidas).toLocaleString("es-AR") },
       { key: "pendientes", header: "Pendientes", align: "center", sortKey: "pendientesCorreccion", render: (row) => <span className="font-bold text-amber-600">{Number(row.pendientesCorreccion).toLocaleString("es-AR")}</span> },
-      { key: "puntaje", header: "Puntaje relativo", align: "right", sortKey: "porcentajePuntaje", render: (row) => percentage(row.porcentajePuntajePromedio) },
-      { key: "acierto", header: "Acierto", align: "right", sortKey: "tasaAcierto", render: (row) => percentage(row.tasaAcierto) },
+      { key: "puntaje", header: "Puntaje promedio", align: "right", sortKey: "porcentajePuntaje", render: (row) => percentage(row.porcentajePuntajePromedio) },
+      { key: "acierto", header: "Respuestas correctas", align: "right", sortKey: "tasaAcierto", render: (row) => percentage(row.tasaAcierto) },
       { key: "tiempo", header: "Tiempo promedio", align: "right", sortKey: "tiempoPromedio", render: (row) => duration(row.tiempoPromedioMilisegundos) },
       {
         key: "opciones",
@@ -333,8 +399,8 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
       { key: "respondidas", header: "Respondidas", align: "center", sortKey: "respondidas", render: (row) => Number(row.respondidas).toLocaleString("es-AR") },
       { key: "omitidas", header: "Omitidas", align: "center", sortKey: "omitidas", render: (row) => Number(row.omitidas).toLocaleString("es-AR") },
       { key: "pendientes", header: "Pendientes", align: "center", sortKey: "pendientesCorreccion", render: (row) => <span className="font-bold text-amber-600">{Number(row.pendientesCorreccion).toLocaleString("es-AR")}</span> },
-      { key: "puntaje", header: "Puntaje relativo", align: "right", sortKey: "porcentajePuntaje", render: (row) => percentage(row.porcentajePuntajePromedio) },
-      { key: "acierto", header: "Acierto", align: "right", sortKey: "tasaAcierto", render: (row) => percentage(row.tasaAcierto) },
+      { key: "puntaje", header: "Puntaje promedio", align: "right", sortKey: "porcentajePuntaje", render: (row) => percentage(row.porcentajePuntajePromedio) },
+      { key: "acierto", header: "Respuestas correctas", align: "right", sortKey: "tasaAcierto", render: (row) => percentage(row.tasaAcierto) },
       { key: "diferencia", header: "Diferencia entre variantes", align: "right", render: (row) => percentage(row.diferenciaVariantesPuntosPorcentuales) },
       { key: "tiempo", header: "Tiempo promedio", align: "right", sortKey: "tiempoPromedio", render: (row) => duration(row.tiempoPromedioMilisegundos) },
     ],
@@ -403,9 +469,21 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
           />
           <ContentPerformanceCharts
             kpis={query.data.kpis}
-            items={query.data.items}
             kind={kind}
           />
+          {!lowestRankingQuery.isPlaceholderData &&
+            !longestRankingQuery.isPlaceholderData &&
+            lowestRankingQuery.data &&
+            longestRankingQuery.data && (
+              <ContentPerformanceRankings
+                kind={kind}
+                lowestScores={lowestRankingQuery.data.items}
+                longestTimes={longestRankingQuery.data.items}
+                onSelectQuestion={
+                  kind === "preguntas" ? setSelectedQuestion : undefined
+                }
+              />
+            )}
           {kind === "preguntas" && questionsQuery.data ? (
             <ReportTable
               columns={questionColumns}

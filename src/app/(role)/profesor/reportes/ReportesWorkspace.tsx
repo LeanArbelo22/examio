@@ -4,10 +4,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { EvaluacionesReport } from "./EvaluacionesReport";
 import { RendimientoReport } from "./RendimientoReport";
 import { ContentPerformanceReport } from "./ContentPerformanceReport";
+import { TeacherPublicationAnalysis } from "./TeacherPublicationAnalysis";
 
 const reports = [
+  { id: "analisis", label: "Analizar evaluación" },
   { id: "alumnos", label: "Por alumno" },
-  { id: "evaluaciones", label: "Por evaluación" },
+  { id: "evaluaciones", label: "Comparar evaluaciones" },
   { id: "preguntas", label: "Por pregunta" },
   { id: "grupos", label: "Por grupo" },
 ] as const;
@@ -19,11 +21,11 @@ export function ReportesWorkspace() {
   const requested = searchParams.get("reporte");
   const selected = reports.some((report) => report.id === requested)
     ? (requested as (typeof reports)[number]["id"])
-    : "alumnos";
+    : "analisis";
 
   const selectReport = (report: (typeof reports)[number]["id"]) => {
     const params = new URLSearchParams();
-    if (report !== "alumnos") params.set("reporte", report);
+    if (report !== "analisis") params.set("reporte", report);
     router.replace(`${pathname}${params.size ? `?${params}` : ""}`, {
       scroll: false,
     });
@@ -51,6 +53,7 @@ export function ReportesWorkspace() {
           </button>
         ))}
       </nav>
+      {selected === "analisis" && <TeacherPublicationAnalysis />}
       {selected === "evaluaciones" && <EvaluacionesReport />}
       {selected === "alumnos" && <RendimientoReport />}
       {selected === "preguntas" && <ContentPerformanceReport kind="preguntas" />}
