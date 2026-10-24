@@ -53,6 +53,26 @@ describe("servicios de rendimiento por contenido", () => {
     );
   });
 
+  it("solicita el resumen institucional junto con el alcance seleccionado", async () => {
+    await obtenerReporteRendimientoEvaluaciones({
+      incluirResumenInstitucional: true,
+      incluirSerieMensual: true,
+      idCarrera: "7",
+      idMateria: "25",
+      idMateriaDivision: "32",
+      muestraMinimaRanking: 10,
+      coberturaMinimaRanking: 70,
+      fechaDesde: "2026-10-01T03:00:00.000Z",
+      fechaHasta: "2026-11-01T02:59:59.999Z",
+      pagina: 2,
+      limite: 10,
+    });
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      "/reportes/rendimiento-evaluaciones?incluirResumenInstitucional=true&incluirSerieMensual=true&idCarrera=7&idMateria=25&idMateriaDivision=32&muestraMinimaRanking=10&coberturaMinimaRanking=70&fechaDesde=2026-10-01T03%3A00%3A00.000Z&fechaHasta=2026-11-01T02%3A59%3A59.999Z&pagina=2&limite=10",
+    );
+  });
+
   it("consume el endpoint paginado de grupos", async () => {
     await obtenerReporteRendimientoGrupos({
       idPublicacion: "47",

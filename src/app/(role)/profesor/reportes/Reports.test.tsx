@@ -176,6 +176,8 @@ const evaluationReport: ReporteEvaluacionesListado = {
     {
       idPublicacion: 47,
       idActividad: 10,
+      idCarrera: 1,
+      carrera: "Desarrollo de Software",
       titulo: "Primer parcial",
       idMateria: 3,
       materia: "Programación",

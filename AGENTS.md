@@ -474,8 +474,14 @@ de pendientes operativos y gráficos legacy. Las preguntas siempre se consultan 
 `validos + confirmada`; el ranking de bajo rendimiento, su regla y los estados de
 evidencia vienen del backend. El detalle de opciones debe enviar `claveContenido`, y una
 incompatibilidad de snapshots se resuelve localmente sin bloquear el resto del análisis.
-No trasladar fechas del listado a las preguntas ni presentar la entrega institucional
-como implementada.
+No trasladar fechas del listado a las preguntas. La vista `/admin/analitica` implementa
+el recorrido institución → carrera → materia → comisión → evaluaciones con el resumen,
+las comparativas y la serie mensual independientes de la página. Usa la jerarquía canónica
+`carreras → materias → comisiones`, respeta la elegibilidad y las posiciones devueltas por
+backend y conserva `porcentajeCoberturaConfirmada`. El período efectivo debe permanecer
+estable en la URL al navegar y paginar. Los meses sin denominador no se representan como
+cero ni se conectan en la línea de aprobación. Resultados oficiales y pendientes operativos
+son dimensiones separadas; las subcategorías operativas pueden superponerse y nunca deben sumarse.
 
 El inicio `/profesor` agrupa las actividades por `idMateria` y mantiene la barra de
 gestión visible. Materias, comisiones y actividades cambian como vistas internas del

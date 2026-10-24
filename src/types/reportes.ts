@@ -28,6 +28,7 @@ export type ReporteEvaluacionesOrden =
   | "pendientesCorreccion";
 
 export interface ReporteEvaluacionesFiltros {
+  idCarrera?: string;
   idMateria?: string;
   idMateriaDivision?: string;
   idActividad?: string;
@@ -41,10 +42,118 @@ export interface ReporteEvaluacionesFiltros {
   tipoIncidente?: string;
   severidad?: SeveridadIncidente | "";
   soloIncidentesSinRevisar?: boolean | "";
+  incluirResumenInstitucional?: boolean;
+  incluirSerieMensual?: boolean;
+  muestraMinimaRanking?: number;
+  coberturaMinimaRanking?: number;
   ordenarPor?: ReporteEvaluacionesOrden;
   ordenDireccion?: OrdenDireccion;
   pagina?: number;
   limite?: number;
+}
+
+export interface ResumenInstitucionalBase {
+  publicaciones: number;
+  publicacionesConResultadosPendientes: number;
+  publicacionesConPendientesOperativos: number;
+  resultadosOficiales: ResultadosOficiales;
+  pendientesOperativos: PendientesOperativos;
+}
+
+export interface ResumenInstitucionalComision extends ResumenInstitucionalBase {
+  idCarrera: number;
+  carrera: string;
+  idMateria: number;
+  materia: string;
+  idMateriaDivision: number;
+  division: string;
+}
+
+export interface ResumenInstitucionalMateria extends ResumenInstitucionalBase {
+  idCarrera: number;
+  carrera: string;
+  idMateria: number;
+  materia: string;
+  comisiones: ResumenInstitucionalComision[];
+}
+
+export interface ResumenInstitucionalCarrera extends ResumenInstitucionalBase {
+  idCarrera: number;
+  carrera: string;
+  materias: ResumenInstitucionalMateria[];
+}
+
+export type MotivoNoElegibilidadInstitucional =
+  | "MUESTRA_INSUFICIENTE"
+  | "COBERTURA_INSUFICIENTE"
+  | "SIN_RESULTADOS_CONFIRMADOS";
+
+export type ComparativaCarrera = ResumenInstitucionalBase & {
+  idCarrera: number;
+  carrera: string;
+};
+
+export type ComparativaMateria = ResumenInstitucionalBase & {
+  idCarrera: number;
+  carrera: string;
+  idMateria: number;
+  materia: string;
+};
+
+export type ComparativaComision = ResumenInstitucionalBase & {
+  idCarrera: number;
+  carrera: string;
+  idMateria: number;
+  materia: string;
+  idMateriaDivision: number;
+  division: string;
+};
+
+export interface ColeccionComparativaInstitucional<T> {
+  elegibles: Array<T & { posicion: number }>;
+  evidenciaLimitada: Array<
+    T & { motivosNoElegibilidad: MotivoNoElegibilidadInstitucional[] }
+  >;
+  sinResultados: Array<
+    T & { motivosNoElegibilidad: ["SIN_RESULTADOS_CONFIRMADOS"] }
+  >;
+}
+
+export interface ComparativasInstitucionales {
+  criteriosElegibilidad: {
+    muestraMinima: number;
+    coberturaMinimaPorcentaje: number;
+    naturaleza: "criterio_operativo_configurable";
+  };
+  carreras: ColeccionComparativaInstitucional<ComparativaCarrera>;
+  materias: ColeccionComparativaInstitucional<ComparativaMateria>;
+  comisiones: ColeccionComparativaInstitucional<ComparativaComision>;
+}
+
+export interface PuntoSerieMensualInstitucional {
+  periodo: string;
+  periodoCompleto: boolean;
+  publicaciones: number;
+  publicacionesConResultadosPendientes: number;
+  resultadosOficiales: ResultadosOficiales;
+}
+
+export interface PeriodoEfectivoInstitucional {
+  desde: string;
+  hasta: string;
+  zonaHoraria: "America/Argentina/Buenos_Aires";
+  mesesCalendarioIncluidos: number;
+}
+
+export interface ResumenInstitucional {
+  unidadEvaluacion: "idPublicacion";
+  dimensionTemporal: "publicacion.fechaInicio";
+  periodoEfectivo: PeriodoEfectivoInstitucional;
+  global: ResumenInstitucionalBase;
+  materias: ResumenInstitucionalMateria[];
+  carreras: ResumenInstitucionalCarrera[];
+  comparativas: ComparativasInstitucionales;
+  serieMensual: PuntoSerieMensualInstitucional[];
 }
 
 export interface ResultadosOficiales {
@@ -100,6 +209,8 @@ export interface ReporteEvaluacionesDistribucionItem {
 export interface ReporteEvaluacionItem {
   idPublicacion: number;
   idActividad: number;
+  idCarrera: number;
+  carrera: string;
   titulo: string;
   idMateria: number;
   materia: string;
@@ -143,6 +254,11 @@ export interface ReporteEvaluacionesListado {
     tipoIncidente: string | null;
     severidad: SeveridadIncidente | null;
     soloIncidentesSinRevisar: boolean | null;
+    incluirResumenInstitucional?: true;
+    incluirSerieMensual?: true;
+    idCarrera?: number | null;
+    muestraMinimaRanking?: number;
+    coberturaMinimaRanking?: number;
   };
   kpis: ReporteEvaluacionesKpis;
   graficos: {
@@ -150,6 +266,7 @@ export interface ReporteEvaluacionesListado {
   };
   evaluaciones: ReporteEvaluacionItem[];
   paginacion: ReporteRendimientoPaginacion;
+  resumenInstitucional?: ResumenInstitucional;
 }
 
 export interface ReporteRendimientoFiltros {

@@ -728,7 +728,24 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 - [x] Mantener los reportes anteriores disponibles y conservar en URL los filtros de retorno sin trasladar fechas al análisis de preguntas.
 - [ ] Validar el recorrido completo contra API y SQL Server reales con un dataset controlado; backend todavía no confirmó compilación, consistencia ni planes de las consultas nuevas en SQL Server real.
 
-La entrega institucional continúa fuera de alcance y no debe presentarse como disponible.
+#### Entrega 2 completada — Seguimiento institucional administrativo
+
+- [x] Integrar `/admin/analitica` con `incluirResumenInstitucional=true` mediante el servicio, hook y query keys existentes.
+- [x] Implementar el recorrido institución → materia → comisión → evaluaciones usando IDs estables y distinguiendo materias homónimas por carrera.
+- [x] Separar resultados oficiales de pendientes operativos en todos los niveles, sin sumar categorías superpuestas.
+- [x] Mantener el resumen independiente de la página del listado y ocultar datos anteriores durante cambios de alcance.
+- [x] Conservar período, estado y jerarquía en la URL, reiniciando la página al cambiar el alcance.
+- [x] Cubrir con pruebas focalizadas valores nulos, conjuntos vacíos, navegación jerárquica, filtros y separación de pendientes.
+- [ ] Validar manualmente el recorrido frontend completo contra la API y SQL Server reales. Backend confirmó exactitud funcional; el rendimiento a escala continúa pendiente.
+
+#### Rediseño institucional v1.2.0
+
+- [x] Extender el recorrido a institución → carrera → materia → comisión → evaluaciones usando la jerarquía canónica del backend.
+- [x] Sustituir la grilla de materias por comparaciones navegables, un ranking acotado de materias y acceso separado a entidades con evidencia limitada o sin resultados.
+- [x] Incorporar la serie mensual con aprobación, resultados confirmados, pendientes, meses parciales y cortes cuando no existe denominador.
+- [x] Mantener el período efectivo estable en URL y separar la paginación de evaluaciones del resumen, las comparativas y la serie.
+- [x] Conservar resultados oficiales y pendientes operativos como dimensiones diferentes, sin sumar subcategorías superpuestas.
+- [ ] Validar tiempos y planes con volumen representativo; la validación backend actual acredita exactitud funcional, no rendimiento a escala.
 
 - [ ] Al finalizar la mejora de reportes, revisar todas las pantallas de los tres roles y retirar textos técnicos que describan API, servidor, frontend, contratos, caché, paginación interna, snapshots o procesos; conservar sólo criterios funcionales, significado de los datos y acciones útiles para cada usuario.
 

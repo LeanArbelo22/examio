@@ -1941,6 +1941,11 @@ parámetros desconocidos también producen `400 REQUEST_INVALID`.
 | `tipoIncidente` | string | Tipo exacto del catálogo de telemetría |
 | `severidad` | enum | `sin_clasificar`, `informar`, `advertir`, `bloquear_interfaz` o `anular_intento` |
 | `soloIncidentesSinRevisar` | boolean | Con `true`, limita el alcance a incidentes operativamente pendientes |
+| `incluirResumenInstitucional` | boolean, default `false` | Agrega el resumen institucional; disponible únicamente para administradores |
+| `idCarrera` | entero positivo | Filtra por carrera; puede combinarse con materia y comisión coherentes |
+| `muestraMinimaRanking` | entero 1–100000, default `10` | Mínimo de resultados para las comparativas institucionales |
+| `coberturaMinimaRanking` | decimal 0–100, default `70` | Porcentaje mínimo de resultados confirmados para las comparativas |
+| `incluirSerieMensual` | boolean, default `false` | Agrega la serie mensual; requiere resumen institucional y ambos límites temporales |
 | `pagina` | entero, default `1` | Mínimo 1 |
 | `limite` | entero, default `20` | Entre 1 y 100 |
 | `ordenarPor` | enum, default `fecha` | `evaluacion`, `fecha`, `promedio`, `entregados`, `aprobacion`, `pendientesCorreccion` |
@@ -2107,11 +2112,54 @@ Cada KPI y fila agrega dos bloques paralelos que no modifican las métricas lega
 La distribución existente conserva su población histórica y no representa por sí sola
 los resultados oficiales. La unidad del análisis docente es siempre `idPublicacion`.
 
+#### Resumen institucional administrativo v1.2.0
+
+Con `incluirResumenInstitucional=true`, un administrador recibe
+`resumenInstitucional`, calculado sobre todo el conjunto filtrado antes de paginar
+`evaluaciones`. Un docente que solicita este bloque recibe
+`403 REPORT_SCOPE_FORBIDDEN`.
+
+El resumen contiene:
+
+- `global`, con publicaciones, publicaciones con resultados pendientes,
+  publicaciones con pendientes operativos, `resultadosOficiales` y
+  `pendientesOperativos`;
+- `carreras`, jerarquía canónica que anida materias y comisiones mediante IDs estables;
+- `materias`, colección plana de v1.1.0 conservada por compatibilidad;
+- `comparativas`, con carreras, materias y comisiones clasificadas como `elegibles`,
+  `evidenciaLimitada` o `sinResultados`; sus posiciones y motivos son autoritativos;
+- `periodoEfectivo`, común al resumen, la jerarquía, las comparativas, la serie y
+  las evaluaciones paginadas;
+- `serieMensual`, cuando se solicita, con el objeto completo `resultadosOficiales`,
+  meses vacíos y la marca `periodoCompleto`.
+
+Los tres niveles usan exactamente la misma estructura de resultados y pendientes.
+El porcentaje de cobertura se expone como
+`resultadosOficiales.porcentajeCoberturaConfirmada`; es `null` cuando no existen
+entregas válidas que formen el denominador. Los porcentajes se recalculan desde
+numeradores y denominadores agregados, no se promedian.
+
+`pendientesOperativos.intentosEntregadosPendientes` cuenta la unión de intentos
+pendientes. Sus subcategorías pueden superponerse y no deben sumarse. Del mismo
+modo, `publicacionesConResultadosPendientes` y
+`publicacionesConPendientesOperativos` describen dimensiones diferentes.
+
+La serie agrupa por el mes de inicio de la publicación en
+`America/Argentina/Buenos_Aires`. Un mes sin resultados devuelve aprobación `null`;
+un mes con resultados y ningún aprobado devuelve `0`. El rango admite hasta 60 meses.
+`data.evaluaciones` continúa paginada y agrega `idCarrera` y `carrera`; cambiar de página
+no modifica el resumen, las comparativas, sus posiciones ni la serie.
+
 #### Errores
 
 | HTTP | `code` | Motivo |
 |---:|---|---|
 | 400 | `REQUEST_INVALID` | Filtro, fecha, paginación u ordenamiento inválidos |
+| 400 | `REPORT_INSTITUTIONAL_OPTIONS_REQUIRE_SUMMARY` | Se enviaron opciones institucionales sin solicitar el resumen |
+| 400 | `REPORT_FILTERS_INCONSISTENT` | Carrera, materia, comisión, actividad o publicación no pertenecen a la misma jerarquía |
+| 400 | `REPORT_SERIES_PERIOD_REQUIRED` | Falta uno de los límites temporales de la serie |
+| 400 | `REPORT_SERIES_PERIOD_INVALID` | El período es inválido o comienza en el futuro |
+| 400 | `REPORT_SERIES_RANGE_TOO_LARGE` | El período supera 60 meses calendario |
 | 401 | `ACCESS_TOKEN_MISSING` / `ACCESS_TOKEN_INVALID` / `ACCESS_TOKEN_EXPIRED` | Autenticación |
 | 403 | `FORBIDDEN` | Rol no autorizado |
 | 403 | `REPORT_SCOPE_FORBIDDEN` | Identidad docente inválida o filtro explícito fuera de alcance |
