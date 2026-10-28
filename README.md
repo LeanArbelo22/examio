@@ -648,20 +648,4 @@ No se utilizan CSS Modules, Sass, Styled Components ni una librería UI externa.
 ```bash
 npm run lint
 npm run build
-```
-
-El repositorio contiene errores ESLint preexistentes. Como mínimo, todo archivo nuevo o modificado debe pasar ESLint focalizado y TypeScript. No deben atribuirse errores preexistentes a una funcionalidad nueva.
-
-## Riesgos y deuda técnica
-
-El inventario completo y el estado de cada iniciativa se mantienen en [PLAN.md](./PLAN.md). Las prioridades principales son:
-
-1. Consolidar autenticación y sesión.
-2. Centralizar configuración y cliente API.
-3. Fortalecer contratos TypeScript.
-4. Normalizar React Query y manejo de errores.
-5. Incorporar testing frontend.
-6. Mejorar accesibilidad.
-7. Mantener mocks exclusivamente en tests y E2E; las dependencias backend faltantes se documentan en `PLAN.md`.
-
-Este README debe actualizarse cuando cambien arquitectura, variables, autenticación, scripts, rutas, servicios o convenciones.
+``
