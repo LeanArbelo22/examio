@@ -29,12 +29,12 @@ Cuando exista una diferencia entre documentación y comportamiento, el código y
 - Vitest 4, jsdom y React Testing Library para tests unitarios y de componentes.
 - Mock Service Worker 2 para simular contratos HTTP en tests sin levantar la API.
 - ESLint 9 con reglas de Next.js.
-- pnpm como gestor de dependencias.
+- npm como gestor de dependencias.
 
 ## Requisitos
 
 - Node.js compatible con Next.js 16.
-- pnpm.
+- npm.
 - API Node de Examio disponible.
 - SQL Server accesible desde la API.
 
@@ -49,29 +49,29 @@ Puertos locales esperados:
 ## Instalación y ejecución
 
 ```bash
-pnpm install
-pnpm env:check
-pnpm dev
+npm install
+npm run env:check
+npm run dev
 ```
 
 También se puede verificar el entorno antes de iniciar Next.js:
 
 ```bash
-pnpm dev:checked
+npm run dev:checked
 ```
 
 Otros comandos:
 
 ```bash
-pnpm lint
-pnpm typecheck
-pnpm test:run
-pnpm test:e2e
-pnpm build
-pnpm start
+npm run lint
+npm run typecheck
+npm run test:run
+npm run test:e2e
+npm run build
+npm run start
 ```
 
-Para desarrollar tests en modo interactivo usar `pnpm test`. Los archivos se ubican junto
+Para desarrollar tests en modo interactivo usar `npm test`. Los archivos se ubican junto
 al módulo probado con sufijo `*.test.ts` o `*.test.tsx`.
 
 Las librerías de testing cumplen responsabilidades separadas:
@@ -108,7 +108,7 @@ entrega coordinada. Los callbacks server-side de NextAuth cubren login, refresh,
 single-flight, logout y ausencia de credenciales en la sesión pública. Los E2E viven
 en `e2e/`; `playwright.config.ts` levanta el frontend en el puerto 3100 y el stub en
 el 55813, usa identidades ficticias `@cervantes.edu.ar` y nunca toca la base real.
-La primera ejecución requiere `pnpm exec playwright install chromium`.
+La primera ejecución requiere `npx playwright install chromium`.
 
 ## Variables de entorno
 
@@ -134,7 +134,7 @@ EXAMIO_API_URL=http://localhost:55803/api
 
 ### Variables de la herramienta de diagnóstico
 
-Estas variables son opcionales y solo afectan `pnpm env:check`:
+Estas variables son opcionales y solo afectan `npm run env:check`:
 
 | Variable | Default | Descripción |
 |---|---|---|
@@ -145,7 +145,7 @@ Ejemplo en PowerShell:
 
 ```powershell
 $env:EXAMIO_BACKEND_URL="http://localhost:55803/api"
-pnpm env:check
+npm run env:check
 ```
 
 `EXAMIO_API_URL` se valida exclusivamente en servidor. El BFF y NextAuth
@@ -646,8 +646,8 @@ No se utilizan CSS Modules, Sass, Styled Components ni una librería UI externa.
 ## Verificación antes de entregar cambios
 
 ```bash
-pnpm lint
-pnpm build
+npm run lint
+npm run build
 ```
 
 El repositorio contiene errores ESLint preexistentes. Como mínimo, todo archivo nuevo o modificado debe pasar ESLint focalizado y TypeScript. No deben atribuirse errores preexistentes a una funcionalidad nueva.
