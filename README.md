@@ -35,6 +35,8 @@ Puertos locales esperados:
 
 ## Instalación y ejecución
 
+Se elimina pnpm:
+
 ```bash
 npm install
 npm run env:check
