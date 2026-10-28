@@ -21,6 +21,8 @@ const SAFE_CODE_MESSAGES: Record<string, string> = {
     "No se encontró evidencia histórica para este contenido.",
   QUESTION_OPTION_EVIDENCE_INCONSISTENT:
     "Las versiones históricas de las opciones no pueden compararse.",
+  REPORT_INVALID_GRADING_SCALE:
+    "No se puede calcular el promedio porque una evaluación tiene una escala de calificación inválida.",
   STUDENT_NOT_FOUND: "No existe un alumno con esa matrícula.",
   MATERIA_DIVISION_NOT_FOUND: "La comisión seleccionada no existe.",
   STUDENT_INACTIVE: "El alumno no está habilitado para inscribirse.",

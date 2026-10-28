@@ -476,11 +476,16 @@ evidencia vienen del backend. El detalle de opciones debe enviar `claveContenido
 incompatibilidad de snapshots se resuelve localmente sin bloquear el resto del análisis.
 No trasladar fechas del listado a las preguntas. La vista `/admin/analitica` implementa
 el recorrido institución → carrera → materia → comisión → evaluaciones con el resumen,
-las comparativas y la serie mensual independientes de la página. Usa la jerarquía canónica
+las comparativas y la serie temporal independientes de la página. Usa la jerarquía canónica
 `carreras → materias → comisiones`, respeta la elegibilidad y las posiciones devueltas por
-backend y conserva `porcentajeCoberturaConfirmada`. El período efectivo debe permanecer
-estable en la URL al navegar y paginar. Los meses sin denominador no se representan como
-cero ni se conectan en la línea de aprobación. Resultados oficiales y pendientes operativos
+backend y conserva `porcentajeCoberturaConfirmada`. El promedio oficial normalizado sobre 10
+se consume desde `resultadosOficiales.promedioNotaBase10`; nunca se recalcula ni se promedian
+agregados en cliente. La configuración institucional mantiene en URL
+el período efectivo, la agrupación temporal, el ranking y la presentación; sólo los parámetros
+que alteran datos remotos forman parte de la consulta y su query key. El orden del ranking es
+independiente del orden de evaluaciones. Los períodos sin denominador no se representan como
+cero. Las series de aprobación, promedio, confirmados y pendientes pueden alternarse sin nuevas
+consultas; los tramos que atraviesan períodos sin datos no inventan observaciones. Resultados oficiales y pendientes operativos
 son dimensiones separadas; las subcategorías operativas pueden superponerse y nunca deben sumarse.
 
 El inicio `/profesor` agrupa las actividades por `idMateria` y mantiene la barra de

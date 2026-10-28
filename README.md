@@ -219,7 +219,7 @@ El proyecto utiliza App Router.
 ### Administración
 
 - `/admin`
-- `/admin/analitica`: panorama institucional por carrera, materia, comisión y evaluación.
+- `/admin/analitica`: panorama institucional configurable por carrera, materia, comisión y evaluación, con período compartible, comparación ordenada, promedio oficial sobre 10 y evolución mensual, semestral o anual con series seleccionables.
   Compara únicamente entidades con evidencia suficiente, muestra la evolución mensual
   de los resultados actuales y mantiene las correcciones pendientes en un bloque separado.
   El período inicial abarca doce meses y permanece en la URL al navegar o paginar.

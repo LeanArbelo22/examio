@@ -88,6 +88,7 @@ const resultadosOficiales = {
   desaprobados: 3,
   porcentajeAprobacion: 78.57,
   porcentajeCoberturaConfirmada: 87.5,
+  promedioNotaBase10: 7.25,
 };
 
 const pendientesOperativos = {

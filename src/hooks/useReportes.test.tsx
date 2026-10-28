@@ -75,6 +75,7 @@ function reporteEvaluaciones(pagina: number): ReporteEvaluacionesListado {
         desaprobados: 4,
         porcentajeAprobacion: 75,
         porcentajeCoberturaConfirmada: 88.89,
+        promedioNotaBase10: 6.75,
       },
       pendientesOperativos: {
         intentosEntregadosPendientes: 3,

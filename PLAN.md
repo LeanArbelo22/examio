@@ -747,6 +747,23 @@ Teams, Moodle, recuperación de contraseña y “Recordar sesión” quedan deli
 - [x] Conservar resultados oficiales y pendientes operativos como dimensiones diferentes, sin sumar subcategorías superpuestas.
 - [ ] Validar tiempos y planes con volumen representativo; la validación backend actual acredita exactitud funcional, no rendimiento a escala.
 
+#### Configuración institucional v1.3.0
+
+- [x] Incorporar períodos rápidos y personalizados de hasta 60 meses, conservando límites exactos en URL y distinguiendo mes actual de meses completos.
+- [x] Unificar comparación y ranking con dimensión, orden autoritativo y cantidad visible configurables, sin enviar opciones puramente visuales a la API.
+- [x] Consumir `serieTemporal` mensual, semestral o anual sin reagrupar ni recalcular porcentajes en el cliente.
+- [x] Integrar muestra, cobertura y visibilidad como un único borrador avanzado con Aplicar y Cancelar.
+- [x] Permitir restablecer la configuración conservando el alcance académico y copiar localmente un enlace reproducible.
+- [ ] Validar manualmente el diseño responsive y el recorrido completo contra el backend v1.3.0 desplegado.
+
+#### Promedio institucional v1.4.0
+
+- [x] Integrar `promedioNotaBase10` oficial en resumen, comparativas, directorios y evaluaciones sin recalcular valores en cliente.
+- [x] Incorporar el promedio como serie opcional de la evolución, con escala 0–10 y selección independiente de aprobación y cantidades.
+- [x] Conservar URLs anteriores, persistir las nuevas series visibles en URL y mantenerlas fuera de la consulta remota.
+- [x] Distinguir promedio nulo de cero real y mostrar la cantidad de resultados considerados.
+- [ ] Validar manualmente el diseño responsive y el recorrido completo contra el backend v1.4.0 desplegado.
+
 - [ ] Al finalizar la mejora de reportes, revisar todas las pantallas de los tres roles y retirar textos técnicos que describan API, servidor, frontend, contratos, caché, paginación interna, snapshots o procesos; conservar sólo criterios funcionales, significado de los datos y acciones útiles para cada usuario.
 
 - [x] Reemplazar en los reportes docentes los catálogos institucionales de materias y comisiones por opciones derivadas exclusivamente de las evaluaciones autorizadas del docente.

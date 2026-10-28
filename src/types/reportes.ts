@@ -14,6 +14,10 @@ export type ReporteRendimientoOrden =
   | "intentos";
 export type OrdenDireccion = "asc" | "desc";
 export type AlcanceIntentosReporte = "todos" | "validos";
+export type OrdenRankingInstitucional =
+  | "aprobacion_asc"
+  | "aprobacion_desc";
+export type AgrupacionSerieInstitucional = "mensual" | "semestral" | "anual";
 
 export type ReporteEvaluacionesEstado =
   | "borrador"
@@ -44,6 +48,8 @@ export interface ReporteEvaluacionesFiltros {
   soloIncidentesSinRevisar?: boolean | "";
   incluirResumenInstitucional?: boolean;
   incluirSerieMensual?: boolean;
+  ordenRanking?: OrdenRankingInstitucional;
+  agrupacionSerie?: AgrupacionSerieInstitucional;
   muestraMinimaRanking?: number;
   coberturaMinimaRanking?: number;
   ordenarPor?: ReporteEvaluacionesOrden;
@@ -120,6 +126,7 @@ export interface ColeccionComparativaInstitucional<T> {
 }
 
 export interface ComparativasInstitucionales {
+  ordenRanking?: OrdenRankingInstitucional;
   criteriosElegibilidad: {
     muestraMinima: number;
     coberturaMinimaPorcentaje: number;
@@ -138,6 +145,29 @@ export interface PuntoSerieMensualInstitucional {
   resultadosOficiales: ResultadosOficiales;
 }
 
+export interface PuntoSerieTemporalInstitucional {
+  periodo: string;
+  etiqueta: string;
+  limitesCalendario: {
+    desde: string;
+    hastaExclusivo: string;
+  };
+  limitesEfectivos: {
+    desde: string;
+    hasta: string;
+  };
+  periodoCompleto: boolean;
+  publicaciones: number;
+  publicacionesConResultadosPendientes: number;
+  resultadosOficiales: ResultadosOficiales;
+}
+
+export interface SerieTemporalInstitucional {
+  agrupacion: AgrupacionSerieInstitucional;
+  zonaHoraria: "America/Argentina/Buenos_Aires";
+  puntos: PuntoSerieTemporalInstitucional[];
+}
+
 export interface PeriodoEfectivoInstitucional {
   desde: string;
   hasta: string;
@@ -153,7 +183,8 @@ export interface ResumenInstitucional {
   materias: ResumenInstitucionalMateria[];
   carreras: ResumenInstitucionalCarrera[];
   comparativas: ComparativasInstitucionales;
-  serieMensual: PuntoSerieMensualInstitucional[];
+  serieMensual?: PuntoSerieMensualInstitucional[];
+  serieTemporal?: SerieTemporalInstitucional;
 }
 
 export interface ResultadosOficiales {
@@ -168,6 +199,7 @@ export interface ResultadosOficiales {
   desaprobados: number;
   porcentajeAprobacion: number | null;
   porcentajeCoberturaConfirmada: number | null;
+  promedioNotaBase10: number | null;
 }
 
 export interface PendientesOperativos {
@@ -256,6 +288,8 @@ export interface ReporteEvaluacionesListado {
     soloIncidentesSinRevisar: boolean | null;
     incluirResumenInstitucional?: true;
     incluirSerieMensual?: true;
+    ordenRanking?: OrdenRankingInstitucional;
+    agrupacionSerie?: AgrupacionSerieInstitucional;
     idCarrera?: number | null;
     muestraMinimaRanking?: number;
     coberturaMinimaRanking?: number;

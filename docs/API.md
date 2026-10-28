@@ -1946,6 +1946,8 @@ parámetros desconocidos también producen `400 REQUEST_INVALID`.
 | `muestraMinimaRanking` | entero 1–100000, default `10` | Mínimo de resultados para las comparativas institucionales |
 | `coberturaMinimaRanking` | decimal 0–100, default `70` | Porcentaje mínimo de resultados confirmados para las comparativas |
 | `incluirSerieMensual` | boolean, default `false` | Agrega la serie mensual; requiere resumen institucional y ambos límites temporales |
+| `ordenRanking` | enum, default `aprobacion_asc` | Orden institucional por aprobación observada: `aprobacion_asc` o `aprobacion_desc` |
+| `agrupacionSerie` | enum | Agrega `serieTemporal` agrupada como `mensual`, `semestral` o `anual`; requiere resumen institucional y ambos límites temporales |
 | `pagina` | entero, default `1` | Mínimo 1 |
 | `limite` | entero, default `20` | Entre 1 y 100 |
 | `ordenarPor` | enum, default `fecha` | `evaluacion`, `fecha`, `promedio`, `entregados`, `aprobacion`, `pendientesCorreccion` |
@@ -2112,7 +2114,7 @@ Cada KPI y fila agrega dos bloques paralelos que no modifican las métricas lega
 La distribución existente conserva su población histórica y no representa por sí sola
 los resultados oficiales. La unidad del análisis docente es siempre `idPublicacion`.
 
-#### Resumen institucional administrativo v1.2.0
+#### Resumen institucional administrativo v1.4.0
 
 Con `incluirResumenInstitucional=true`, un administrador recibe
 `resumenInstitucional`, calculado sobre todo el conjunto filtrado antes de paginar
@@ -2132,8 +2134,15 @@ El resumen contiene:
   las evaluaciones paginadas;
 - `serieMensual`, cuando se solicita, con el objeto completo `resultadosOficiales`,
   meses vacíos y la marca `periodoCompleto`.
+- `serieTemporal`, cuando se solicita `agrupacionSerie`, con períodos mensuales,
+  semestrales o anuales, etiquetas y límites efectivos provistos por la API.
 
 Los tres niveles usan exactamente la misma estructura de resultados y pendientes.
+Cada objeto `resultadosOficiales` incluye además `promedioNotaBase10: number | null`,
+calculado por la API sobre los resultados considerados. El valor normaliza notas de
+escalas 10 y 100, se devuelve con dos decimales, conserva el cero real y es `null`
+cuando no existen resultados confirmados. También está disponible en comparativas,
+evaluaciones y cada punto de `serieTemporal`; el cliente no lo recalcula ni promedia.
 El porcentaje de cobertura se expone como
 `resultadosOficiales.porcentajeCoberturaConfirmada`; es `null` cuando no existen
 entregas válidas que formen el denominador. Los porcentajes se recalculan desde
@@ -2149,6 +2158,17 @@ La serie agrupa por el mes de inicio de la publicación en
 un mes con resultados y ningún aprobado devuelve `0`. El rango admite hasta 60 meses.
 `data.evaluaciones` continúa paginada y agrega `idCarrera` y `carrera`; cambiar de página
 no modifica el resumen, las comparativas, sus posiciones ni la serie.
+
+`ordenRanking` es independiente de `ordenarPor` y `ordenDireccion`, que sólo ordenan
+las evaluaciones paginadas. El frontend respeta las posiciones devueltas y no invierte
+las colecciones. `agrupacionSerie` reemplaza a `incluirSerieMensual` en el recorrido
+institucional configurable; el campo mensual se conserva únicamente por compatibilidad.
+La visibilidad de aprobación, promedio, resultados confirmados y pendientes es una
+preferencia local reproducible mediante la URL y no agrega parámetros a la consulta.
+La presentación inicial combina aprobación, promedio y resultados confirmados en un
+único gráfico; los conteos se rotulan dentro de las barras y no exponen una escala propia.
+`REPORT_INVALID_GRADING_SCALE` indica que una evaluación posee una escala inválida y
+la respuesta completa no contiene un promedio parcial.
 
 #### Errores
 

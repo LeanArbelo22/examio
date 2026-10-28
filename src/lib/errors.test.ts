@@ -34,6 +34,20 @@ describe("errors", () => {
     ).toContain("otra pestaña");
   });
 
+  it("explica una escala inválida sin reemplazar el promedio por cero", () => {
+    expect(
+      getUserErrorMessage(
+        new ApiError(
+          "Detalle interno",
+          500,
+          "REPORT_INVALID_GRADING_SCALE",
+        ),
+      ),
+    ).toBe(
+      "No se puede calcular el promedio porque una evaluación tiene una escala de calificación inválida.",
+    );
+  });
+
   it("agrupa el primer error de validación de cada campo", () => {
     expect(
       validationErrorsByField([
