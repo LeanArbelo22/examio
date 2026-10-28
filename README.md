@@ -2,19 +2,6 @@
 
 Frontend web de Examio, una plataforma académica para crear, rendir, corregir y analizar evaluaciones. La aplicación está desarrollada con Next.js 16, React 19 y TypeScript.
 
-## Documentación del sistema
-
-La documentación se divide por responsabilidad:
-
-| Documento | Contenido |
-|---|---|
-| [README.md](./README.md) | Frontend: instalación, arquitectura, autenticación, servicios, hooks y convenciones |
-| [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) | Entorno local, puertos, health check y diagnóstico |
-| [docs/API.md](./docs/API.md) | Contratos HTTP, endpoints, RBAC y testing de la API Node |
-| [docs/DATABASE.md](./docs/DATABASE.md) | Modelo y procedimientos de SQL Server |
-| [PLAN.md](./PLAN.md) | Plan técnico, fases, estado y deuda registrada |
-
-Cuando exista una diferencia entre documentación y comportamiento, el código y el contrato efectivo de la API deben verificarse antes de implementar.
 
 ## Stack
 
