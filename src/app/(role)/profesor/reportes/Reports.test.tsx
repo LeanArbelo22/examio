@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -24,6 +24,7 @@ const reportMocks = vi.hoisted(() => ({
   preguntasHook: vi.fn(),
   gruposHook: vi.fn(),
   opcionesHook: vi.fn(),
+  resultadosVariantesHook: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -110,6 +111,8 @@ vi.mock("@/hooks/useReportes", () => ({
     reportMocks.gruposHook(...args),
   useReporteOpcionesPregunta: (...args: unknown[]) =>
     reportMocks.opcionesHook(...args),
+  useResultadosVariantes: (...args: unknown[]) =>
+    reportMocks.resultadosVariantesHook(...args),
 }));
 
 vi.mock("@/components/reports/EvaluationReportCharts", () => ({
@@ -444,6 +447,139 @@ function failedQuery(error: Error) {
 }
 
 describe("reportes docentes", () => {
+  it("compara el contenido agregado aunque el grupo de origen no tenga calificaciones", async () => {
+    reportMocks.search = "reporte=preguntas";
+    const question = questionsReport.items[0];
+    reportMocks.gruposHook.mockReturnValue(successfulQuery({ ...groupsReport, items: [{
+      ...groupsReport.items[0], idGrupoPregunta: question.idGrupoPregunta,
+      variantes: [{ ...question, idPregunta: 195, claveContenido: "hardening", enunciado: "Variante de hardening", presentadas: 4, pendientesCorreccion: 4, muestrasConfirmadas: 0, porcentajePuntajePromedio: null }],
+    }] }));
+    reportMocks.resultadosVariantesHook.mockReturnValue(successfulQuery([
+      { ...question, idPregunta: 900, idGrupoPregunta: 800, claveContenido: "hardening", presentadas: 9, respondidas: 8, pendientesCorreccion: 4, muestrasConfirmadas: 3, porcentajePuntajePromedio: 60 },
+    ]));
+    render(<ContentPerformanceReport kind="preguntas" />);
+    await userEvent.click(screen.getByRole("button", { name: "Ver opciones" }));
+    const comparison = screen.getByRole("region", { name: "Comparación con otras variantes" });
+    expect(within(comparison).getByText("60.0% de puntaje promedio")).toBeVisible();
+    expect(within(comparison).getByText("5 respuestas calificadas")).toBeVisible();
+    expect(within(comparison).getByText("9 presentadas · 8 respondidas · 4 pendientes de calificación")).toBeVisible();
+    expect(reportMocks.resultadosVariantesHook).toHaveBeenCalledWith(expect.objectContaining({ idGrupoPregunta: "" }), ["hardening"], true);
+  });
+
+  it("distingue una variante pendiente de una calificada con cero puntos", async () => {
+    const question = questionsReport.items[0];
+    const variants = [
+      { ...question, claveContenido: "pendiente", enunciado: "Variante pendiente", presentadas: 5, respondidas: 5, pendientesCorreccion: 5, porcentajePuntajePromedio: null },
+      { ...question, claveContenido: "cero", enunciado: "Variante con cero", presentadas: 3, respondidas: 3, pendientesCorreccion: 0, porcentajePuntajePromedio: 0 },
+    ];
+    reportMocks.gruposHook.mockReturnValue(successfulQuery({ ...groupsReport, items: [{ ...groupsReport.items[0], idGrupoPregunta: question.idGrupoPregunta, variantes: variants }] }));
+    reportMocks.resultadosVariantesHook.mockReturnValue(successfulQuery(variants));
+    render(<ContentPerformanceReport kind="preguntas" />);
+    await userEvent.click(screen.getByRole("button", { name: "Ver opciones" }));
+    const comparison = screen.getByRole("region", { name: "Comparación con otras variantes" });
+    expect(within(comparison).getByText("Sin puntaje disponible")).toBeVisible();
+    expect(within(comparison).getByText("0.0% de puntaje promedio")).toBeVisible();
+    expect(within(comparison).getByText("5 presentadas · 5 respondidas · 5 pendientes de calificación")).toBeVisible();
+    expect(within(comparison).getByText("3 respuestas calificadas")).toBeVisible();
+  });
+
+  it.each(["loading", "error"])("no muestra ceros del grupo mientras los resultados agregados están en %s", async (state) => {
+    const question = questionsReport.items[0];
+    reportMocks.gruposHook.mockReturnValue(successfulQuery({ ...groupsReport, items: [{ ...groupsReport.items[0], idGrupoPregunta: question.idGrupoPregunta, variantes: [{ ...question, claveContenido: "otra" }] }] }));
+    reportMocks.resultadosVariantesHook.mockReturnValue(state === "loading"
+      ? { ...successfulQuery(undefined), isPending: true, isLoading: true }
+      : failedQuery(new ApiError("Sin conexión", 503, "NETWORK_UNAVAILABLE")));
+    render(<ContentPerformanceReport kind="preguntas" />);
+    await userEvent.click(screen.getByRole("button", { name: "Ver opciones" }));
+    const comparison = screen.getByRole("region", { name: "Comparación con otras variantes" });
+    expect(within(comparison).queryByText(/^\d+ respuestas calificadas$/)).not.toBeInTheDocument();
+    if (state === "loading") expect(within(comparison).getByText("Cargando variantes del grupo…")).toBeVisible();
+    else {
+      await userEvent.click(within(comparison).getByRole("button", { name: "Reintentar" }));
+      expect(reportMocks.resultadosVariantesHook.mock.results.at(-1)?.value.refetch).toHaveBeenCalledOnce();
+    }
+  });
+
+  it.each(["preguntas", "analisis"])("carga las variantes del grupo al abrir el detalle desde %s", async (entry) => {
+    reportMocks.search = entry === "analisis"
+      ? "reporte=analisis&idPublicacion=47&analisisPaso=preguntas"
+      : "reporte=preguntas&idMateria=3&fechaDesde=2026-08-01";
+    const question = questionsReport.items[0];
+    reportMocks.resultadosVariantesHook.mockReturnValue(successfulQuery([
+      { ...question, idPregunta: 11, claveContenido: "hash-udp", enunciado: "Variante UDP", presentadas: 14, pendientesCorreccion: 2, porcentajePuntajePromedio: 62.5 },
+    ]));
+    reportMocks.gruposHook.mockReturnValue(successfulQuery({
+      ...groupsReport,
+      items: [{
+        ...groupsReport.items[0],
+        idGrupoPregunta: question.idGrupoPregunta,
+        variantes: [
+          question,
+          { ...question, idPregunta: 11, claveContenido: "hash-udp", enunciado: "Variante UDP", muestrasConfirmadas: 12, porcentajePuntajePromedio: 62.5 },
+        ],
+      }],
+    }));
+    render(entry === "analisis" ? <TeacherPublicationAnalysis /> : <ContentPerformanceReport kind="preguntas" />);
+    expect(reportMocks.gruposHook).toHaveBeenCalledWith(expect.anything(), false);
+    await userEvent.click(entry === "analisis"
+      ? screen.getByRole("button", { name: "Ver detalle" })
+      : screen.getByRole("button", { name: "Ver opciones" }));
+    const dialog = screen.getByRole("dialog", { name: "Detalle de la pregunta" });
+    const comparison = within(dialog).getByRole("region", { name: "Comparación con otras variantes" });
+    expect(within(comparison).getByText("Variante UDP")).toBeVisible();
+    expect(within(comparison).getByText("12 respuestas calificadas")).toBeVisible();
+    expect(within(comparison).getByText("62.5% de puntaje promedio")).toBeVisible();
+    expect(within(comparison).queryByText(question.enunciado)).not.toBeInTheDocument();
+    expect(within(comparison).queryByText("No hay otras variantes con resultados disponibles.")).not.toBeInTheDocument();
+    expect(reportMocks.gruposHook).toHaveBeenCalledWith(expect.objectContaining({
+      idGrupoPregunta: String(question.idGrupoPregunta),
+      ...(entry === "analisis"
+        ? { idPublicacion: "47", alcanceIntentos: "validos", estadoCorreccion: "confirmada" }
+        : { idMateria: "3", fechaDesde: "2026-08-01" }),
+    }), true);
+  });
+
+  it.each(["loading", "placeholder", "error"])("no anuncia ausencia de variantes durante %s", async (state) => {
+    reportMocks.search = "reporte=preguntas";
+    reportMocks.gruposHook.mockReturnValue(state === "error"
+      ? failedQuery(new ApiError("Sin conexión", 503, "NETWORK_UNAVAILABLE"))
+      : { ...successfulQuery(groupsReport), isLoading: state === "loading", isPlaceholderData: state === "placeholder" });
+    render(<ContentPerformanceReport kind="preguntas" />);
+    await userEvent.click(screen.getByRole("button", { name: "Ver opciones" }));
+    expect(screen.queryByText("No hay otras variantes con resultados disponibles.")).not.toBeInTheDocument();
+    if (state === "error") {
+      expect(screen.getByRole("button", { name: /Reintentar/ })).toBeVisible();
+      await userEvent.click(screen.getByRole("button", { name: /Reintentar/ }));
+      expect(reportMocks.gruposHook.mock.results.at(-1)?.value.refetch).toHaveBeenCalledOnce();
+    } else {
+      expect(screen.getByText("Cargando variantes del grupo…")).toBeVisible();
+    }
+  });
+
+  it("anuncia ausencia de variantes solo cuando el grupo consultado no tiene otras", async () => {
+    reportMocks.search = "reporte=preguntas";
+    render(<ContentPerformanceReport kind="preguntas" />);
+    await userEvent.click(screen.getByRole("button", { name: "Ver opciones" }));
+    expect(screen.getByText("No hay otras variantes con resultados disponibles.")).toBeVisible();
+  });
+
+  it("conserva las opciones completas y distingue ausencia de respuesta de cero en el gráfico", async () => {
+    reportMocks.search = "reporte=preguntas";
+    reportMocks.opcionesHook.mockReturnValue(successfulQuery({ ...optionsReport, items: optionsReport.items.map((item) => ({ ...item, porcentajeSeleccion: null })) }));
+    render(<ContentPerformanceReport kind="preguntas" />);
+    await userEvent.click(screen.getByRole("button", { name: "Ver opciones" }));
+    const chart = screen.getByTestId("option-distribution-chart");
+    expect(within(chart).getByText("Sin respuestas")).toBeInTheDocument();
+    expect(within(chart).queryByText("0.0%")).not.toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Distribución de opciones" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Opciones completas, desplazamiento horizontal" })).toHaveAttribute("tabindex", "0");
+  });
+  it("limpia los criterios sin salir del reporte por alumno", async () => {
+    reportMocks.search = "reporte=alumnos&idMateria=3&pagina=2";
+    render(<RendimientoReport />);
+    await userEvent.click(screen.getByRole("button", { name: "Limpiar filtros" }));
+    expect(reportMocks.replace).toHaveBeenCalledWith("/profesor/reportes?reporte=alumnos", { scroll: false });
+  });
   beforeEach(() => {
     reportMocks.search = "";
     reportMocks.replace.mockReset();
@@ -453,11 +589,13 @@ describe("reportes docentes", () => {
     reportMocks.preguntasHook.mockReset();
     reportMocks.gruposHook.mockReset();
     reportMocks.opcionesHook.mockReset();
+    reportMocks.resultadosVariantesHook.mockReset();
     reportMocks.evaluacionesHook.mockReturnValue(successfulQuery(evaluationReport));
     reportMocks.rendimientoHook.mockReturnValue(successfulQuery(studentReport));
     reportMocks.preguntasHook.mockReturnValue(successfulQuery(questionsReport));
     reportMocks.gruposHook.mockReturnValue(successfulQuery(groupsReport));
     reportMocks.opcionesHook.mockReturnValue(successfulQuery(optionsReport));
+    reportMocks.resultadosVariantesHook.mockReturnValue(successfulQuery([]));
   });
 
   it("usa KPIs y distribución global del backend en el reporte por evaluación", async () => {

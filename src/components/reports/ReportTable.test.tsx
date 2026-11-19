@@ -23,6 +23,16 @@ const columns: ReportColumn<Row, Sort>[] = [
 ];
 
 describe("ReportTable", () => {
+  it("anuncia la dirección solo en la columna ordenada y actualiza el anuncio", () => {
+    const props = { columns, rows: [{ id: 1, name: "Ada", average: 9 }], rowKey: (row: Row) => row.id, sortBy: "name" as Sort, sortDirection: "asc" as const, onSort: vi.fn(), page: 1, totalPages: 1, total: 1, onPageChange: vi.fn() };
+    const view = render(<ReportTable {...props} />);
+    expect(screen.getByRole("button", { name: "Ordenar por Alumno" }).closest("th")).toHaveAttribute("aria-sort", "ascending");
+    expect(screen.getByRole("button", { name: "Ordenar por Promedio" }).closest("th")).not.toHaveAttribute("aria-sort");
+    view.rerender(<ReportTable {...props} sortBy="average" sortDirection="desc" />);
+    expect(screen.getByRole("button", { name: "Ordenar por Alumno" }).closest("th")).not.toHaveAttribute("aria-sort");
+    expect(screen.getByRole("button", { name: "Ordenar por Promedio" }).closest("th")).toHaveAttribute("aria-sort", "descending");
+    expect(screen.getByRole("region", { name: /desplazamiento horizontal/ })).toHaveAttribute("tabindex", "0");
+  });
   it("alterna orden, pagina y activa filas por teclado", async () => {
     const user = userEvent.setup();
     const onSort = vi.fn();
@@ -37,6 +47,7 @@ describe("ReportTable", () => {
         sortDirection="asc"
         onSort={onSort}
         onRowClick={onRowClick}
+        rowActionLabel={(row) => `Ver detalle de ${row.name}`}
         page={1}
         totalPages={2}
         total={21}
@@ -52,10 +63,13 @@ describe("ReportTable", () => {
     expect(onSort).toHaveBeenCalledWith("average", "asc");
 
     const row = screen.getByText("Ada").closest("tr");
-    expect(row).toHaveAttribute("tabindex", "0");
-    row?.focus();
+    expect(row).not.toHaveAttribute("tabindex");
+    screen.getByRole("button", { name: "Ver detalle de Ada" }).focus();
     await user.keyboard("{Enter}");
+    expect(onRowClick).toHaveBeenCalledOnce();
     expect(onRowClick).toHaveBeenCalledWith({ id: 1, name: "Ada", average: 9 });
+    await user.click(screen.getByRole("button", { name: "Ver detalle de Ada" }));
+    expect(onRowClick).toHaveBeenCalledTimes(2);
 
     await user.click(screen.getByRole("button", { name: "Siguiente" }));
     expect(onPageChange).toHaveBeenCalledWith(2);

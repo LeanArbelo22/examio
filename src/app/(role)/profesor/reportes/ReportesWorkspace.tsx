@@ -43,7 +43,7 @@ export function ReportesWorkspace() {
             type="button"
             onClick={() => selectReport(report.id)}
             aria-current={selected === report.id ? "page" : undefined}
-            className={`rounded-lg px-4 py-2 text-xs font-bold transition-colors ${
+            className={`min-h-11 rounded-lg px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${
               selected === report.id
                 ? "bg-indigo-600 text-white"
                 : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"

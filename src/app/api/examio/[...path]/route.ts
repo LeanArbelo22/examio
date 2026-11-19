@@ -10,7 +10,7 @@ type RouteContext = {
 };
 
 const ALLOWED_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
-const UPSTREAM_TIMEOUT_MS = 15_000;
+const UPSTREAM_TIMEOUT_MS = 35_000;
 const FORWARDED_REQUEST_HEADERS = [
   "accept",
   "content-type",

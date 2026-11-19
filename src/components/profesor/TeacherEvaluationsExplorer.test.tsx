@@ -5,6 +5,22 @@ import { useGetEvaluacionesDocente } from "@/hooks/useEvaluaciones";
 import type { EvaluacionDocente } from "@/types";
 import { TeacherEvaluationsExplorer } from "./TeacherEvaluationsExplorer";
 
+const navigation = vi.hoisted(() => ({ search: "", push: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/profesor",
+  useSearchParams: () => new URLSearchParams(navigation.search),
+  useRouter: () => ({ push: navigation.push }),
+}));
+
+function renderExplorer() {
+  const view = render(<TeacherEvaluationsExplorer />);
+  navigation.push.mockImplementation((href: string) => {
+    navigation.search = href.split("?")[1] ?? "";
+    view.rerender(<TeacherEvaluationsExplorer />);
+  });
+  return view;
+}
+
 vi.mock("next-auth/react", () => ({
   useSession: vi.fn(),
 }));
@@ -78,10 +94,12 @@ const evaluations: EvaluacionDocente[] = [
 
 describe("TeacherEvaluationsExplorer", () => {
   beforeEach(() => {
+    navigation.search = "";
+    navigation.push.mockReset();
     useSessionMock.mockReturnValue({
       data: {
         user: {
-          id: "100",
+          id: 100,
           name: "Gabriel",
           email: "gabriel@example.com",
           rol: "docente",
@@ -102,7 +120,7 @@ describe("TeacherEvaluationsExplorer", () => {
   });
 
   it("agrupa el inicio docente por materia", () => {
-    render(<TeacherEvaluationsExplorer />);
+    renderExplorer();
 
     expect(screen.getByRole("heading", { name: "Mis materias" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Fundamentos de Redes" })).toBeVisible();
@@ -112,7 +130,7 @@ describe("TeacherEvaluationsExplorer", () => {
   });
 
   it("muestra comisiones antes que actividades cuando una materia tiene varias", () => {
-    render(<TeacherEvaluationsExplorer />);
+    renderExplorer();
 
     const materiaCard = screen
       .getByRole("heading", { name: "Fundamentos de Redes" })
@@ -127,7 +145,7 @@ describe("TeacherEvaluationsExplorer", () => {
   });
 
   it("evita el paso de comisión cuando la materia tiene una sola", () => {
-    render(<TeacherEvaluationsExplorer />);
+    renderExplorer();
 
     const materiaCard = screen
       .getByRole("heading", { name: "Programación" })
@@ -140,7 +158,7 @@ describe("TeacherEvaluationsExplorer", () => {
   });
 
   it("filtra las actividades por la comisión seleccionada", () => {
-    render(<TeacherEvaluationsExplorer />);
+    renderExplorer();
 
     const materiaCard = screen
       .getByRole("heading", { name: "Fundamentos de Redes" })
@@ -158,7 +176,7 @@ describe("TeacherEvaluationsExplorer", () => {
   });
 
   it("mantiene la barra de gestión visible en todos los niveles", () => {
-    render(<TeacherEvaluationsExplorer />);
+    renderExplorer();
 
     const materiaCard = screen
       .getByRole("heading", { name: "Fundamentos de Redes" })
@@ -167,5 +185,24 @@ describe("TeacherEvaluationsExplorer", () => {
 
     expect(screen.getByRole("heading", { name: "Centro de Gestión Docente" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Crear actividad" })).toBeVisible();
+  });
+
+  it("recupera la comisión desde la URL al recargar o abrir un enlace compartido", () => {
+    navigation.search = "idMateria=8&idMateriaDivision=18";
+    renderExplorer();
+    expect(screen.getByRole("heading", { name: "Segundo parcial" })).toBeVisible();
+    expect(screen.queryByText("Primer parcial")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Volver a comisiones/ }));
+    expect(navigation.push).toHaveBeenCalledWith("/profesor?idMateria=8", { scroll: false });
+    expect(screen.getByRole("heading", { name: "1° A" })).toBeVisible();
+  });
+
+  it("permite recuperar la navegación ante una comisión ajena a la materia", () => {
+    navigation.search = "idMateria=8&idMateriaDivision=22";
+    renderExplorer();
+    expect(screen.getByText("No encontramos esta comisión")).toBeVisible();
+    expect(screen.queryByText("Trabajo práctico")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Volver a Fundamentos de Redes" }));
+    expect(screen.getByRole("heading", { name: "1° A" })).toBeVisible();
   });
 });

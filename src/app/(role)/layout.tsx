@@ -11,7 +11,7 @@ export default function DashboardLayout({
       <div className="mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 pt-10 pb-6 flex flex-col flex-grow">
         <Header />
         <Breadcrumbs />
-        <main className="flex-1 flex flex-col">{children}</main>
+        <div className="flex-1 flex flex-col">{children}</div>
       </div>
     </div>
   );

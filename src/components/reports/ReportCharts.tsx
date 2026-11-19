@@ -1,5 +1,7 @@
 "use client";
 
+import { chartColors, chartTypography } from "@/lib/chart-tokens";
+
 import {
   Bar,
   BarChart,
@@ -25,8 +27,8 @@ export function ReportCharts({ alumnos }: { alumnos: ReporteRendimientoAlumno[] 
   const aprobados = alumnos.reduce((total, alumno) => total + alumno.aprobados, 0);
   const desaprobados = alumnos.reduce((total, alumno) => total + alumno.desaprobados, 0);
   const resultados = [
-    { name: "Aprobados", value: aprobados, color: "#10b981" },
-    { name: "Desaprobados", value: desaprobados, color: "#f43f5e" },
+    { name: "Aprobados", value: aprobados, color: chartColors.success },
+    { name: "Desaprobados", value: desaprobados, color: chartColors.danger },
   ];
 
   return (
@@ -37,11 +39,11 @@ export function ReportCharts({ alumnos }: { alumnos: ReporteRendimientoAlumno[] 
         </ul>
         <div aria-hidden="true" className="h-full w-full"><ResponsiveContainer width="100%" height="100%">
           <BarChart data={promedios} margin={{ top: 8, right: 8, left: -16, bottom: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis dataKey="alumno" tick={{ fontSize: 10, fill: "#64748b" }} angle={-20} textAnchor="end" interval={0} />
-            <YAxis domain={[0, 10]} tick={{ fontSize: 10, fill: "#64748b" }} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.grid} />
+            <XAxis dataKey="alumno" tick={{ fontSize: chartTypography.tickSize, fill: chartColors.axis }} angle={-20} textAnchor="end" interval={0} />
+            <YAxis domain={[0, 10]} tick={{ fontSize: chartTypography.tickSize, fill: chartColors.axis }} />
             <Tooltip formatter={(value) => [Number(value).toFixed(2), "Promedio"]} />
-            <Bar dataKey="promedio" fill="#4f46e5" radius={[6, 6, 0, 0]} maxBarSize={42} />
+            <Bar dataKey="promedio" fill={chartColors.primary} radius={[6, 6, 0, 0]} maxBarSize={42} />
           </BarChart>
         </ResponsiveContainer></div>
       </ChartCard>
@@ -55,7 +57,7 @@ export function ReportCharts({ alumnos }: { alumnos: ReporteRendimientoAlumno[] 
                 {resultados.map((item) => <Cell key={item.name} fill={item.color} />)}
               </Pie>
               <Tooltip formatter={(value) => Number(value).toLocaleString("es-AR")} />
-              <Legend verticalAlign="bottom" iconType="circle" />
+              <Legend verticalAlign="bottom" iconType="circle" formatter={(value) => <span className="text-sm text-slate-700">{value}</span>} />
             </PieChart>
           </ResponsiveContainer></div></>
         )}

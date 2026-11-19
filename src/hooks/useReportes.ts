@@ -6,6 +6,7 @@ import {
   obtenerReporteRendimientoGrupos,
   obtenerReporteRendimientoPreguntas,
   obtenerReporteOpcionesPregunta,
+  obtenerResultadosVariantes,
 } from "@/services/api/reportes.api";
 import type {
   ReporteEvaluacionesFiltros,
@@ -15,6 +16,7 @@ import type {
   ReporteRendimientoDetalle,
   ReporteRendimientoFiltros,
   ReporteRendimientoListado,
+  ReporteContenidoFiltrosBase,
 } from "@/types/index";
 import { isValidId, reporteKeys } from "@/lib/query-keys";
 
@@ -95,6 +97,17 @@ export const useReporteRendimientoGrupos = (
     queryFn: () => obtenerReporteRendimientoGrupos(filtros),
     enabled,
     placeholderData: (previousData) => previousData,
+  });
+
+export const useResultadosVariantes = (
+  filtros: ReporteContenidoFiltrosBase,
+  clavesContenido: string[],
+  enabled: boolean,
+) =>
+  useQuery({
+    queryKey: [...reporteKeys.rendimientoPreguntas, "variantes", filtros, [...clavesContenido].sort()],
+    queryFn: () => obtenerResultadosVariantes(filtros, clavesContenido),
+    enabled: enabled && clavesContenido.length > 0,
   });
 
 export const useReporteOpcionesPregunta = (

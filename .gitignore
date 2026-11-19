@@ -5,11 +5,15 @@
 /.pnp
 .pnp.*
 .yarn/*
+.codex
+.impeccable
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
+API.md
+DATABASE.md
+PRODUCT.md
 # testing
 /coverage
 /playwright-report

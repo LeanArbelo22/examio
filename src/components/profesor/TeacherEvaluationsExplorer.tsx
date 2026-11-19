@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -71,7 +71,24 @@ function ActivitiesGrid({
 }
 
 export function TeacherEvaluationsExplorer() {
-  const [selection, setSelection] = useState<ExplorerSelection>({ view: "subjects" });
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const idMateria = Number(searchParams.get("idMateria"));
+  const idMateriaDivision = Number(searchParams.get("idMateriaDivision"));
+  const selection: ExplorerSelection = Number.isSafeInteger(idMateria) && idMateria > 0
+    ? Number.isSafeInteger(idMateriaDivision) && idMateriaDivision > 0
+      ? { view: "commission", idMateria, idMateriaDivision }
+      : { view: "subject", idMateria }
+    : { view: "subjects" };
+  const setSelection = (next: ExplorerSelection) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("idMateria");
+    params.delete("idMateriaDivision");
+    if (next.view !== "subjects") params.set("idMateria", String(next.idMateria));
+    if (next.view === "commission") params.set("idMateriaDivision", String(next.idMateriaDivision));
+    router.push(`${pathname}${params.size ? `?${params}` : ""}`, { scroll: false });
+  };
   const { data: session, status: sessionStatus } = useSession();
   const legajo = Number(session?.user?.identificadorInstitucional) || 0;
   const query = useGetEvaluacionesDocente(legajo);

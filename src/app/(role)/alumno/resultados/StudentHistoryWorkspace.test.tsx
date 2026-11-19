@@ -167,4 +167,18 @@ describe("StudentHistoryWorkspace", () => {
     ).toBeInTheDocument();
     expect(routerReplace).not.toHaveBeenCalled();
   });
+
+  it("ordena junto a los resultados conservando los filtros aplicados y reiniciando la página", async () => {
+    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams("idMateria=4&resultado=aprobado&pagina=2") as never);
+    render(<StudentHistoryWorkspace />);
+    const ordering = screen.getByLabelText("Ordenar por");
+    expect(within(ordering).queryByRole("option", { name: "Todos" })).not.toBeInTheDocument();
+    await userEvent.selectOptions(ordering, "nota");
+    const target = routerReplace.mock.calls.at(-1)?.[0] as string;
+    const params = new URL(target, "http://localhost").searchParams;
+    expect(params.get("idMateria")).toBe("4");
+    expect(params.get("resultado")).toBe("aprobado");
+    expect(params.get("ordenarPor")).toBe("nota");
+    expect(params.get("pagina")).toBe("1");
+  });
 });

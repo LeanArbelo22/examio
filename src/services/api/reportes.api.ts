@@ -12,6 +12,8 @@ import type {
   ReporteOpcionesListado,
   ReportePreguntasFiltros,
   ReportePreguntasListado,
+  ReportePreguntaItem,
+  ReporteContenidoFiltrosBase,
 } from "@/types/index";
 
 export const obtenerReporteRendimientoEvaluaciones = (
@@ -48,6 +50,30 @@ export const obtenerReporteRendimientoGrupos = (
   apiFetch<ReporteGruposListado>(
     `/reportes/rendimiento-grupos${buildQueryString(filtros)}`,
   );
+
+// Las variantes del endpoint de grupos describen un grupo de origen. Sus
+// métricas no representan necesariamente el contenido agregado del reporte.
+export async function obtenerResultadosVariantes(
+  filtros: ReporteContenidoFiltrosBase,
+  clavesContenido: string[],
+): Promise<ReportePreguntaItem[]> {
+  const pendientes = new Set(clavesContenido);
+  const resultados: ReportePreguntaItem[] = [];
+  for (let pagina = 1; pendientes.size > 0; pagina += 1) {
+    const reporte = await obtenerReporteRendimientoPreguntas({
+      ...filtros,
+      pagina,
+      limite: 100,
+      ordenarPor: "pregunta",
+      ordenDireccion: "asc",
+    });
+    for (const item of reporte.items) {
+      if (pendientes.delete(item.claveContenido)) resultados.push(item);
+    }
+    if (pagina >= reporte.pagination.totalPages) break;
+  }
+  return resultados;
+}
 
 export const obtenerReporteOpcionesPregunta = (
   idPregunta: number,

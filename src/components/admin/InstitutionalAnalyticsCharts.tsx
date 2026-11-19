@@ -1,5 +1,7 @@
 "use client";
 
+import { chartColors, chartTypography } from "@/lib/chart-tokens";
+
 import {
   Bar,
   CartesianGrid,
@@ -81,7 +83,7 @@ export function InstitutionalRankingView({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs font-semibold text-slate-500">
+      <p className="text-sm font-semibold text-slate-500">
         Mostrando {items.length} de {totalAvailable} disponibles · selección: {requestedLabel}
       </p>
       {useBars ? (
@@ -101,9 +103,9 @@ export function InstitutionalRankingView({
                     <span>
                       <span className="font-black text-indigo-700">{item.posicion}.</span>{" "}
                       <span className="font-bold text-slate-900">{itemLabel(item)}</span>
-                      {itemContext(item) && <span className="mt-0.5 block text-xs text-slate-500">{itemContext(item)}</span>}
+                      {itemContext(item) && <span className="mt-0.5 block text-sm text-slate-500">{itemContext(item)}</span>}
                     </span>
-                    <span className="text-xs text-slate-600 sm:text-right">
+                    <span className="text-sm text-slate-600 sm:text-right">
                       <span className="block text-base font-black text-slate-900">{formatPercent(official.porcentajeAprobacion)}</span>
                       <span>{official.aprobados}/{official.resultadosConsiderados} aprobados · promedio {formatAverage(official.promedioNotaBase10)} sobre 10 ({official.resultadosConsiderados} resultados) · {official.resultadosPendientes} pendientes · {formatPercent(official.porcentajeCoberturaConfirmada)} confirmados</span>
                     </span>
@@ -115,7 +117,7 @@ export function InstitutionalRankingView({
         </ol>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full min-w-[780px] text-xs">
+          <table className="w-full min-w-[780px] text-sm">
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
                 <th className="px-4 py-3">Posición</th>
@@ -133,9 +135,9 @@ export function InstitutionalRankingView({
                 return (
                   <tr key={itemKey(item)} className="border-t border-slate-100 hover:bg-indigo-50/40">
                     <td className="px-4 py-3 font-black text-indigo-700">{item.posicion}</td>
-                    <td className="px-4 py-3"><button type="button" onClick={() => onSelect(item)} className="font-bold text-slate-900 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{itemLabel(item)}</button>{itemContext(item) && <span className="block text-[10px] text-slate-500">{itemContext(item)}</span>}</td>
+                    <td className="px-4 py-3"><button type="button" onClick={() => onSelect(item)} className="font-bold text-slate-900 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{itemLabel(item)}</button>{itemContext(item) && <span className="block text-sm text-slate-500">{itemContext(item)}</span>}</td>
                     <td className="px-4 py-3 text-right font-black text-slate-900">{formatPercent(official.porcentajeAprobacion)}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatAverage(official.promedioNotaBase10)}<span className="block text-[10px] font-normal text-slate-500">{official.resultadosConsiderados} resultados</span></td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatAverage(official.promedioNotaBase10)}<span className="block text-sm font-normal text-slate-500">{official.resultadosConsiderados} resultados</span></td>
                     <td className="px-4 py-3 text-right text-slate-600">{official.resultadosConsiderados}</td>
                     <td className="px-4 py-3 text-right text-amber-700">{official.resultadosPendientes}</td>
                     <td className="px-4 py-3 text-right text-slate-600">{formatPercent(official.porcentajeCoberturaConfirmada)}</td>
@@ -193,26 +195,26 @@ export function InstitutionalTemporalChart({
       <div aria-hidden="true" className="h-96 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 18, right: 28, left: 8, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#64748b" }} />
-            {showCounts && <YAxis yAxisId="count" hide allowDecimals={false} />}
-            {showApproval && <YAxis yAxisId="percent" orientation="left" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(value: number) => `${value}%`} allowDataOverflow tick={{ fontSize: 10, fill: "#64748b" }} label={{ value: "Aprobación (%)", angle: -90, position: "insideLeft", fill: "#047857", fontSize: 10 }} />}
-            {showAverage && <YAxis yAxisId="average" orientation="right" domain={[0, 10]} tick={{ fontSize: 10, fill: "#64748b" }} label={{ value: "Nota sobre 10", angle: 90, position: "insideRight", fill: "#0369a1", fontSize: 10 }} />}
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.grid} />
+            <XAxis dataKey="label" tick={{ fontSize: chartTypography.tickSize, fill: chartColors.axis }} />
+            {showCounts && <YAxis yAxisId="count" width={0} hide allowDecimals={false} />}
+            {showApproval && <YAxis yAxisId="percent" width={64} orientation="left" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(value: number) => `${value}%`} allowDataOverflow tick={{ fontSize: chartTypography.tickSize, fill: chartColors.axis }} label={{ value: "Aprobación (%)", angle: -90, position: "insideLeft", fill: chartColors.approvalLabel, fontSize: chartTypography.tickSize }} />}
+            {showAverage && <YAxis yAxisId="average" width={56} orientation="right" domain={[0, 10]} tick={{ fontSize: chartTypography.tickSize, fill: chartColors.axis }} label={{ value: "Nota sobre 10", angle: 90, position: "insideRight", fill: chartColors.averageLabel, fontSize: chartTypography.tickSize }} />}
             <Tooltip filterNull={false} labelFormatter={labelFormatter} formatter={tooltipFormatter} />
-            <Legend verticalAlign="top" iconType="circle" />
-            {showConfirmed && <Bar yAxisId="count" dataKey="considered" name="Resultados confirmados" stackId="results" fill="#a5b4fc"><LabelList dataKey="considered" position="insideTop" fill="#312e81" fontSize={11} fontWeight={700} /></Bar>}
-            {showPending && <Bar yAxisId="count" dataKey="pending" name="Resultados pendientes" stackId="results" fill="#fcd34d" radius={[5, 5, 0, 0]}><LabelList dataKey="pending" position="insideTop" fill="#78350f" fontSize={11} fontWeight={700} /></Bar>}
-            {showApproval && <Line yAxisId="percent" dataKey="approval" stroke="#059669" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls legendType="none" tooltipType="none" />}
-            {showApproval && <Line yAxisId="percent" dataKey="approval" name="Aprobación observada" stroke="#059669" strokeWidth={3} dot={{ r: 4 }} connectNulls={false} />}
-            {showAverage && <Line yAxisId="average" dataKey="average" stroke="#0284c7" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls legendType="none" tooltipType="none" />}
-            {showAverage && <Line yAxisId="average" dataKey="average" name="Promedio de notas" stroke="#0284c7" strokeWidth={3} dot={{ r: 4 }} connectNulls={false} />}
+            <Legend verticalAlign="top" iconType="circle" formatter={(value) => <span className="text-sm text-slate-700">{value}</span>} />
+            {showConfirmed && <Bar yAxisId="count" dataKey="considered" name="Resultados confirmados" stackId="results" fill={chartColors.confirmedFill}><LabelList dataKey="considered" position="insideTop" fill={chartColors.confirmedLabel} fontSize={chartTypography.tickSize} fontWeight={700} /></Bar>}
+            {showPending && <Bar yAxisId="count" dataKey="pending" name="Resultados pendientes" stackId="results" fill={chartColors.pendingFill} radius={[5, 5, 0, 0]}><LabelList dataKey="pending" position="insideTop" fill={chartColors.pendingLabel} fontSize={chartTypography.tickSize} fontWeight={700} /></Bar>}
+            {showApproval && <Line yAxisId="percent" dataKey="approval" stroke={chartColors.approval} strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls legendType="none" tooltipType="none" />}
+            {showApproval && <Line yAxisId="percent" dataKey="approval" name="Aprobación observada" stroke={chartColors.approval} strokeWidth={3} dot={{ r: 4 }} connectNulls={false} />}
+            {showAverage && <Line yAxisId="average" dataKey="average" stroke={chartColors.average} strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls legendType="none" tooltipType="none" />}
+            {showAverage && <Line yAxisId="average" dataKey="average" name="Promedio de notas" stroke={chartColors.average} strokeWidth={3} dot={{ r: 4 }} connectNulls={false} />}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
       <details className="mt-3 rounded-xl border border-slate-200 px-4 py-3">
-        <summary className="cursor-pointer text-xs font-bold text-indigo-700">Ver datos de la evolución</summary>
+        <summary className="cursor-pointer text-sm font-bold text-indigo-700">Ver datos de la evolución</summary>
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[640px] text-xs">
+          <table className="w-full min-w-[640px] text-sm">
             <thead><tr className="border-b border-slate-200 text-left text-slate-500"><th className="px-2 py-2">Período</th>{showApproval && <th className="px-2 py-2 text-right">Aprobación</th>}{showAverage && <th className="px-2 py-2 text-right">Promedio de notas · sobre 10</th>}{showConfirmed && <th className="px-2 py-2 text-right">Confirmados</th>}{showPending && <th className="px-2 py-2 text-right">Pendientes</th>}<th className="px-2 py-2 text-right">Cobertura</th></tr></thead>
             <tbody>{data.map((point) => <tr key={point.period} className="border-b border-slate-100 last:border-0"><td className="px-2 py-2.5 font-semibold text-slate-700">{point.label}{!point.complete ? " · parcial" : ""}</td>{showApproval && <td className="px-2 py-2.5 text-right">{point.approval === null ? "Sin resultados" : formatPercent(point.approval)}</td>}{showAverage && <td className="px-2 py-2.5 text-right">{point.average === null ? "Sin resultados" : <>{formatAverage(point.average)} <span className="text-slate-500">· {point.considered} resultados</span></>}</td>}{showConfirmed && <td className="px-2 py-2.5 text-right">{point.considered}</td>}{showPending && <td className="px-2 py-2.5 text-right text-amber-700">{point.pending}</td>}<td className="px-2 py-2.5 text-right">{point.coverage === null ? "Sin resultados" : formatPercent(point.coverage)}</td></tr>)}</tbody>
           </table>

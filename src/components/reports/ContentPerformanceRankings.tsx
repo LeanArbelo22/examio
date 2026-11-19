@@ -58,14 +58,14 @@ function RankingList({
       {availableItems.map((item, index) => {
         const content = (
           <>
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-black text-indigo-700">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-black text-indigo-700">
               {index + 1}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block line-clamp-2 text-sm font-bold text-slate-900">
                 {title(item)}
               </span>
-              <span className="mt-1 block text-xs text-slate-500">
+              <span className="mt-1 block text-sm text-slate-500">
                 {item.muestrasConfirmadas.toLocaleString("es-AR")} respuestas calificadas
                 {"cantidadVariantes" in item
                   ? ` · ${item.cantidadVariantes} variante${item.cantidadVariantes === 1 ? "" : "s"}`
@@ -115,17 +115,17 @@ export function ContentPerformanceRankings({
   return (
     <section aria-labelledby={`${kind}-rankings-title`}>
       <div className="mb-3">
-        <h2 id={`${kind}-rankings-title`} className="text-base font-black text-slate-900">
+        <h2 id={`${kind}-rankings-title`} className="text-base font-bold text-slate-900">
           Rankings de {label}
         </h2>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-sm text-slate-500">
           Las primeras cinco posiciones se calculan sobre todo el conjunto que coincide con los filtros.
         </p>
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
         <article className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
-          <h3 className="text-sm font-black text-slate-900">Menor puntaje promedio</h3>
-          <p className="mb-3 mt-1 text-xs text-slate-500">
+          <h3 className="text-sm font-bold text-slate-900">Menor puntaje promedio</h3>
+          <p className="mb-3 mt-1 text-sm text-slate-500">
             Ayuda a identificar contenidos que podrían necesitar revisión.
           </p>
           <RankingList
@@ -135,8 +135,8 @@ export function ContentPerformanceRankings({
           />
         </article>
         <article className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
-          <h3 className="text-sm font-black text-slate-900">Mayor tiempo promedio</h3>
-          <p className="mb-3 mt-1 text-xs text-slate-500">
+          <h3 className="text-sm font-bold text-slate-900">Mayor tiempo promedio</h3>
+          <p className="mb-3 mt-1 text-sm text-slate-500">
             El tiempo aporta contexto, pero no demuestra dificultad ni comprensión.
           </p>
           <RankingList

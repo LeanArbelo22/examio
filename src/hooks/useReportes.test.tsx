@@ -6,6 +6,7 @@ import {
   obtenerDetalleRendimientoAlumno,
   obtenerReporteRendimientoEvaluaciones,
   obtenerReporteRendimientoPreguntas,
+  obtenerResultadosVariantes,
 } from "@/services/api/reportes.api";
 import type {
   ReporteEvaluacionesFiltros,
@@ -17,6 +18,7 @@ import {
   useDetalleRendimientoAlumno,
   useReporteRendimientoEvaluaciones,
   useReporteRendimientoPreguntas,
+  useResultadosVariantes,
 } from "./useReportes";
 
 vi.mock("@/services/api/reportes.api", async (importOriginal) => {
@@ -26,12 +28,14 @@ vi.mock("@/services/api/reportes.api", async (importOriginal) => {
     obtenerDetalleRendimientoAlumno: vi.fn(),
     obtenerReporteRendimientoEvaluaciones: vi.fn(),
     obtenerReporteRendimientoPreguntas: vi.fn(),
+    obtenerResultadosVariantes: vi.fn(),
   };
 });
 
 const detalleMock = vi.mocked(obtenerDetalleRendimientoAlumno);
 const evaluacionesMock = vi.mocked(obtenerReporteRendimientoEvaluaciones);
 const preguntasMock = vi.mocked(obtenerReporteRendimientoPreguntas);
+const variantesMock = vi.mocked(obtenerResultadosVariantes);
 
 function reporteEvaluaciones(pagina: number): ReporteEvaluacionesListado {
   return {
@@ -92,6 +96,23 @@ function reporteEvaluaciones(pagina: number): ReporteEvaluacionesListado {
 }
 
 describe("hooks de reportes", () => {
+  it("espera identidades y no conserva resultados de otro alcance al cambiar los filtros", async () => {
+    const { wrapper } = createQueryTestHarness();
+    variantesMock.mockReset().mockResolvedValueOnce([]).mockImplementationOnce(() => new Promise(() => {}));
+    const { result, rerender } = renderHook(
+      ({ publicacion, enabled }: { publicacion: string; enabled: boolean }) =>
+        useResultadosVariantes({ idPublicacion: publicacion, alcanceIntentos: "validos", estadoCorreccion: "confirmada" }, ["contenido"], enabled),
+      { wrapper, initialProps: { publicacion: "47", enabled: false } },
+    );
+    expect(variantesMock).not.toHaveBeenCalled();
+    rerender({ publicacion: "47", enabled: true });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(variantesMock).toHaveBeenCalledWith({ idPublicacion: "47", alcanceIntentos: "validos", estadoCorreccion: "confirmada" }, ["contenido"]);
+    rerender({ publicacion: "48", enabled: true });
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.isPending).toBe(true);
+  });
+
   beforeEach(() => {
     detalleMock.mockReset();
     evaluacionesMock.mockReset();

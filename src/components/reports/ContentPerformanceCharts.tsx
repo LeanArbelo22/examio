@@ -1,5 +1,7 @@
 "use client";
 
+import { chartColors } from "@/lib/chart-tokens";
+
 import {
   Cell,
   Legend,
@@ -23,14 +25,14 @@ export function ContentPerformanceCharts({
   kind,
 }: ContentPerformanceChartsProps) {
   const distribution = [
-    { name: "Correctas", value: Number(kpis.correctas), color: "#10b981" },
-    { name: "Parciales", value: Number(kpis.parciales), color: "#f59e0b" },
-    { name: "Incorrectas", value: Number(kpis.incorrectas), color: "#f43f5e" },
+    { name: "Correctas", value: Number(kpis.correctas), color: chartColors.success },
+    { name: "Parciales", value: Number(kpis.parciales), color: chartColors.pending },
+    { name: "Incorrectas", value: Number(kpis.incorrectas), color: chartColors.danger },
   ].filter((item) => item.value > 0);
   const responseStatus = [
-    { name: "Respondidas", value: Number(kpis.respondidas), color: "#3b82f6" },
-    { name: "Omitidas", value: Number(kpis.omitidas), color: "#94a3b8" },
-    { name: "Pendientes de corrección", value: Number(kpis.pendientesCorreccion), color: "#f59e0b" },
+    { name: "Respondidas", value: Number(kpis.respondidas), color: chartColors.activity },
+    { name: "Omitidas", value: Number(kpis.omitidas), color: chartColors.muted },
+    { name: "Pendientes de corrección", value: Number(kpis.pendientesCorreccion), color: chartColors.pending },
   ].filter((item) => item.value > 0);
 
   return (
@@ -66,7 +68,7 @@ export function ContentPerformanceCharts({
                     ))}
                   </Pie>
                   <Tooltip formatter={(value) => Number(value).toLocaleString("es-AR")} />
-                  <Legend verticalAlign="bottom" iconType="circle" />
+                  <Legend verticalAlign="bottom" iconType="circle" formatter={(value) => <span className="text-sm text-slate-700">{value}</span>} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -104,7 +106,7 @@ export function ContentPerformanceCharts({
                     ))}
                   </Pie>
                   <Tooltip formatter={(value) => Number(value).toLocaleString("es-AR")} />
-                  <Legend verticalAlign="bottom" iconType="circle" />
+                  <Legend verticalAlign="bottom" iconType="circle" formatter={(value) => <span className="text-sm text-slate-700">{value}</span>} />
                 </PieChart>
               </ResponsiveContainer>
             </div>

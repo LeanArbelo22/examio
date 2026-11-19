@@ -1,5 +1,7 @@
 "use client";
 
+import { chartColors, chartTypography } from "@/lib/chart-tokens";
+
 import {
   Bar,
   BarChart,
@@ -20,12 +22,12 @@ import type {
 import { ChartCard } from "./ChartCard";
 
 const categoryColors: Record<string, string> = {
-  Aprobados: "#10b981",
-  Desaprobados: "#f43f5e",
-  "Pendientes de corrección": "#f59e0b",
-  "En progreso": "#3b82f6",
-  Vencidos: "#64748b",
-  Anulados: "#a855f7",
+  Aprobados: chartColors.success,
+  Desaprobados: chartColors.danger,
+  "Pendientes de corrección": chartColors.pending,
+  "En progreso": chartColors.activity,
+  Vencidos: chartColors.neutral,
+  Anulados: chartColors.cancelled,
 };
 
 export function EvaluationReportCharts({
@@ -81,14 +83,14 @@ export function EvaluationReportCharts({
           <div aria-hidden="true" className="h-full w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={comparisonData} margin={{ top: 8, right: 8, left: -12, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="reference" tick={{ fontSize: 11, fill: "#64748b" }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#64748b" }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.grid} />
+                <XAxis dataKey="reference" tick={{ fontSize: chartTypography.tickSize, fill: chartColors.axis }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: chartTypography.tickSize, fill: chartColors.axis }} />
                 <Tooltip labelFormatter={(label) => evaluationName(String(label))} />
-                <Legend verticalAlign="bottom" iconType="circle" />
-                <Bar dataKey="alcanzados" name="Alcanzados" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="iniciaron" name="Iniciaron" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="entregaron" name="Entregaron" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Legend verticalAlign="bottom" iconType="circle" formatter={(value) => <span className="text-sm text-slate-700">{value}</span>} />
+                <Bar dataKey="alcanzados" name="Alcanzados" fill={chartColors.comparison} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="iniciaron" name="Iniciaron" fill={chartColors.activity} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="entregaron" name="Entregaron" fill={chartColors.success} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -107,21 +109,21 @@ export function EvaluationReportCharts({
           <div aria-hidden="true" className="h-full w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={comparisonData} margin={{ top: 8, right: 8, left: -12, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="reference" tick={{ fontSize: 11, fill: "#64748b" }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#64748b" }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.grid} />
+                <XAxis dataKey="reference" tick={{ fontSize: chartTypography.tickSize, fill: chartColors.axis }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: chartTypography.tickSize, fill: chartColors.axis }} />
                 <Tooltip labelFormatter={(label) => evaluationName(String(label))} />
-                <Legend verticalAlign="bottom" iconType="circle" />
-                <Bar dataKey="aprobados" name="Aprobados" stackId="results" fill="#10b981" />
-                <Bar dataKey="desaprobados" name="Desaprobados" stackId="results" fill="#f43f5e" />
-                <Bar dataKey="pendientes" name="Pendientes" stackId="results" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                <Legend verticalAlign="bottom" iconType="circle" formatter={(value) => <span className="text-sm text-slate-700">{value}</span>} />
+                <Bar dataKey="aprobados" name="Aprobados" stackId="results" fill={chartColors.success} />
+                <Bar dataKey="desaprobados" name="Desaprobados" stackId="results" fill={chartColors.danger} />
+                <Bar dataKey="pendientes" name="Pendientes" stackId="results" fill={chartColors.pending} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </ChartCard>
         <div className="xl:col-span-2">
           <h3 className="sr-only">Referencias de evaluaciones</h3>
-          <ul className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid gap-2 text-sm text-slate-600 sm:grid-cols-2 xl:grid-cols-3">
             {comparisonData.map((item) => (
               <li key={item.reference} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                 <strong className="text-indigo-700">{item.reference}</strong> · {item.title}
@@ -157,14 +159,14 @@ export function EvaluationReportCharts({
                 {data.map((item) => (
                   <Cell
                     key={item.categoria}
-                    fill={categoryColors[item.categoria] ?? "#6366f1"}
+                    fill={categoryColors[item.categoria] ?? chartColors.comparison}
                   />
                 ))}
               </Pie>
               <Tooltip
                 formatter={(value) => Number(value).toLocaleString("es-AR")}
               />
-              <Legend verticalAlign="bottom" iconType="circle" />
+              <Legend verticalAlign="bottom" iconType="circle" formatter={(value) => <span className="text-sm text-slate-700">{value}</span>} />
             </PieChart>
           </ResponsiveContainer></div></>
         )}

@@ -292,7 +292,7 @@ export function EvaluacionesReport() {
         render: (row) => (
           <div>
             <p className="font-bold text-slate-800">{row.titulo}</p>
-            <p className="mt-0.5 text-[10px] text-slate-400">
+            <p className="mt-0.5 text-sm text-slate-400">
               Publicación #{row.idPublicacion}
             </p>
           </div>
@@ -304,7 +304,7 @@ export function EvaluacionesReport() {
         render: (row) => (
           <div>
             <p className="font-semibold text-slate-700">{row.materia}</p>
-            <p className="text-[10px] text-slate-400">{row.division}</p>
+            <p className="text-sm text-slate-400">{row.division}</p>
           </div>
         ),
       },
@@ -348,12 +348,12 @@ export function EvaluacionesReport() {
               {row.totalIncidentes}
             </span>
             {row.incidentesSinRevisar > 0 && (
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-sm font-bold text-amber-700">
                 {row.incidentesSinRevisar} pendientes
               </span>
             )}
             {row.intentosAnulados > 0 && (
-              <span className="text-[10px] font-bold text-red-700">
+              <span className="text-sm font-bold text-red-700">
                 {row.intentosAnulados} anulados
               </span>
             )}
@@ -390,13 +390,14 @@ export function EvaluacionesReport() {
       actions={
         <Button
           onClick={() => router.push("/profesor")}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
         >
           Volver al panel
         </Button>
       }
     >
       <ReportFilterPanel
+        primaryKeys={["idMateria", "idMateriaDivision", "fechaDesde", "fechaHasta"]}
         key={searchParams.toString()}
         filters={visibleFilters}
         definitions={filterDefinitions}

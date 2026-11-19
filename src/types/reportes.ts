@@ -32,6 +32,11 @@ export type ReporteEvaluacionesOrden =
   | "pendientesCorreccion";
 
 export interface ReporteEvaluacionesFiltros {
+  resumenPersonas?: "alumnos" | "docentes";
+  paginaPersonas?: number;
+  limitePersonas?: number;
+  matriculaAlumno?: string;
+  legajoDocente?: string;
   idCarrera?: string;
   idMateria?: string;
   idMateriaDivision?: string;
@@ -67,6 +72,8 @@ export interface ResumenInstitucionalBase {
 }
 
 export interface ResumenInstitucionalComision extends ResumenInstitucionalBase {
+  idDocente?: number | null;
+  docente?: string | null;
   idCarrera: number;
   carrera: string;
   idMateria: number;
@@ -239,6 +246,8 @@ export interface ReporteEvaluacionesDistribucionItem {
 }
 
 export interface ReporteEvaluacionItem {
+  idDocente?: number | null;
+  docente?: string | null;
   idPublicacion: number;
   idActividad: number;
   idCarrera: number;
@@ -301,7 +310,24 @@ export interface ReporteEvaluacionesListado {
   evaluaciones: ReporteEvaluacionItem[];
   paginacion: ReporteRendimientoPaginacion;
   resumenInstitucional?: ResumenInstitucional;
+  resumenPersonas?: ResumenPersonas;
 }
+
+interface ResultadoPersonaBase {
+  nombre: string;
+  apellido: string;
+  resultadosOficiales: ResultadosOficiales;
+}
+
+export type ResumenPersonas = {
+  tipo: "alumnos";
+  items: (ResultadoPersonaBase & { matricula: number })[];
+  paginacion: ReporteRendimientoPaginacion;
+} | {
+  tipo: "docentes";
+  items: (ResultadoPersonaBase & { legajo: number })[];
+  paginacion: ReporteRendimientoPaginacion;
+};
 
 export interface ReporteRendimientoFiltros {
   matricula?: string;

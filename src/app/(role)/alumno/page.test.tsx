@@ -1,4 +1,6 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { ApiError } from "@/lib/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSession } from "next-auth/react";
 import {
@@ -23,8 +25,10 @@ describe("AlumnoPage", () => {
     vi.mocked(useGetExamenesPendientes).mockReturnValue({
       data: [],
       isLoading: false,
+      isSuccess: true,
     } as never);
     vi.mocked(useGetEstadisticasAlumno).mockReturnValue({
+      isSuccess: true,
       data: {
         totalCorregidos: 1,
         promedioGeneral: 7,
@@ -33,6 +37,7 @@ describe("AlumnoPage", () => {
       },
     } as never);
     vi.mocked(useGetHistorialCorregido).mockReturnValue({
+      isSuccess: true,
       data: [
         {
           idIntento: 21,
@@ -84,6 +89,7 @@ describe("AlumnoPage", () => {
         },
       ],
       isLoading: false,
+      isSuccess: true,
     } as never);
 
     render(<AlumnoPage />);
@@ -94,5 +100,50 @@ describe("AlumnoPage", () => {
       "href",
       "/alumno/examen/31",
     );
+  });
+
+  it("no informa que está al día ante un error y permite reintentar sin ocultar resultados", async () => {
+    const refetch = vi.fn();
+    vi.mocked(useGetExamenesPendientes).mockReturnValue({
+      isError: true, isSuccess: false, isPending: false,
+      error: new ApiError("Falla", 503), refetch,
+    } as never);
+    const view = render(<AlumnoPage />);
+    expect(screen.queryByText("Estás al día")).not.toBeInTheDocument();
+    expect(screen.queryByText("0 pendientes")).not.toBeInTheDocument();
+    expect(screen.getByText("Parcial de redes")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+    expect(refetch).toHaveBeenCalledOnce();
+    vi.mocked(useGetExamenesPendientes).mockReturnValue({ data: [], isSuccess: true } as never);
+    view.rerender(<AlumnoPage />);
+    expect(screen.getByText("Estás al día")).toBeVisible();
+  });
+
+  it("espera la respuesta de cada sección antes de mostrar estados vacíos", () => {
+    vi.mocked(useGetExamenesPendientes).mockReturnValue({ isPending: true } as never);
+    vi.mocked(useGetEstadisticasAlumno).mockReturnValue({ isPending: true } as never);
+    vi.mocked(useGetHistorialCorregido).mockReturnValue({ isPending: true } as never);
+    render(<AlumnoPage />);
+    expect(screen.getAllByRole("status")).toHaveLength(3);
+    expect(screen.queryByText("Estás al día")).not.toBeInTheDocument();
+    expect(screen.queryByText("Todavía no hay resultados")).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("aísla las fallas del resumen y del historial sin presentarlas como ausencia de resultados", () => {
+    const failure = { isError: true, error: new ApiError("Falla", 503), refetch: vi.fn() };
+    vi.mocked(useGetEstadisticasAlumno).mockReturnValue(failure as never);
+    vi.mocked(useGetHistorialCorregido).mockReturnValue(failure as never);
+    render(<AlumnoPage />);
+    expect(screen.getByText("Estás al día")).toBeVisible();
+    expect(screen.getAllByRole("alert")).toHaveLength(2);
+    expect(screen.queryByText("Todavía no hay resultados")).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("no anuncia un promedio cero cuando aún no hay calificaciones", () => {
+    vi.mocked(useGetEstadisticasAlumno).mockReturnValue({ isSuccess: true, data: { promedioGeneral: null } } as never);
+    render(<AlumnoPage />);
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 });

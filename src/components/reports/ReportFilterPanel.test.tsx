@@ -52,4 +52,25 @@ describe("ReportFilterPanel", () => {
     await user.click(screen.getByRole("button", { name: "Limpiar filtros" }));
     expect(onClear).toHaveBeenCalledOnce();
   });
+
+  it("conserva el borrador avanzado al plegarlo y lo aplica junto con los filtros principales", async () => {
+    const user = userEvent.setup();
+    const onSearch = vi.fn();
+    render(<ReportFilterPanel primaryKeys={["matricula"]} filters={{ matricula: "", estado: "" }} definitions={definitions} onSearch={onSearch} onClear={vi.fn()} />);
+    expect(screen.getByLabelText("Estado")).not.toBeVisible();
+    await user.click(screen.getByText("Más filtros"));
+    await user.selectOptions(screen.getByLabelText("Estado"), "entregado");
+    await user.click(screen.getByText("Más filtros"));
+    expect(screen.getByLabelText("Estado")).not.toBeVisible();
+    await user.type(screen.getByLabelText("Matrícula"), "30123");
+    await user.click(screen.getByRole("button", { name: "Buscar" }));
+    expect(onSearch).toHaveBeenCalledWith({ matricula: "30123", estado: "entregado" });
+  });
+
+  it("hace visibles los criterios avanzados ya aplicados desde un enlace", () => {
+    render(<ReportFilterPanel primaryKeys={["matricula"]} filters={{ matricula: "", estado: "entregado" }} definitions={definitions} onSearch={vi.fn()} onClear={vi.fn()} />);
+    expect(screen.getByText("Más filtros · 1 aplicado")).toBeVisible();
+    expect(screen.getByLabelText("Estado")).toBeVisible();
+    expect(screen.getByLabelText("Estado")).toHaveValue("entregado");
+  });
 });

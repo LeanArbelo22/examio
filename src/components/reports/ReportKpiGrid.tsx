@@ -20,14 +20,14 @@ export function ReportKpiGrid({ items }: { items: ReportKpiItem[] }) {
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       {items.map((item) => (
-        <article key={item.id ?? item.label} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_4px_rgba(0,0,0,0.005)]">
+        <article key={item.id ?? item.label} className="min-w-0 rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{item.label}</p>
-              <p className="mt-2 text-2xl font-black tracking-tight text-slate-800">{item.value}</p>
-              {item.helper && <p className="mt-1 text-[11px] text-slate-400">{item.helper}</p>}
+            <div className="min-w-0 break-words">
+              <p className="text-sm font-semibold leading-snug text-slate-600">{item.label}</p>
+              <p className="mt-2 break-words text-2xl font-bold tabular-nums tracking-tight text-slate-900">{item.value}</p>
+              {item.helper && <p className="mt-1 text-sm leading-relaxed text-slate-600">{item.helper}</p>}
             </div>
-            {item.icon && <div className={`rounded-xl p-2 ${tones[item.tone ?? "indigo"]}`}>{item.icon}</div>}
+            {item.icon && <div aria-hidden="true" className={`hidden shrink-0 rounded-xl p-2 sm:block ${tones[item.tone ?? "indigo"]}`}>{item.icon}</div>}
           </div>
         </article>
       ))}

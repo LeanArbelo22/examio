@@ -128,7 +128,7 @@ export function RendimientoReport() {
     updateUrl({ ...normalizedValues, pagina: 1 });
   };
   const columns = useMemo<ReportColumn<ReporteRendimientoAlumno, ReporteRendimientoOrden>[]>(() => [
-    { key: "alumno", header: "Alumno", sortKey: "alumno", render: (row) => <div><p className="font-bold text-slate-800">{row.apellido}, {row.nombre}</p><p className="mt-0.5 text-[10px] text-slate-400">Ver detalle</p></div> },
+    { key: "alumno", header: "Alumno", sortKey: "alumno", render: (row) => <div><p className="font-bold text-slate-800">{row.apellido}, {row.nombre}</p></div> },
     { key: "matricula", header: "Matrícula", render: (row) => <span className="font-mono font-semibold">{row.matricula}</span> },
     { key: "promedio", header: "Promedio", align: "right", sortKey: "promedio", render: (row) => <span className="text-sm font-black text-slate-800">{row.promedio.toFixed(2)}</span> },
     { key: "intentos", header: "Intentos", align: "center", sortKey: "intentos", render: (row) => row.totalIntentos },
@@ -137,8 +137,8 @@ export function RendimientoReport() {
     { key: "porcentaje", header: "% aprobación", align: "right", render: (row) => `${row.porcentajeAprobacion.toFixed(1)}%` },
   ], []);
 
-  return <ReportLayout title="Rendimiento por alumno" description="Analizá promedios, intentos y aprobación de los alumnos dentro de tus materias y comisiones." actions={<Button onClick={() => router.push("/profesor")} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50">Volver al panel</Button>}>
-    <ReportFilterPanel key={searchParams.toString()} filters={visibleFilters} definitions={filterDefinitions} onSearch={search} onClear={() => { setFilterValidationError(null); router.replace(pathname, { scroll: false }); }} />
+  return <ReportLayout title="Rendimiento por alumno" description="Analizá promedios, intentos y aprobación de los alumnos dentro de tus materias y comisiones." actions={<Button onClick={() => router.push("/profesor")} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">Volver al panel</Button>}>
+    <ReportFilterPanel key={searchParams.toString()} primaryKeys={["idMateria", "idMateriaDivision", "fechaDesde", "fechaHasta"]} filters={visibleFilters} definitions={filterDefinitions} onSearch={search} onClear={() => { setFilterValidationError(null); router.replace(`${pathname}?reporte=alumnos`, { scroll: false }); }} />
     {filterValidationError && <ErrorMessage message={filterValidationError} />}
     {isLoading && <ReportSkeleton />}
     {isError && (
@@ -150,7 +150,7 @@ export function RendimientoReport() {
     )}
     {data && <div className={`space-y-6 transition-opacity ${isFetching ? "opacity-60" : "opacity-100"}`} aria-busy={isFetching}>
       <ReportKpiGrid items={[{ label: "Promedio general", value: data.kpis.promedioGeneral.toFixed(2), helper: `Sobre 10 · ${data.kpis.alcanceIntentos === "validos" ? "intentos válidos" : "todos los intentos"}`, tone: "indigo" }, { label: "Total de alumnos", value: data.kpis.totalAlumnos.toLocaleString("es-AR"), helper: `${data.kpis.conIntentos} con intentos`, tone: "blue" }, { label: "Total de intentos", value: data.kpis.totalIntentos.toLocaleString("es-AR"), helper: `${data.kpis.intentosAlcanceAcademico} en el cálculo académico`, tone: "amber" }, { label: "Tasa de aprobación", value: `${data.kpis.tasaAprobacion.toFixed(1)}%`, tone: "emerald" }]} />
-      <ReportTable columns={columns} rows={data.alumnos} rowKey={(row) => row.matricula} sortBy={filters.ordenarPor ?? "alumno"} sortDirection={filters.ordenDireccion ?? "asc"} onSort={(ordenarPor, ordenDireccion) => updateUrl({ ordenarPor, ordenDireccion, pagina: 1 })} onRowClick={(row) => setSelectedStudent(row.matricula)} page={data.paginacion.pagina} totalPages={data.paginacion.totalPaginas} total={data.paginacion.total} itemLabel="alumnos" onPageChange={(pagina) => updateUrl({ pagina })} />
+      <ReportTable columns={columns} rows={data.alumnos} rowKey={(row) => row.matricula} sortBy={filters.ordenarPor ?? "alumno"} sortDirection={filters.ordenDireccion ?? "asc"} onSort={(ordenarPor, ordenDireccion) => updateUrl({ ordenarPor, ordenDireccion, pagina: 1 })} onRowClick={(row) => setSelectedStudent(row.matricula)} rowActionLabel={(row) => `Ver detalle de ${row.apellido}, ${row.nombre}`} page={data.paginacion.pagina} totalPages={data.paginacion.totalPaginas} total={data.paginacion.total} itemLabel="alumnos" onPageChange={(pagina) => updateUrl({ pagina })} />
     </div>}
     <StudentReportDetail matricula={selectedStudent} filters={filters} onClose={() => setSelectedStudent(null)} />
   </ReportLayout>;

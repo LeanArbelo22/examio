@@ -110,8 +110,10 @@ describe("panorama institucional configurable v1.4", () => {
 
   it("aplica accesos rápidos inmediatamente y limita cantidades personalizadas a 60 meses", () => {
     render(<InstitutionalAnalyticsWorkspace />);
-    fireEvent.click(screen.getByRole("button", { name: "24 meses" }));
+    expect(screen.getByLabelText("Desde")).not.toBeVisible();
+    fireEvent.change(screen.getByLabelText("Período"), { target: { value: "24" } });
     expect(navigation.replace).toHaveBeenCalledWith(expect.stringContaining("periodoMeses=24"), { scroll: false });
+    fireEvent.click(screen.getByText("Personalizar período y estado"));
     fireEvent.change(screen.getByLabelText("Cantidad personalizada"), { target: { value: "61" } });
     fireEvent.click(screen.getAllByRole("button", { name: "Aplicar" })[0]);
     expect(screen.getByText("Ingresá una cantidad entre 1 y 60 meses.")).toBeInTheDocument();
@@ -131,6 +133,41 @@ describe("panorama institucional configurable v1.4", () => {
     expect(advancedPanel).not.toBeNull();
     fireEvent.click(within(advancedPanel!).getByRole("button", { name: "Aplicar" }));
     expect(navigation.replace).toHaveBeenCalledWith(expect.stringMatching(/muestraMinimaRanking=25.*verResumen=0/), { scroll: false });
+  });
+
+  it("deja evidencia y correcciones desactivadas por defecto y permite activarlas explícitamente", () => {
+    const ui = render(<InstitutionalAnalyticsWorkspace />);
+    fireEvent.click(screen.getByRole("button", { name: "Opciones avanzadas" }));
+    expect(screen.getByLabelText("Evidencia limitada")).not.toBeChecked();
+    expect(screen.getByLabelText("Correcciones pendientes")).not.toBeChecked();
+    fireEvent.click(screen.getByLabelText("Evidencia limitada"));
+    fireEvent.click(screen.getByLabelText("Correcciones pendientes"));
+    const panel = screen.getByRole("heading", { name: "Opciones avanzadas" }).closest("section")!;
+    fireEvent.click(within(panel).getByRole("button", { name: "Aplicar" }));
+    const url = navigation.replace.mock.calls.at(-1)![0] as string;
+    expect(url).toContain("verEvidencia=1");
+    expect(url).toContain("verOperativo=1");
+    navigation.search = url.split("?")[1];
+    ui.rerender(<InstitutionalAnalyticsWorkspace />);
+    fireEvent.click(screen.getByRole("button", { name: "Opciones avanzadas" }));
+    expect(screen.getByLabelText("Evidencia limitada")).toBeChecked();
+    expect(screen.getByLabelText("Correcciones pendientes")).toBeChecked();
+  });
+
+  it("mantiene accesible el rango personalizado y valida sus fechas", () => {
+    render(<InstitutionalAnalyticsWorkspace />);
+    fireEvent.click(screen.getByText("Personalizar período y estado"));
+    fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-10-20" } });
+    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-10-10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar rango" }));
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(navigation.replace).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-10-25" } });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar rango" }));
+    const params = new URL(navigation.replace.mock.calls.at(-1)![0], "http://localhost").searchParams;
+    expect(params.get("periodoModo")).toBe("custom");
+    expect(params.get("fechaDesde")).toContain("2026-10-20");
+    expect(params.get("fechaHasta")).toContain("2026-10-26");
   });
 
   it("cambiar sólo visibilidad no incorpora parámetros visuales a la consulta", () => {
@@ -178,6 +215,7 @@ describe("panorama institucional configurable v1.4", () => {
   it("restablece la configuración conservando carrera, materia y comisión", () => {
     setSearch("idCarrera=1&idMateria=11&idMateriaDivision=101&agrupacionSerie=anual&dimensionRanking=materias&verResumen=0");
     render(<InstitutionalAnalyticsWorkspace />);
+    fireEvent.click(screen.getByText("Personalizar período y estado"));
     fireEvent.click(screen.getByRole("button", { name: "Restablecer" }));
     const url = navigation.replace.mock.calls[0][0] as string;
     expect(url).toContain("idCarrera=1"); expect(url).toContain("idMateria=11"); expect(url).toContain("idMateriaDivision=101");

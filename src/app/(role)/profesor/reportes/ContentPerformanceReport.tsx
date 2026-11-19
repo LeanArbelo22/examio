@@ -338,7 +338,7 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
         render: (row) => (
           <div className="max-w-md">
             <p className="font-bold text-slate-800">{row.enunciado}</p>
-            <p className="mt-1 text-[10px] text-slate-500">
+            <p className="mt-1 text-sm text-slate-500">
               {typeLabel(row.tipo)} · {row.grupo || "Grupo sin título"}
             </p>
           </div>
@@ -359,7 +359,7 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
           <Button
             type="button"
             onClick={() => setSelectedQuestion(row)}
-            className="rounded-lg border border-indigo-200 px-3 py-1.5 text-[11px] font-bold text-indigo-700 hover:bg-indigo-50"
+            className="rounded-lg border border-indigo-200 px-3 py-1.5 text-sm font-bold text-indigo-700 hover:bg-indigo-50"
           >
             Ver opciones
           </Button>
@@ -381,10 +381,10 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
           <div className="max-w-md">
             <p className="font-bold text-slate-800">{row.grupo || "Grupo sin título"}</p>
             <details className="mt-1">
-              <summary className="cursor-pointer text-[10px] font-bold text-indigo-600">
+              <summary className="cursor-pointer text-sm font-bold text-indigo-600">
                 {row.cantidadVariantes} variante{row.cantidadVariantes === 1 ? "" : "s"}
               </summary>
-              <ul className="mt-2 space-y-1 border-l-2 border-indigo-100 pl-3 text-[10px] text-slate-500">
+              <ul className="mt-2 space-y-1 border-l-2 border-indigo-100 pl-3 text-sm text-slate-500">
                 {row.variantes.map((variant) => (
                   <li key={variant.claveContenido}>
                     {variant.enunciado} · {percentage(variant.porcentajePuntajePromedio)}
@@ -425,13 +425,14 @@ export function ContentPerformanceReport({ kind }: ContentPerformanceReportProps
       actions={
         <Button
           onClick={() => router.push("/profesor")}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
         >
           Volver al panel
         </Button>
       }
     >
       <ReportFilterPanel
+        primaryKeys={["idMateria", "idMateriaDivision", "idActividad", "idPublicacion"]}
         key={searchParams.toString()}
         filters={visibleFilters}
         definitions={filterDefinitions}

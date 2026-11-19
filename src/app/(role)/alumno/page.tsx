@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { LoadingState } from "@/components/ui/LoadingState";
+import { RequestErrorState } from "@/components/ui/RequestErrorState";
 import {
   useGetEstadisticasAlumno,
   useGetExamenesPendientes,
@@ -18,14 +20,18 @@ function formatDeadline(value: string | null): string {
 }
 
 export default function AlumnoPage() {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const identificador = session?.user?.identificadorInstitucional
     ? Number(session.user.identificadorInstitucional)
     : 0;
 
-  const { data: pendingActivities = [], isLoading } = useGetExamenesPendientes(identificador);
-  const { data: stats } = useGetEstadisticasAlumno(identificador);
-  const { data: historial = [] } = useGetHistorialCorregido(identificador);
+  const pendingQuery = useGetExamenesPendientes(identificador);
+  const statsQuery = useGetEstadisticasAlumno(identificador);
+  const historyQuery = useGetHistorialCorregido(identificador);
+  const pendingActivities = pendingQuery.data ?? [];
+  const stats = statsQuery.data;
+  const historial = historyQuery.data ?? [];
+  const isLoading = pendingQuery.isPending || pendingQuery.isFetching && !pendingQuery.data;
 
   const activas = pendingActivities.filter((evaluacion) => !evaluacion.intentosAgotados);
   const ultimosResultados = historial.slice(0, 3);
@@ -39,6 +45,13 @@ export default function AlumnoPage() {
     ? Math.min(Number(stats.promedioGeneral) * 10, 100)
     : 0;
 
+  if (sessionStatus === "loading") {
+    return <LoadingState message="Cargando tu sesión..." />;
+  }
+  if (!Number.isSafeInteger(identificador) || identificador <= 0) {
+    return <RequestErrorState error={null} fallback="No pudimos identificar tu perfil de alumno. Volvé a iniciar sesión." />;
+  }
+
   return (
     <div className="grid grid-cols-1 gap-8 antialiased lg:grid-cols-3">
       <section className="space-y-5 lg:col-span-2" aria-labelledby="pending-title">
@@ -51,18 +64,18 @@ export default function AlumnoPage() {
               Iniciá, continuá o reintentá las evaluaciones que todavía tenés disponibles.
             </p>
           </div>
-          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
-            {isLoading ? "Consultando..." : `${activas.length} ${activas.length === 1 ? "pendiente" : "pendientes"}`}
+          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-sm font-semibold text-indigo-700">
+            {isLoading ? "Consultando..." : pendingQuery.isError ? "Sin actualizar" : pendingQuery.isSuccess ? `${activas.length} ${activas.length === 1 ? "pendiente" : "pendientes"}` : "Sin consultar"}
           </span>
         </div>
 
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm font-medium text-slate-500">
-            Consultando tus actividades disponibles...
-          </div>
+          <LoadingState message="Consultando tus actividades disponibles..." />
         )}
 
-        {!isLoading && activas.length === 0 && (
+        {!isLoading && pendingQuery.isError && <RequestErrorState error={pendingQuery.error} fallback="No pudimos consultar tus actividades disponibles." onRetry={() => void pendingQuery.refetch()} />}
+
+        {!isLoading && pendingQuery.isSuccess && activas.length === 0 && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-8 text-center">
             <p className="text-lg font-black text-slate-900">Estás al día</p>
             <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
@@ -70,20 +83,20 @@ export default function AlumnoPage() {
             </p>
             <Link
               href="/alumno/resultados"
-              className="mt-5 inline-flex rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-xs font-bold text-emerald-800 shadow-sm hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              className="mt-5 inline-flex rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-sm font-bold text-emerald-800 shadow-sm hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
             >
               Consultar mi historial
             </Link>
           </div>
         )}
 
-        {!isLoading && activas.length > 0 && (
+        {!isLoading && pendingQuery.isSuccess && activas.length > 0 && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {activas.map((exam) => {
               const action = exam.enProgreso
-                ? { label: "Continuar examen", className: "bg-amber-500 hover:bg-amber-600" }
+                ? { label: "Continuar examen", className: "bg-amber-700 hover:bg-amber-800" }
                 : exam.intentosRealizados > 0 && exam.puedeReintentar
-                  ? { label: "Reintentar examen", className: "bg-sky-600 hover:bg-sky-700" }
+                  ? { label: "Reintentar examen", className: "bg-sky-700 hover:bg-sky-800" }
                   : { label: "Iniciar examen", className: "bg-indigo-600 hover:bg-indigo-700" };
 
               return (
@@ -93,18 +106,18 @@ export default function AlumnoPage() {
                 >
                   <div>
                     <div className="flex items-start justify-between gap-3">
-                      <span className="rounded-md border border-indigo-100 bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-indigo-600">
+                      <span className="rounded-md border border-indigo-100 bg-indigo-50 px-2.5 py-0.5 text-sm font-bold uppercase tracking-wide text-indigo-600">
                         {exam.enProgreso ? "En progreso" : "Disponible"}
                       </span>
-                      <span className="text-xs font-medium text-slate-500">
+                      <span className="text-sm font-medium text-slate-500">
                         {exam.duracionMinutos ? `${exam.duracionMinutos} min` : "Sin límite"}
                       </span>
                     </div>
-                    <h3 className="mt-4 text-lg font-black tracking-tight text-slate-900">
+                    <h3 className="mt-4 text-lg font-bold tracking-tight text-slate-900">
                       {exam.titulo}
                     </h3>
                     <p className="mt-1 text-sm font-medium text-slate-600">{exam.materia}</p>
-                    <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs">
+                    <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm">
                       <div>
                         <dt className="font-semibold text-slate-500">Disponible hasta</dt>
                         <dd className="mt-1 font-bold text-slate-800">{formatDeadline(exam.fechaFin)}</dd>
@@ -119,7 +132,7 @@ export default function AlumnoPage() {
                   </div>
                   <Link
                     href={`/alumno/examen/${exam.idPublicacion}`}
-                    className={`mt-5 block w-full rounded-xl px-4 py-2.5 text-center text-xs font-bold text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${action.className}`}
+                    className={`mt-5 block w-full rounded-xl px-4 py-2.5 text-center text-sm font-bold text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${action.className}`}
                   >
                     {action.label}
                   </Link>
@@ -138,36 +151,36 @@ export default function AlumnoPage() {
             </h2>
             <Link
               href="/alumno/resultados"
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               Ver historial
             </Link>
           </div>
-          <div className="grid grid-cols-2 gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
+          {statsQuery.isPending ? <LoadingState message="Consultando tu resumen académico..." /> : statsQuery.isError ? <RequestErrorState error={statsQuery.error} fallback="No pudimos consultar tu resumen académico." onRetry={() => void statsQuery.refetch()} /> : statsQuery.isSuccess && <div className="grid grid-cols-2 gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
             <div className="border-r border-slate-100 pr-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Promedio</p>
+              <p className="text-sm font-semibold text-slate-500">Promedio</p>
               <p className="mt-1 text-3xl font-black tracking-tight text-slate-800">{promedio}</p>
-              <div
+              {stats?.promedioGeneral != null && <div
                 className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
                 role="progressbar"
                 aria-label="Promedio general"
                 aria-valuemin={0}
                 aria-valuemax={10}
-                aria-valuenow={stats?.promedioGeneral ?? 0}
+                aria-valuenow={stats.promedioGeneral}
               >
                 <div className="h-full rounded-full bg-indigo-600" style={{ width: `${anchoBarra}%` }} />
-              </div>
+              </div>}
             </div>
             <div className="pl-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Aprobadas</p>
+              <p className="text-sm font-semibold text-slate-500">Aprobadas</p>
               <p className="mt-1 text-3xl font-black tracking-tight text-emerald-600">{porcentaje}</p>
-              <p className="mt-2 text-[11px] font-medium text-slate-500">
+              <p className="mt-2 text-sm font-medium text-slate-500">
                 {stats != null
                   ? `${stats.aprobados ?? 0} de ${stats.totalCorregidos ?? 0} resultados`
                   : "Sin resultados académicos"}
               </p>
             </div>
-          </div>
+          </div>}
         </section>
 
         <section aria-labelledby="recent-title">
@@ -177,16 +190,16 @@ export default function AlumnoPage() {
             </h2>
             <Link
               href="/alumno/resultados"
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               Ver todos
             </Link>
           </div>
-          <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
+          {historyQuery.isPending ? <LoadingState message="Consultando tus resultados recientes..." /> : historyQuery.isError ? <RequestErrorState error={historyQuery.error} fallback="No pudimos consultar tus resultados recientes." onRetry={() => void historyQuery.refetch()} /> : historyQuery.isSuccess && <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
             {ultimosResultados.length === 0 && (
               <div className="py-3 text-center">
                 <p className="text-sm font-bold text-slate-700">Todavía no hay resultados</p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-sm text-slate-500">
                   Acá aparecerán únicamente tus resultados académicos corregidos.
                 </p>
               </div>
@@ -197,9 +210,9 @@ export default function AlumnoPage() {
                   key={result.idIntento}
                   className="flex items-center justify-between rounded-xl border border-transparent p-2 transition-colors hover:border-slate-100 hover:bg-slate-50/80"
                 >
-                  <div className="max-w-[75%]">
-                    <p className="truncate text-sm font-bold text-slate-700">{result.tituloEvaluacion}</p>
-                    <p className="mt-0.5 text-[11px] font-medium text-slate-500">{result.materia}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-base font-semibold leading-snug text-slate-800">{result.tituloEvaluacion}</p>
+                    <p className="mt-0.5 text-sm font-medium text-slate-500">{result.materia}</p>
                   </div>
                   <span className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-sm font-black text-indigo-700">
                     {result.notaFinal == null ? "—" : result.notaFinal.toFixed(1)}
@@ -207,7 +220,7 @@ export default function AlumnoPage() {
                 </div>
               );
             })}
-          </div>
+          </div>}
         </section>
       </aside>
     </div>

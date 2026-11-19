@@ -34,10 +34,10 @@ export function StudentReportDetail({ matricula, filters, onClose }: StudentRepo
           ]} />
           <div>
             <h3 className="text-sm font-bold text-slate-800">Historial de actividades</h3>
-            <p className="mt-1 text-xs text-slate-400">El contrato actual informa métricas agrupadas y el mejor intento de cada actividad.</p>
+            <p className="mt-1 text-sm text-slate-400">El contrato actual informa métricas agrupadas y el mejor intento de cada actividad.</p>
           </div>
           {data.actividades.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-400">No hay actividades para los filtros aplicados.</div>
+            <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-400">No hay actividades para los filtros aplicados.</div>
           ) : (
             <div className="space-y-3">
               {data.actividades.map((actividad) => (
@@ -45,9 +45,9 @@ export function StudentReportDetail({ matricula, filters, onClose }: StudentRepo
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <h4 className="text-sm font-bold text-slate-800">{actividad.titulo}</h4>
-                      <p className="mt-1 text-xs text-slate-500">{actividad.materia} · {actividad.division} · {actividad.tipo}</p>
+                      <p className="mt-1 text-sm text-slate-500">{actividad.materia} · {actividad.division} · {actividad.tipo}</p>
                     </div>
-                    <span className="self-start rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">{actividad.intentos} intentos</span>
+                    <span className="self-start rounded-lg bg-indigo-50 px-2.5 py-1 text-sm font-bold text-indigo-700">{actividad.intentos} intentos</span>
                   </div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <Metric label="Nota promedio" value={`${actividad.notaPromedio.toFixed(2)} / ${actividad.escalaCalificacion}`} />
@@ -66,7 +66,7 @@ export function StudentReportDetail({ matricula, filters, onClose }: StudentRepo
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div><dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</dt><dd className="mt-1 text-sm font-black text-slate-700">{value}</dd></div>;
+  return <div><dt className="text-sm font-semibold text-slate-400">{label}</dt><dd className="mt-1 text-sm font-black text-slate-700">{value}</dd></div>;
 }
 
 function DetailSkeleton() {

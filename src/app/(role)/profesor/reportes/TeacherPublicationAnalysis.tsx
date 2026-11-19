@@ -17,7 +17,6 @@ import { ReportTable, type ReportColumn } from "@/components/reports/ReportTable
 import { useGetEvaluacionesDocente } from "@/hooks/useEvaluaciones";
 import {
   useReporteRendimientoEvaluaciones,
-  useReporteRendimientoGrupos,
   useReporteRendimientoPreguntas,
 } from "@/hooks/useReportes";
 import type {
@@ -128,13 +127,13 @@ function PublicationSelector({
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4">
-        <h2 className="text-base font-black text-slate-900">Seleccioná una publicación</h2>
+        <h2 className="text-base font-bold text-slate-900">Seleccioná una publicación</h2>
         <p className="mt-1 text-sm text-slate-500">
           Elegí la materia, la comisión y la evaluación que querés analizar.
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
-        <label className="flex flex-col gap-1.5 text-xs font-bold text-slate-600">
+        <label className="flex flex-col gap-1.5 text-sm font-bold text-slate-600">
           Materia
           <select
             aria-label="Materia del análisis"
@@ -154,7 +153,7 @@ function PublicationSelector({
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1.5 text-xs font-bold text-slate-600">
+        <label className="flex flex-col gap-1.5 text-sm font-bold text-slate-600">
           Comisión
           <select
             aria-label="Comisión del análisis"
@@ -174,7 +173,7 @@ function PublicationSelector({
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1.5 text-xs font-bold text-slate-600">
+        <label className="flex flex-col gap-1.5 text-sm font-bold text-slate-600">
           Evaluación
           <select
             aria-label="Evaluación del análisis"
@@ -203,10 +202,10 @@ function PublicationSelector({
       ) : (
         <div className="mt-6">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-black text-slate-800">
+            <h3 className="text-sm font-bold text-slate-800">
               Publicaciones disponibles
             </h3>
-            <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+            <span className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-bold text-indigo-700">
               {publications.length} {publications.length === 1 ? "resultado" : "resultados"}
             </span>
           </div>
@@ -226,19 +225,19 @@ function PublicationSelector({
                     <span className="text-xl font-black leading-none text-slate-900">
                       {date.day}
                     </span>
-                    <span className="text-xs font-bold uppercase text-indigo-600">
+                    <span className="text-sm font-bold uppercase text-indigo-600">
                       {date.month}
                     </span>
                   </time>
 
                   <div className="min-w-0 flex-1">
-                    <h4 className="truncate text-base font-black text-slate-900">
+                    <h4 className="break-words text-balance text-lg font-bold leading-snug text-slate-900">
                       {evaluation.titulo}
                     </h4>
                     <p className="mt-1 text-sm font-medium text-slate-600">
                       {evaluation.materia} · {evaluation.division}
                     </p>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
                       <span>{evaluation.duracionMinutos} min</span>
                       <span>
                         {evaluation.cantidadIntentosMaximos}{" "}
@@ -260,7 +259,7 @@ function PublicationSelector({
                         idActividad: String(evaluation.idActividad),
                       })
                     }
-                    className="w-full shrink-0 rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-xs font-bold text-indigo-700 hover:border-indigo-300 hover:bg-indigo-50 sm:w-auto"
+                    className="w-full shrink-0 rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-bold text-indigo-700 hover:border-indigo-300 hover:bg-indigo-50 sm:w-auto"
                   >
                     Ver análisis <span aria-hidden="true">→</span>
                   </Button>
@@ -330,19 +329,6 @@ export function TeacherPublicationAnalysis() {
     },
     idPublicacion > 0 && step === "preguntas",
   );
-  const groupQuery = useReporteRendimientoGrupos(
-    {
-      ...baseQuestionFilters,
-      idGrupoPregunta: selectedQuestion
-        ? String(selectedQuestion.idGrupoPregunta)
-        : undefined,
-      ordenarPor: "grupo",
-      ordenDireccion: "asc",
-      pagina: 1,
-      limite: 100,
-    },
-    selectedQuestion !== null,
-  );
 
   const replaceParams = (mutate: (params: URLSearchParams) => void) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -391,7 +377,7 @@ export function TeacherPublicationAnalysis() {
         render: (row) => (
           <div className="max-w-md">
             <p className="font-bold text-slate-800">{row.enunciado}</p>
-            <p className="mt-1 text-[10px] text-slate-500">
+            <p className="mt-1 text-sm text-slate-500">
               {row.grupo || "Grupo sin título"} · {row.presentacionesOficiales} presentaciones oficiales
             </p>
           </div>
@@ -480,7 +466,7 @@ export function TeacherPublicationAnalysis() {
           variant="warning"
           message="Volvé al selector para elegir una publicación disponible."
           action={
-            <Button type="button" onClick={returnToSelection} className="rounded-lg bg-amber-900 px-3 py-2 text-xs font-bold text-white">
+            <Button type="button" onClick={returnToSelection} className="rounded-lg bg-amber-900 px-3 py-2 text-sm font-bold text-white">
               Volver
             </Button>
           }
@@ -494,9 +480,6 @@ export function TeacherPublicationAnalysis() {
     : summaryQuery.data?.evaluaciones[0];
   const official = summary?.resultadosOficiales;
   const operational = summary?.pendientesOperativos;
-  const variants = groupQuery.isPlaceholderData
-    ? []
-    : groupQuery.data?.items[0]?.variantes ?? [];
   const rankingData = rankingQuery.isPlaceholderData
     ? undefined
     : rankingQuery.data;
@@ -514,7 +497,7 @@ export function TeacherPublicationAnalysis() {
         <Button
           type="button"
           onClick={returnToSelection}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
         >
           Volver a publicaciones
         </Button>
@@ -525,7 +508,7 @@ export function TeacherPublicationAnalysis() {
           type="button"
           aria-current={step === "resumen" ? "step" : undefined}
           onClick={() => replaceParams((params) => params.set("analisisPaso", "resumen"))}
-          className={`rounded-lg px-4 py-2 text-xs font-bold ${step === "resumen" ? "bg-indigo-600 text-white" : "text-slate-600"}`}
+          className={`min-h-11 rounded-lg px-4 py-2 text-sm font-bold ${step === "resumen" ? "bg-indigo-600 text-white" : "text-slate-600"}`}
         >
           1. Resultados oficiales
         </button>
@@ -539,7 +522,7 @@ export function TeacherPublicationAnalysis() {
               params.delete("fechaHasta");
             })
           }
-          className={`rounded-lg px-4 py-2 text-xs font-bold ${step === "preguntas" ? "bg-indigo-600 text-white" : "text-slate-600"}`}
+          className={`min-h-11 rounded-lg px-4 py-2 text-sm font-bold ${step === "preguntas" ? "bg-indigo-600 text-white" : "text-slate-600"}`}
         >
           2. Preguntas y evidencia
         </button>
@@ -573,7 +556,7 @@ export function TeacherPublicationAnalysis() {
             <div className="space-y-6">
               <section aria-labelledby="official-results-title">
                 <div className="mb-3">
-                  <h2 id="official-results-title" className="text-lg font-black text-slate-900">Resultados oficiales</h2>
+                  <h2 id="official-results-title" className="text-lg font-bold text-slate-900">Resultados oficiales</h2>
                   <p className="text-sm text-slate-500">Sólo intentos válidos entregados, con corrección confirmada y nota final.</p>
                 </div>
                 <ReportKpiGrid
@@ -587,7 +570,7 @@ export function TeacherPublicationAnalysis() {
               </section>
 
               <section aria-labelledby="operational-pending-title" className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
-                <h2 id="operational-pending-title" className="text-base font-black text-slate-900">Pendientes operativos</h2>
+                <h2 id="operational-pending-title" className="text-base font-bold text-slate-900">Pendientes operativos</h2>
                 <p className="mt-1 text-sm text-slate-600">Incluyen todos los intentos entregados, sean válidos o no. Las subcategorías se superponen y no deben sumarse.</p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                   {[
@@ -598,7 +581,7 @@ export function TeacherPublicationAnalysis() {
                     ["Preguntas sin puntaje", operational.preguntasSinPuntaje],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-xl border border-amber-100 bg-white p-3">
-                      <p className="text-[10px] font-bold uppercase text-slate-500">{label}</p>
+                      <p className="text-sm font-bold uppercase text-slate-500">{label}</p>
                       <p className="mt-1 text-xl font-black text-slate-900">{Number(value).toLocaleString("es-AR")}</p>
                     </div>
                   ))}
@@ -607,7 +590,7 @@ export function TeacherPublicationAnalysis() {
 
               <details className="rounded-2xl border border-slate-200 bg-white p-5">
                 <summary className="cursor-pointer text-sm font-bold text-slate-800">Ver distribución de todos los intentos</summary>
-                <p className="mt-2 text-xs text-slate-500">Incluye todos los intentos y puede diferir de los resultados oficiales.</p>
+                <p className="mt-2 text-sm text-slate-500">Incluye todos los intentos y puede diferir de los resultados oficiales.</p>
                 <div className="mt-4">
                   <EvaluationReportCharts
                     distribution={summaryQuery.data?.graficos.distribucionResultados ?? []}
@@ -671,7 +654,7 @@ export function TeacherPublicationAnalysis() {
           {evidenceSummary && findingRule && (
             <section aria-labelledby="finding-summary-title" className="space-y-3">
               <div>
-                <h2 id="finding-summary-title" className="text-lg font-black text-slate-900">Preguntas que merecen revisión</h2>
+                <h2 id="finding-summary-title" className="text-lg font-bold text-slate-900">Preguntas que merecen revisión</h2>
                 <p className="text-sm text-slate-500">Se destacan las preguntas con menos de {findingRule.porcentajePuntajeMaximoExclusivo}% de puntaje promedio y al menos {findingRule.muestrasConfirmadasMinimas} respuestas calificadas.</p>
               </div>
               {evidenceSummary.preguntasEnCoberturaGeneral === 0 && (
@@ -686,15 +669,15 @@ export function TeacherPublicationAnalysis() {
               {evidenceSummary.preguntasCoincidentes > 0 && (
                 <FeedbackMessage variant="info" message={`Se detectaron ${evidenceSummary.preguntasCoincidentes} pregunta(s) que cumplen el criterio de revisión.`} />
               )}
-              <p className="text-xs text-slate-500">Los porcentajes se muestran redondeados. Por eso, un 30,00% visible puede estar apenas por debajo del límite.</p>
+              <p className="text-sm text-slate-500">Los porcentajes se muestran redondeados. Por eso, un 30,00% visible puede estar apenas por debajo del límite.</p>
             </section>
           )}
 
           {rankingData && rankingData.items.length > 0 && (
             <section aria-labelledby="finding-ranking-title">
               <div className="mb-3">
-                <h2 id="finding-ranking-title" className="text-base font-black text-slate-900">Preguntas prioritarias para revisar</h2>
-                <p className="text-xs text-slate-500">Ordenadas desde el menor puntaje promedio. Sólo aparecen preguntas con al menos {findingRule?.muestrasConfirmadasMinimas ?? 10} respuestas calificadas.</p>
+                <h2 id="finding-ranking-title" className="text-base font-bold text-slate-900">Preguntas prioritarias para revisar</h2>
+                <p className="text-sm text-slate-500">Ordenadas desde el menor puntaje promedio. Sólo aparecen preguntas con al menos {findingRule?.muestrasConfirmadasMinimas ?? 10} respuestas calificadas.</p>
               </div>
               <ol className="grid gap-3 lg:grid-cols-2">
                 {rankingData.items.map((question, index) => (
@@ -704,13 +687,13 @@ export function TeacherPublicationAnalysis() {
                       onClick={() => setSelectedQuestion(question)}
                       className="flex h-full w-full items-start gap-3 rounded-xl border border-rose-200 bg-white p-4 text-left hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
                     >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-black text-rose-700">{index + 1}</span>
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100 text-sm font-black text-rose-700">{index + 1}</span>
                       <span className="min-w-0 flex-1">
-                        <span className="mb-2 inline-flex rounded-full bg-rose-100 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-rose-700">
+                        <span className="mb-2 inline-flex rounded-full bg-rose-100 px-2 py-1 text-sm font-black uppercase tracking-wide text-rose-700">
                           Puntaje promedio bajo
                         </span>
                         <span className="block font-bold text-slate-900">{question.enunciado}</span>
-                        <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                        <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
                           <span><strong className="text-slate-900">{percentage(question.porcentajePuntajePromedio)}</strong> del puntaje disponible</span>
                           <span><strong className="text-slate-900">{question.muestrasConfirmadas}</strong> respuestas calificadas</span>
                           {question.grupo && <span>{question.grupo}</span>}
@@ -726,8 +709,8 @@ export function TeacherPublicationAnalysis() {
           {questionsData && (
             <section aria-labelledby="question-table-title">
               <div className="mb-3">
-                <h2 id="question-table-title" className="text-base font-black text-slate-900">Todas las preguntas con evidencia oficial</h2>
-                <p className="text-xs text-slate-500">Seleccioná una pregunta para consultar sus opciones y compararla con las variantes del mismo grupo.</p>
+                <h2 id="question-table-title" className="text-base font-bold text-slate-900">Todas las preguntas con evidencia oficial</h2>
+                <p className="text-sm text-slate-500">Seleccioná una pregunta para consultar sus opciones y compararla con las variantes del mismo grupo.</p>
               </div>
               <ReportTable
                 columns={questionColumns}
@@ -763,7 +746,6 @@ export function TeacherPublicationAnalysis() {
           idPublicacion: String(idPublicacion),
           ...OFFICIAL_SCOPE,
         }}
-        variants={variants}
         onClose={() => setSelectedQuestion(null)}
       />
     </ReportLayout>

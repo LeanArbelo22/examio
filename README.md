@@ -555,6 +555,13 @@ paso consulta preguntas con `alcanceIntentos=validos` y
 abrir opciones históricas por `claveContenido` junto con las variantes descriptivas del
 grupo. Las fechas del listado no se trasladan a este análisis.
 
+El detalle de preguntas usa el grupo de origen para identificar las variantes y consulta
+sus resultados por `claveContenido` con el alcance original del reporte. Un contenido
+puede aparecer en varios grupos: las métricas de uno de ellos no reemplazan las del
+contenido agregado. La búsqueda recorre las páginas necesarias, sin sumar promedios
+ni usar una página parcial como total. Presentaciones, respuestas, calificaciones
+pendientes y puntajes disponibles se muestran como estados distintos.
+
 ### Administración
 
 - `ManagementPageHeader`
@@ -609,6 +616,34 @@ Esta revisión es un seguimiento operativo separado de las acciones de supervisi
 modifica notas, estados del intento ni consecuencias, y un incidente pendiente no implica fraude.
 El reporte por evaluación incorpora los mismos agregados y filtros sobre el conjunto completo antes
 de paginar.
+
+## Reportes administrativos
+
+`/admin/reportes` ofrece Carreras, Materias, Comisiones, Alumnos y Docentes con búsqueda,
+filtros, paginación y un detalle junto al listado (apilado en pantallas pequeñas). El acceso
+está junto a «Ver rendimiento institucional» en el panel de administración. La exportación
+queda fuera de esta iteración.
+
+Carreras, materias y comisiones provienen de `rendimiento-evaluaciones` con
+`incluirResumenInstitucional=true`: sólo incluyen entidades con publicaciones en el período.
+Los agregados se toman del servidor, antes de paginar; no se promedian promedios locales.
+Alumnos y docentes muestran promedio base 10 y aprobación oficial mediante el bloque optativo
+`resumenPersonas=alumnos|docentes` de `rendimiento-evaluaciones`, conservando las personas sin
+resultados. Los listados existentes aportan correo y estado, relacionados exclusivamente por
+matrícula o legajo. El detalle sigue usando `matriculaAlumno` o `legajoDocente`.
+El resumen se recupera por páginas de hasta 100 personas y se completa antes de aplicar búsqueda,
+estado, orden y paginación locales; no se realiza una consulta por persona ni se calculan promedios
+en el cliente. Un fallo impide presentar datos parciales como el listado completo.
+Los catálogos maestros alimentan Carrera/Materia/Comisión y el servidor aplica las relaciones
+actuales al listado y a sus resultados, independientemente de que existan publicaciones.
+El detalle conserva los mismos filtros institucionales. Rendimiento institucional y los reportes
+docentes no solicitan `resumenPersonas` y mantienen sus consultas existentes.
+
+Los resultados usan exclusivamente `resultadosOficiales`; ausencia de resultado y nota cero
+son estados distintos. Los pendientes operativos no se muestran en este módulo.
+El período corresponde al inicio de publicaciones, con límites de día de Buenos Aires.
+Las inscripciones y asignaciones son actuales, no históricas. La relación docente tampoco
+representa una calificación de su desempeño. Los detalles de relaciones se cargan bajo demanda.
 
 ## Estilos
 

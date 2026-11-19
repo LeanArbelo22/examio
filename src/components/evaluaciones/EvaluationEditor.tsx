@@ -348,12 +348,12 @@ function EvaluationEditorForm({
     );
     try {
       setPublishError(null);
-      await publishEvaluation.mutateAsync({
+      const published = await publishEvaluation.mutateAsync({
         payload,
         idempotencyKey: publishIdempotency.keyFor(payload),
       });
       publishIdempotency.complete();
-      router.replace(`/profesor/examen/${idPublicacion}/detalle`);
+      router.replace(`/profesor/examen/${published.idPublicacion}`);
     } catch (cause) {
       setPublishError(
         getUserErrorMessage(

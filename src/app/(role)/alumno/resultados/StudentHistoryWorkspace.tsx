@@ -176,26 +176,6 @@ export function StudentHistoryWorkspace() {
         type: "select",
         options: Object.entries(resultLabels).map(([value, label]) => ({ value, label })),
       },
-      {
-        key: "ordenarPor",
-        label: "Ordenar por",
-        type: "select",
-        options: [
-          { value: "fecha", label: "Fecha" },
-          { value: "materia", label: "Materia" },
-          { value: "evaluacion", label: "Evaluación" },
-          { value: "nota", label: "Nota" },
-        ],
-      },
-      {
-        key: "ordenDireccion",
-        label: "Dirección",
-        type: "select",
-        options: [
-          { value: "desc", label: "Descendente" },
-          { value: "asc", label: "Ascendente" },
-        ],
-      },
     ],
     [commissions, materias],
   );
@@ -219,25 +199,25 @@ export function StudentHistoryWorkspace() {
     <div className="mx-auto max-w-6xl space-y-6 antialiased">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             Mi historial de actividades
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-2 max-w-[65ch] text-pretty text-base leading-relaxed text-slate-600">
             Consultá tus intentos, resultados y evaluaciones pendientes de corrección.
           </p>
         </div>
         <Link
           href="/alumno"
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         >
           Volver al panel
         </Link>
       </header>
 
       <ReportFilterPanel
+        primaryKeys={["idMateria", "idMateriaDivision", "fechaDesde", "fechaHasta"]}
         key={searchParams.toString()}
         title="Filtrar historial"
-        description="Podés combinar materia, comisión, fechas, estado y resultado."
         filters={visibleFilters}
         definitions={definitions}
         onSearch={search}
@@ -291,6 +271,22 @@ export function StudentHistoryWorkspace() {
             ]}
           />
 
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-lg font-bold text-slate-900">Intentos encontrados</h2>
+            <div className="flex flex-wrap gap-3">
+              <label className="grid gap-1 text-sm font-semibold text-slate-600">Ordenar por
+                <select className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-base text-slate-700" value={filters.ordenarPor ?? "fecha"} onChange={(event) => updateUrl({ ordenarPor: event.target.value, pagina: 1 })}>
+                  <option value="fecha">Fecha</option><option value="materia">Materia</option><option value="evaluacion">Evaluación</option><option value="nota">Nota</option>
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm font-semibold text-slate-600">Dirección
+                <select className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-base text-slate-700" value={filters.ordenDireccion ?? "desc"} onChange={(event) => updateUrl({ ordenDireccion: event.target.value, pagina: 1 })}>
+                  <option value="desc">Descendente</option><option value="asc">Ascendente</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
           {data.items.length === 0 ? (
             <EmptyState
               title="No encontramos intentos"
@@ -313,19 +309,17 @@ export function StudentHistoryWorkspace() {
                   >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-indigo-600">
+                      <p className="text-sm font-semibold text-indigo-600">
                         {attempt.materia} · {attempt.division}
                       </p>
-                      <h2 className="mt-1 truncate text-base font-black text-slate-900">
+                      <h2 className="mt-1 break-words text-balance text-lg font-bold leading-snug text-slate-900">
                         {attempt.titulo}
                       </h2>
                     </div>
-                    {isAcademicResult && (
-                      <StatusBadge label="Resultado académico" tone="indigo" />
-                    )}
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
+                    {isAcademicResult && <StatusBadge label="Resultado académico" tone="indigo" />}
                     <StatusBadge
                       label={stateLabels[attempt.estado]}
                       tone={stateTones[attempt.estado]}
@@ -341,7 +335,7 @@ export function StudentHistoryWorkspace() {
                     />
                   </div>
 
-                  <dl className={`mt-4 grid gap-3 rounded-xl bg-slate-50 p-3 text-xs ${isCancelled ? "grid-cols-1" : "grid-cols-2"}`}>
+                  <dl className={`mt-4 grid gap-3 rounded-xl bg-slate-50 p-3 text-sm ${isCancelled ? "grid-cols-1" : "grid-cols-2"}`}>
                     <div>
                       <dt className="font-semibold text-slate-500">Fecha de inicio</dt>
                       <dd className="mt-1 font-bold text-slate-800">
@@ -361,23 +355,23 @@ export function StudentHistoryWorkspace() {
                   </dl>
 
                   {isCancelled ? (
-                    <p className="mt-4 text-xs font-medium text-slate-600">
+                    <p className="mt-4 text-sm font-medium text-slate-600">
                       Este intento no forma parte de tu resultado académico.
                     </p>
                   ) : (
                     <div className="mt-4 flex items-center justify-between gap-3">
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-sm text-slate-500">
                         Aprobación: {attempt.notaAprobacion} / {attempt.escalaCalificacion}
                       </p>
                       {attempt.revisionDisponible ? (
                       <Link
                         href={`/alumno/intento/${attempt.idIntento}`}
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                        className="text-sm font-bold text-indigo-600 hover:text-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                       >
                         Revisar examen →
                       </Link>
                       ) : (
-                        <span className="text-xs font-semibold text-slate-500">
+                        <span className="text-sm font-semibold text-slate-500">
                           {attempt.correccionPendiente
                             ? "Corrección en curso"
                             : "Revisión no disponible"}
