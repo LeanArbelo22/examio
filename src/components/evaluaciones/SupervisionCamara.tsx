@@ -13,7 +13,7 @@ export function SupervisionCamara({
   onHabilitadoChange,
   onIntervaloChange,
 }: SupervisionCamaraProps) {
-  const helpId = useId();
+  const helpId = useId(); // id generado para el texto de ayuda del input
   const segundosIntervalo = Number(intervalo);
   const intervaloInvalido =
     habilitado &&

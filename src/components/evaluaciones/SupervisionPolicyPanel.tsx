@@ -145,8 +145,8 @@ function SupervisionPolicyEditor({
             Supervisión durante el examen
           </h3>
           <p className="mt-1 max-w-3xl text-sm text-slate-600">
-            Definí qué debe ocurrir ante interrupciones. Los cambios se aplican
-            solamente a intentos que comiencen después de guardar.
+            Definí qué debe ocurrir ante determinados eventos durante el examen,
+            como salir de pantalla completa.
           </p>
         </div>
         <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-800">
@@ -166,6 +166,12 @@ function SupervisionPolicyEditor({
         onIntervaloChange={setIntervalo}
       />
       <div className="mt-5 space-y-4">
+        <h3
+          id="supervision-policy-title"
+          className="text-base font-black text-slate-900"
+        >
+          Reglas de comportamiento
+        </h3>
         {rules.map((rule, index) => {
           const isDuration = rule.metrica !== "cantidad";
           const supportsDuration = DURATION_EVENT_TYPES.has(rule.tipoEvento);
