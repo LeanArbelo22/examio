@@ -11,8 +11,15 @@ export type AccionSupervision =
   | "bloquear_interfaz"
   | "anular_intento";
 
-export type EstadoSupervision = "normal" | "advertido" | "bloqueado" | "anulado";
-export type AccionOverrideSupervision = "desbloquear" | "reconocer" | "descartar";
+export type EstadoSupervision =
+  | "normal"
+  | "advertido"
+  | "bloqueado"
+  | "anulado";
+export type AccionOverrideSupervision =
+  | "desbloquear"
+  | "reconocer"
+  | "descartar";
 
 export interface ReglaSupervision {
   id?: number;
@@ -34,6 +41,8 @@ export interface PoliticaSupervision {
   modificadoPor: number | null;
   fechaModificacion: string | null;
   reglas: ReglaSupervision[];
+  capturasHabilitadas: boolean;
+  intervaloCapturasSegundos: number;
 }
 
 export interface ReglaSupervisionPayload {
@@ -51,6 +60,8 @@ export interface ActualizarPoliticaSupervisionPayload {
   PantallaCompletaObligatoria: boolean;
   RevisionEsperada: number;
   Reglas: ReglaSupervisionPayload[];
+  CapturasHabilitadas?: boolean;
+  IntervaloCapturasSegundos?: number;
 }
 
 export interface InstruccionSupervision {
@@ -62,7 +73,10 @@ export interface InstruccionSupervision {
   replay: boolean;
 }
 
-export interface EstadoSupervisionIntento extends Omit<InstruccionSupervision, "decisionId" | "replay"> {
+export interface EstadoSupervisionIntento extends Omit<
+  InstruccionSupervision,
+  "decisionId" | "replay"
+> {
   idIntento: number;
   pantallaCompletaObligatoria: boolean;
   revision: number;

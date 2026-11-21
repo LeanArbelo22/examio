@@ -3,6 +3,7 @@ import { useId } from "react";
 type SupervisionCamaraProps = {
   habilitado: boolean;
   intervalo: string;
+  intervaloInvalido: boolean;
   onHabilitadoChange: (enabled: boolean) => void;
   onIntervaloChange: (interval: string) => void;
 };
@@ -10,16 +11,12 @@ type SupervisionCamaraProps = {
 export function SupervisionCamara({
   habilitado,
   intervalo,
+  intervaloInvalido,
   onHabilitadoChange,
   onIntervaloChange,
+  
 }: SupervisionCamaraProps) {
   const helpId = useId(); // id generado para el texto de ayuda del input
-  const segundosIntervalo = Number(intervalo);
-  const intervaloInvalido =
-    habilitado &&
-    (!/^\d+$/.test(intervalo) ||
-      segundosIntervalo < 30 ||
-      segundosIntervalo > 300);
 
   return (
     <fieldset className="mt-5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">

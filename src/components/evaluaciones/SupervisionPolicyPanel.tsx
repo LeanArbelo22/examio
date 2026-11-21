@@ -99,6 +99,22 @@ function SupervisionPolicyEditor({
   );
   const [rules, setRules] = useState(policy.reglas);
 
+  // nuevas configuraciones para camara
+  const [camaraHabilitada, setCamaraHabilitada] = useState(
+    policy.capturasHabilitadas, // quitamos hardcodeado , ahora lo traemos de la api
+  );
+  const [intervalo, setIntervalo] = useState(
+    String(policy.intervaloCapturasSegundos),
+  );
+
+  // traigo la validacion de SupervisionCamara a este componente
+  const segundosIntervalo = Number(intervalo);
+  const intervaloInvalido =
+    camaraHabilitada &&
+    (!/^\d+$/.test(intervalo) ||
+      segundosIntervalo < 30 ||
+      segundosIntervalo > 300);
+
   const updateRule = (index: number, changes: Partial<ReglaSupervision>) => {
     setRules((current) =>
       current.map((rule, ruleIndex) =>
@@ -113,6 +129,10 @@ function SupervisionPolicyEditor({
   async function save() {
     await mutation.mutateAsync({
       PantallaCompletaObligatoria: fullscreenRequired,
+      CapturasHabilitadas: camaraHabilitada,
+      IntervaloCapturasSegundos: camaraHabilitada
+        ? segundosIntervalo
+        : undefined,
       RevisionEsperada: policy.revision,
       Reglas: rules.map((rule) => ({
         Codigo: rule.codigo,
@@ -126,14 +146,6 @@ function SupervisionPolicyEditor({
       })),
     });
   }
-
-  // nuevas configuraciones para camara
-  const [camaraHabilitada, setCamaraHabilitada] = useState(
-    policy.capturasHabilitadas, // quitamos hardcodeado , ahora lo traemos de la api
-  );
-  const [intervalo, setIntervalo] = useState(
-    String(policy.intervaloCapturasSegundos),
-  );
 
   return (
     <section
@@ -166,6 +178,7 @@ function SupervisionPolicyEditor({
       <SupervisionCamara
         habilitado={camaraHabilitada}
         intervalo={intervalo}
+        intervaloInvalido={intervaloInvalido}
         onHabilitadoChange={setCamaraHabilitada}
         onIntervaloChange={setIntervalo}
       />
@@ -356,7 +369,7 @@ function SupervisionPolicyEditor({
       <div className="mt-5 flex justify-end">
         <button
           type="button"
-          disabled={invalid || mutation.isPending || camaraHabilitada}
+          disabled={invalid || mutation.isPending || intervaloInvalido}
           onClick={() => void save()}
           className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
         >
