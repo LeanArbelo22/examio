@@ -79,7 +79,7 @@ export function SupervisionPolicyPanel({
   }
   return (
     <SupervisionPolicyEditor
-      key={query.data.revision}
+      key={`${idPublicacion}:${query.data.revision}`}
       idPublicacion={idPublicacion}
       policy={query.data}
     />
@@ -128,8 +128,12 @@ function SupervisionPolicyEditor({
   }
 
   // nuevas configuraciones para camara
-  const [camaraHabilitada, setCamaraHabilitada] = useState(false);
-  const [intervalo, setIntervalo] = useState("60");
+  const [camaraHabilitada, setCamaraHabilitada] = useState(
+    policy.capturasHabilitadas, // quitamos hardcodeado , ahora lo traemos de la api
+  );
+  const [intervalo, setIntervalo] = useState(
+    String(policy.intervaloCapturasSegundos),
+  );
 
   return (
     <section
