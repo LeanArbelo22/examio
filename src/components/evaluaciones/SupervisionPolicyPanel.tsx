@@ -162,7 +162,7 @@ function SupervisionPolicyEditor({
           </h3>
           <p className="mt-1 max-w-3xl text-sm text-slate-600">
             Definí qué debe ocurrir ante determinados eventos durante el examen,
-            como salir de pantalla completa.
+            como salir de pantalla completa. Los cambios se aplican a los intentos que comiencen después de guardar.
           </p>
         </div>
         <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-800">

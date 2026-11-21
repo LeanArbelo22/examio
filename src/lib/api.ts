@@ -23,7 +23,7 @@ export interface ApiRequestInit extends RequestInit {
   timeoutMs?: number;
 }
 
-const DEFAULT_REQUEST_TIMEOUT_MS = 20_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 40_000;
 
 export class ApiError extends Error {
   constructor(
